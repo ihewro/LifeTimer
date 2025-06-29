@@ -7,9 +7,12 @@
 
 import Foundation
 import SwiftUI
+#if canImport(Cocoa)
 import Cocoa
+#endif
 
 /// 活动监控管理器 - 统一管理所有系统监控功能
+#if canImport(Cocoa)
 class ActivityMonitorManager: ObservableObject {
     @Published var isMonitoring = false
     @Published var hasPermissions = false
@@ -218,7 +221,58 @@ class ActivityMonitorManager: ObservableObject {
         }
     }
 }
+#endif
 
+#else
+// iOS版本的简化实现
+class ActivityMonitorManager: ObservableObject {
+    @Published var isMonitoring = false
+    @Published var hasPermissions = true
+    @Published var permissionStatus: PermissionStatus = .granted
+    
+    private let eventStore = SystemEventStore.shared
+    
+    enum PermissionStatus {
+        case unknown
+        case granted
+        case denied
+        case needsRequest
+    }
+    
+    init() {
+        // iOS上默认有权限
+        hasPermissions = true
+        permissionStatus = .granted
+    }
+    
+    func checkPermissions() {
+        hasPermissions = true
+        permissionStatus = .granted
+    }
+    
+    func requestPermissions() {
+        hasPermissions = true
+        permissionStatus = .granted
+    }
+    
+    func startMonitoring() {
+        isMonitoring = true
+        print("iOS上的活动监控功能已禁用")
+    }
+    
+    func stopMonitoring() {
+        isMonitoring = false
+        print("iOS上的活动监控功能已停止")
+    }
+    
+    func getProductivityScore() -> Double {
+        return 75.0 // 默认分数
+    }
+    
+    func getProductivityLevel() -> String {
+        return "iOS模式"
+    }
+}
 // MARK: - 权限管理扩展
 
 extension ActivityMonitorManager {

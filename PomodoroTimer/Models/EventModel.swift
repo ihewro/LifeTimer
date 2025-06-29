@@ -9,7 +9,16 @@ import Foundation
 import SwiftUI
 
 struct PomodoroEvent: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
+    
+    init(title: String, startTime: Date, endTime: Date, type: EventType, isCompleted: Bool = false) {
+        self.id = UUID()
+        self.title = title
+        self.startTime = startTime
+        self.endTime = endTime
+        self.type = type
+        self.isCompleted = isCompleted
+    }
     var title: String
     var startTime: Date
     var endTime: Date

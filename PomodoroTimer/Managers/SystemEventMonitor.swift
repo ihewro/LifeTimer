@@ -5,11 +5,14 @@
 //  Created by Assistant on 2024
 //
 
+#if canImport(Cocoa)
 import Cocoa
+#endif
 import Foundation
 import SwiftUI
 
 /// 系统事件监控器
+#if canImport(Cocoa)
 class SystemEventMonitor: ObservableObject {
     @Published var currentApp: String = ""
     @Published var isMonitoring = false
@@ -343,3 +346,37 @@ extension SystemEventMonitor {
         return host
     }
 }
+
+#else
+// iOS版本的简化实现
+class SystemEventMonitor: ObservableObject {
+    @Published var currentApp: String = "iOS App"
+    @Published var isMonitoring = false
+    @Published var hasAccessibilityPermission = false
+    
+    private let eventStore = SystemEventStore.shared
+    
+    init() {
+        // iOS上不需要辅助功能权限
+        hasAccessibilityPermission = true
+    }
+    
+    func startMonitoring() {
+        isMonitoring = true
+        print("iOS上的系统监控功能已禁用")
+    }
+    
+    func stopMonitoring() {
+        isMonitoring = false
+        print("iOS上的系统监控功能已停止")
+    }
+    
+    func checkAccessibilityPermission() {
+        hasAccessibilityPermission = true
+    }
+    
+    func requestAccessibilityPermission() {
+        hasAccessibilityPermission = true
+    }
+}
+#endif

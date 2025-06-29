@@ -7,15 +7,40 @@
 
 import SwiftUI
 
+
+
 struct SettingsView: View {
     @EnvironmentObject var timerModel: TimerModel
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var eventManager: EventManager
     
     var body: some View {
+        TabView {
+            timerSettingsView
+                .tabItem {
+                    Label("时间设置", systemImage: "timer")
+                }
+            
+            audioSettingsView
+                .tabItem {
+                    Label("音频设置", systemImage: "speaker.wave.2")
+                }
+            
+            statisticsView
+                .tabItem {
+                    Label("统计信息", systemImage: "chart.bar")
+                }
+            
+            aboutView
+                .tabItem {
+                    Label("关于应用", systemImage: "info.circle")
+                }
+        }
+    }
+    
+    private var timerSettingsView: some View {
         NavigationView {
             List {
-                // 时间设置
                 Section("时间设置") {
                     TimeSettingRow(
                         title: "番茄时间",
@@ -41,8 +66,14 @@ struct SettingsView: View {
                         )
                     )
                 }
-                
-                // 音频设置
+            }
+            .navigationTitle("时间设置")
+        }
+    }
+    
+    private var audioSettingsView: some View {
+        NavigationSplitView {
+            List {
                 Section("音频设置") {
                     // BGM文件夹路径
                     VStack(alignment: .leading, spacing: 8) {
@@ -90,8 +121,17 @@ struct SettingsView: View {
                         }
                     }
                 }
-                
-                // 统计信息
+            }
+            .navigationTitle("音频设置")
+        } detail: {
+            Text("选择左侧的音乐列表查看详情")
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var statisticsView: some View {
+        NavigationSplitView {
+            List {
                 Section("统计信息") {
                     StatisticRow(
                         title: "今日完成番茄",
@@ -108,9 +148,18 @@ struct SettingsView: View {
                             .environmentObject(eventManager)
                     }
                 }
-                
-                // 应用信息
-                Section("关于") {
+            }
+            .navigationTitle("统计信息")
+        } detail: {
+            Text("选择左侧的详细统计查看更多信息")
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var aboutView: some View {
+        NavigationView {
+            List {
+                Section("关于应用") {
                     HStack {
                         Text("版本")
                         Spacer()
@@ -118,15 +167,17 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Link("反馈建议", destination: URL(string: "mailto:feedback@example.com")!)
+                    Button("反馈建议") {
+                        // 打开邮件或反馈页面
+                    }
                     
-                    Button("重置所有数据") {
-                        // 重置数据的确认对话框
+                    Button("重置数据") {
+                        // 重置所有数据
                     }
                     .foregroundColor(.red)
                 }
             }
-            .navigationTitle("设置")
+            .navigationTitle("关于应用")
         }
     }
     
