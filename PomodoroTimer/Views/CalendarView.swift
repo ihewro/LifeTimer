@@ -41,40 +41,38 @@ struct CalendarView: View {
     private let calendar = Calendar.current
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // 顶部工具栏
-                CalendarToolbar(
-                    selectedDate: $selectedDate,
-                    viewMode: $currentViewMode,
-                    showingAddEvent: $showingAddEvent
-                )
-                
-                // 主要内容区域
-                switch currentViewMode {
-                case .day:
-                    DayView(
-                        selectedDate: $selectedDate,
-                        selectedEvent: $selectedEvent,
-                        showingAddEvent: $showingAddEvent,
-                        draggedEvent: $draggedEvent,
-                        dragOffset: $dragOffset
-                    )
-                    .environmentObject(eventManager)
-                    
-                case .week:
-                    WeekView(selectedDate: $selectedDate)
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
+        VStack(spacing: 0) {
+            // 顶部工具栏
+            CalendarToolbar(
+                selectedDate: $selectedDate,
+                viewMode: $currentViewMode,
+                showingAddEvent: $showingAddEvent
+            )
 
-                case .month:
-                    MonthView(selectedDate: $selectedDate)
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
-                }
+            // 主要内容区域
+            switch currentViewMode {
+            case .day:
+                DayView(
+                    selectedDate: $selectedDate,
+                    selectedEvent: $selectedEvent,
+                    showingAddEvent: $showingAddEvent,
+                    draggedEvent: $draggedEvent,
+                    dragOffset: $dragOffset
+                )
+                .environmentObject(eventManager)
+
+            case .week:
+                WeekView(selectedDate: $selectedDate)
+                    .environmentObject(eventManager)
+                    .environmentObject(activityMonitor)
+
+            case .month:
+                MonthView(selectedDate: $selectedDate)
+                    .environmentObject(eventManager)
+                    .environmentObject(activityMonitor)
             }
-            .navigationTitle("日历")
         }
+        .navigationTitle("日历")
         .sheet(isPresented: $showingAddEvent) {
             EventEditView(event: PomodoroEvent(
                 title: "新事件",

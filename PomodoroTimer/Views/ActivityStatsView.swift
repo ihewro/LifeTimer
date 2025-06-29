@@ -15,58 +15,56 @@ struct ActivityStatsView: View {
     @State private var showingSettings = false
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // 顶部状态栏
-                statusBar
-                
-                // 日期选择器
-                DatePicker("选择日期", selection: $selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                    .padding(.horizontal)
-                
-                // 标签页
-                TabView(selection: $selectedTab) {
-                    overviewTab
-                        .tabItem {
-                            Image(systemName: "chart.pie")
-                            Text("概览")
-                        }
-                        .tag(0)
-                    
-                    appStatsTab
-                        .tabItem {
-                            Image(systemName: "app.badge")
-                            Text("应用")
-                        }
-                        .tag(1)
-                    
-                    websiteStatsTab
-                        .tabItem {
-                            Image(systemName: "globe")
-                            Text("网站")
-                        }
-                        .tag(2)
-                    
-                    productivityTab
-                        .tabItem {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                            Text("生产力")
-                        }
-                        .tag(3)
-                }
-            }
-            .navigationTitle("活动统计")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: { showingSettings = true }) {
-                        Image(systemName: "gear")
+        VStack(spacing: 0) {
+            // 顶部状态栏
+            statusBar
+
+            // 日期选择器
+            DatePicker("选择日期", selection: $selectedDate, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .padding(.horizontal)
+
+            // 标签页
+            TabView(selection: $selectedTab) {
+                overviewTab
+                    .tabItem {
+                        Image(systemName: "chart.pie")
+                        Text("概览")
                     }
+                    .tag(0)
+
+                appStatsTab
+                    .tabItem {
+                        Image(systemName: "app.badge")
+                        Text("应用")
+                    }
+                    .tag(1)
+
+                websiteStatsTab
+                    .tabItem {
+                        Image(systemName: "globe")
+                        Text("网站")
+                    }
+                    .tag(2)
+
+                productivityTab
+                    .tabItem {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                        Text("生产力")
+                    }
+                    .tag(3)
+            }
+        }
+        .navigationTitle("活动统计")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { showingSettings = true }) {
+                    Image(systemName: "gear")
                 }
             }
-            .sheet(isPresented: $showingSettings) {
-                ActivitySettingsView(activityMonitor: activityMonitor)
-            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            ActivitySettingsView(activityMonitor: activityMonitor)
         }
     }
     

@@ -39,146 +39,132 @@ struct SettingsView: View {
     }
     
     private var timerSettingsView: some View {
-        NavigationView {
-            List {
-                Section("时间设置") {
-                    TimeSettingRow(
-                        title: "番茄时间",
-                        time: Binding(
-                            get: { timerModel.pomodoroTime },
-                            set: { timerModel.pomodoroTime = $0 }
-                        )
+        List {
+            Section("时间设置") {
+                TimeSettingRow(
+                    title: "番茄时间",
+                    time: Binding(
+                        get: { timerModel.pomodoroTime },
+                        set: { timerModel.pomodoroTime = $0 }
                     )
-                    
-                    TimeSettingRow(
-                        title: "短休息",
-                        time: Binding(
-                            get: { timerModel.shortBreakTime },
-                            set: { timerModel.shortBreakTime = $0 }
-                        )
+                )
+
+                TimeSettingRow(
+                    title: "短休息",
+                    time: Binding(
+                        get: { timerModel.shortBreakTime },
+                        set: { timerModel.shortBreakTime = $0 }
                     )
-                    
-                    TimeSettingRow(
-                        title: "长休息",
-                        time: Binding(
-                            get: { timerModel.longBreakTime },
-                            set: { timerModel.longBreakTime = $0 }
-                        )
+                )
+
+                TimeSettingRow(
+                    title: "长休息",
+                    time: Binding(
+                        get: { timerModel.longBreakTime },
+                        set: { timerModel.longBreakTime = $0 }
                     )
-                }
+                )
             }
-            .navigationTitle("时间设置")
         }
+        .navigationTitle("时间设置")
     }
     
     private var audioSettingsView: some View {
-        NavigationSplitView {
-            List {
-                Section("音频设置") {
-                    // BGM文件夹路径
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("BGM文件夹")
-                            Spacer()
-                            Button("选择") {
-                                audioManager.selectBGMFolder()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+        List {
+            Section("音频设置") {
+                // BGM文件夹路径
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("BGM文件夹")
+                        Spacer()
+                        Button("选择") {
+                            audioManager.selectBGMFolder()
                         }
-                        
-                        if !audioManager.bgmFolderPath.isEmpty {
-                            Text(audioManager.bgmFolderPath)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    
-                    // 音量控制
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("音量")
-                            Spacer()
-                            Text("\(Int(audioManager.volume * 100))%")
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Slider(
-                            value: Binding(
-                                get: { audioManager.volume },
-                                set: { audioManager.setVolume($0) }
-                            ),
-                            in: 0...1
-                        )
+
+                    if !audioManager.bgmFolderPath.isEmpty {
+                        Text(audioManager.bgmFolderPath)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
                     }
-                    
-                    // 音乐列表
-                    if !audioManager.tracks.isEmpty {
-                        NavigationLink("音乐列表 (\(audioManager.tracks.count)首)") {
-                            MusicListView()
-                                .environmentObject(audioManager)
-                        }
+                }
+
+                // 音量控制
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("音量")
+                        Spacer()
+                        Text("\(Int(audioManager.volume * 100))%")
+                            .foregroundColor(.secondary)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { audioManager.volume },
+                            set: { audioManager.setVolume($0) }
+                        ),
+                        in: 0...1
+                    )
+                }
+
+                // 音乐列表
+                if !audioManager.tracks.isEmpty {
+                    NavigationLink("音乐列表 (\(audioManager.tracks.count)首)") {
+                        MusicListView()
+                            .environmentObject(audioManager)
                     }
                 }
             }
-            .navigationTitle("音频设置")
-        } detail: {
-            Text("选择左侧的音乐列表查看详情")
-                .foregroundColor(.secondary)
         }
+        .navigationTitle("音频设置")
     }
     
     private var statisticsView: some View {
-        NavigationSplitView {
-            List {
-                Section("统计信息") {
-                    StatisticRow(
-                        title: "今日完成番茄",
-                        value: "\(eventManager.completedPomodorosToday())个"
-                    )
-                    
-                    StatisticRow(
-                        title: "今日专注时间",
-                        value: formatTotalTime(eventManager.totalFocusTimeToday())
-                    )
-                    
-                    NavigationLink("查看详细统计") {
-                        StatisticsView()
-                            .environmentObject(eventManager)
-                    }
+        List {
+            Section("统计信息") {
+                StatisticRow(
+                    title: "今日完成番茄",
+                    value: "\(eventManager.completedPomodorosToday())个"
+                )
+
+                StatisticRow(
+                    title: "今日专注时间",
+                    value: formatTotalTime(eventManager.totalFocusTimeToday())
+                )
+
+                NavigationLink("查看详细统计") {
+                    StatisticsView()
+                        .environmentObject(eventManager)
                 }
             }
-            .navigationTitle("统计信息")
-        } detail: {
-            Text("选择左侧的详细统计查看更多信息")
-                .foregroundColor(.secondary)
         }
+        .navigationTitle("统计信息")
     }
     
     private var aboutView: some View {
-        NavigationView {
-            List {
-                Section("关于应用") {
-                    HStack {
-                        Text("版本")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Button("反馈建议") {
-                        // 打开邮件或反馈页面
-                    }
-                    
-                    Button("重置数据") {
-                        // 重置所有数据
-                    }
-                    .foregroundColor(.red)
+        List {
+            Section("关于应用") {
+                HStack {
+                    Text("版本")
+                    Spacer()
+                    Text("1.0.0")
+                        .foregroundColor(.secondary)
                 }
+
+                Button("反馈建议") {
+                    // 打开邮件或反馈页面
+                }
+
+                Button("重置数据") {
+                    // 重置所有数据
+                }
+                .foregroundColor(.red)
             }
-            .navigationTitle("关于应用")
         }
+        .navigationTitle("关于应用")
     }
     
     private func formatTotalTime(_ timeInterval: TimeInterval) -> String {

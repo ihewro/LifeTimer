@@ -20,40 +20,38 @@ struct ActivitySettingsView: View {
     private let dataRetentionOptions = [7, 14, 30, 60, 90, 180]
     
     var body: some View {
-        NavigationView {
-            Form {
-                // 监控状态部分
-                Section("监控状态") {
-                    monitoringStatusView
-                    permissionStatusView
-                }
-                
-                // 权限管理部分
-                Section("权限管理") {
-                    permissionManagementView
-                }
-                
-                // 数据管理部分
-                Section("数据管理") {
-                    dataManagementView
-                }
-                
-                // 隐私设置部分
-                Section("隐私设置") {
-                    privacySettingsView
-                }
-                
-                // 关于部分
-                Section("关于") {
-                    aboutView
-                }
+        Form {
+            // 监控状态部分
+            Section("监控状态") {
+                monitoringStatusView
+                permissionStatusView
             }
-            .navigationTitle("活动监控设置")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("完成") {
-                        dismiss()
-                    }
+
+            // 权限管理部分
+            Section("权限管理") {
+                permissionManagementView
+            }
+
+            // 数据管理部分
+            Section("数据管理") {
+                dataManagementView
+            }
+
+            // 隐私设置部分
+            Section("隐私设置") {
+                privacySettingsView
+            }
+
+            // 关于部分
+            Section("关于") {
+                aboutView
+            }
+        }
+        .navigationTitle("活动监控设置")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("完成") {
+                    dismiss()
                 }
             }
         }
@@ -381,30 +379,28 @@ struct ExportDataView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                Text(data)
-                    .font(.system(.caption, design: .monospaced))
-                    .padding()
-                    .textSelection(.enabled)
-            }
-            .navigationTitle("导出数据")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") {
-                        dismiss()
-                    }
+        ScrollView {
+            Text(data)
+                .font(.system(.caption, design: .monospaced))
+                .padding()
+                .textSelection(.enabled)
+        }
+        .navigationTitle("导出数据")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("关闭") {
+                    dismiss()
                 }
-                
-                ToolbarItem(placement: .primaryAction) {
-                    Button("复制") {
-                        #if canImport(Cocoa)
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(data, forType: .string)
-                        #else
-                        UIPasteboard.general.string = data
-                        #endif
-                    }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("复制") {
+                    #if canImport(Cocoa)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(data, forType: .string)
+                    #else
+                    UIPasteboard.general.string = data
+                    #endif
                 }
             }
         }
