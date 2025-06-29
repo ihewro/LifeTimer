@@ -14,7 +14,7 @@ struct ActivitySettingsView: View {
     
     @State private var showingClearDataAlert = false
     @State private var showingExportSheet = false
-    @State private var exportedData: String = ""
+    @State private var exportedData: Data? = nil
     @State private var selectedDataRetentionDays = 30
     
     private let dataRetentionOptions = [7, 14, 30, 60, 90, 180]
@@ -66,7 +66,11 @@ struct ActivitySettingsView: View {
             Text("此操作将永久删除所有活动监控数据，无法恢复。")
         }
         .sheet(isPresented: $showingExportSheet) {
-            ExportDataView(data: exportedData)
+            if let data = exportedData, let string = String(data: data, encoding: .utf8) {
+                ExportDataView(data: string)
+            } else {
+                ExportDataView(data: "导出失败")
+            }
         }
     }
     
@@ -311,7 +315,11 @@ struct PermissionRow: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(8)
     }
 }
@@ -390,8 +398,12 @@ struct ExportDataView: View {
                 
                 ToolbarItem(placement: .primaryAction) {
                     Button("复制") {
+                        #if canImport(Cocoa)
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(data, forType: .string)
+                        #else
+                        UIPasteboard.general.string = data
+                        #endif
                     }
                 }
             }

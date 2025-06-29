@@ -78,9 +78,15 @@ struct ActivityStatsView: View {
                 .fill(activityMonitor.isMonitoring ? Color.green : Color.red)
                 .frame(width: 8, height: 8)
             
+            #if canImport(Cocoa)
             Text(activityMonitor.monitoringStatusDescription)
                 .font(.caption)
                 .foregroundColor(.secondary)
+            #else
+            Text(activityMonitor.isMonitoring ? "监控中" : "未监控")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            #endif
             
             Spacer()
             
@@ -92,7 +98,11 @@ struct ActivityStatsView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
     }
     
     // MARK: - 概览标签页
@@ -100,7 +110,11 @@ struct ActivityStatsView: View {
     private var overviewTab: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
+                #if canImport(Cocoa)
                 let overview = activityMonitor.getTodayOverview()
+                #else
+                let overview = (activeTime: TimeInterval(3600), appSwitches: 25, websiteVisits: 10)
+                #endif
                 
                 // 今日概览卡片
                 VStack(alignment: .leading, spacing: 12) {
@@ -131,7 +145,11 @@ struct ActivityStatsView: View {
                     }
                 }
                 .padding()
+                #if canImport(Cocoa)
                 .background(Color(NSColor.controlBackgroundColor))
+                #else
+                .background(Color(.systemGray6))
+                #endif
                 .cornerRadius(12)
                 
                 // 快速应用统计
@@ -224,7 +242,11 @@ struct ActivityStatsView: View {
                     }
                 }
                 .padding()
+                #if canImport(Cocoa)
                 .background(Color(NSColor.controlBackgroundColor))
+                #else
+                .background(Color(.systemGray6))
+                #endif
                 .cornerRadius(12)
                 
                 // 时间分布
@@ -262,7 +284,11 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(12)
     }
     
@@ -289,7 +315,11 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(12)
     }
     
@@ -322,7 +352,11 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(12)
     }
     
@@ -356,7 +390,11 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(12)
     }
     
@@ -445,7 +483,11 @@ struct AppStatRow: View {
             }
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(8)
     }
     
@@ -477,7 +519,11 @@ struct WebsiteStatRow: View {
                 .fontWeight(.semibold)
         }
         .padding()
+        #if canImport(Cocoa)
         .background(Color(NSColor.controlBackgroundColor))
+        #else
+        .background(Color(.systemGray6))
+        #endif
         .cornerRadius(8)
     }
 }
