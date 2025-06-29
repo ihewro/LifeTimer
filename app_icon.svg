@@ -1,0 +1,30 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="512" cy="512" r="512" fill="#FF6B6B"/>
+  
+  <!-- 番茄形状 -->
+  <ellipse cx="512" cy="550" rx="280" ry="320" fill="#FF4757"/>
+  
+  <!-- 番茄顶部凹陷 -->
+  <ellipse cx="512" cy="280" rx="100" ry="40" fill="#FF3742"/>
+  
+  <!-- 番茄叶子 -->
+  <path d="M 450 250 Q 420 200 380 220 Q 400 240 430 260 Q 460 270 450 250" fill="#2ED573"/>
+  <path d="M 570 240 Q 600 190 640 210 Q 620 230 590 250 Q 560 260 570 240" fill="#2ED573"/>
+  
+  <!-- 计时器指针 -->
+  <circle cx="512" cy="550" r="200" fill="none" stroke="#FFFFFF" stroke-width="8" opacity="0.3"/>
+  
+  <!-- 时钟指针 -->
+  <line x1="512" y1="550" x2="512" y2="400" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  <line x1="512" y1="550" x2="600" y2="550" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- 中心点 -->
+  <circle cx="512" cy="550" r="20" fill="#FFFFFF"/>
+  
+  <!-- 时间刻度 -->
+  <circle cx="512" cy="350" r="8" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="662" cy="550" r="8" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="512" cy="750" r="8" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="362" cy="550" r="8" fill="#FFFFFF" opacity="0.8"/>
+</svg>
