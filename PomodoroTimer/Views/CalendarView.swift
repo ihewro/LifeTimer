@@ -192,40 +192,44 @@ struct DayView: View {
     @Binding var draggedEvent: PomodoroEvent?
     @Binding var dragOffset: CGSize
     @EnvironmentObject var eventManager: EventManager
-    
     private let calendar = Calendar.current
     private let hourHeight: CGFloat = 60
     
     var body: some View {
-        HStack(spacing: 0) {
-            // 左侧时间轴区域
-            TimelineView(
-                selectedDate: selectedDate,
-                selectedEvent: $selectedEvent,
-                showingAddEvent: $showingAddEvent,
-                draggedEvent: $draggedEvent,
-                dragOffset: $dragOffset,
-                hourHeight: hourHeight
-            )
-            .environmentObject(eventManager)
-            .frame(maxWidth: .infinity)
-            
-            // 右侧面板
-            VStack(spacing: 0) {
-                // 上方：小日历选择器
-                MiniCalendarView(selectedDate: $selectedDate)
-                    .frame(height: 300)
-                    .padding()
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                // 左侧时间轴区域
+                TimelineView(
+                    selectedDate: selectedDate,
+                    selectedEvent: $selectedEvent,
+                    showingAddEvent: $showingAddEvent,
+                    draggedEvent: $draggedEvent,
+                    dragOffset: $dragOffset,
+                    hourHeight: hourHeight
+                )
+                .environmentObject(eventManager)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
-                Divider()
-                
-                // 下方：事件详情
-                EventDetailPanel(selectedEvent: $selectedEvent)
-                    .environmentObject(eventManager)
-                    .frame(maxHeight: .infinity)
+                // 右侧面板
+                VStack(spacing: 0) {
+                    MiniCalendarView(selectedDate: $selectedDate)
+                        .frame(height: 300)
+                        .padding()
+                    Divider()
+                    EventDetailPanel(selectedEvent: $selectedEvent)
+                        .environmentObject(eventManager)
+                        .frame(maxHeight: .infinity)
+                }
+                .frame(width: 300)
+                .background {
+                    #if os(iOS)
+                    Color(.systemGray6)
+                    #else
+                    Color(NSColor.windowBackgroundColor)
+                    #endif
+                }
             }
-            .frame(width: 300)
-            .background(Color.gray.opacity(0.1))
+            .frame(width: geo.size.width, height: geo.size.height)
         }
     }
 }
@@ -250,7 +254,12 @@ struct TimelineView: View {
     private var eventsForDay: [PomodoroEvent] {
         eventManager.eventsForDate(selectedDate)
     }
-    
+
+    // 新增：计算事件并列排布信息
+    private var eventLayoutInfo: [(event: PomodoroEvent, column: Int, totalColumns: Int)] {
+        computeEventColumns(events: eventsForDay)
+    }
+
     var body: some View {
         ScrollView {
             ZStack(alignment: .topLeading) {
@@ -273,15 +282,18 @@ struct TimelineView: View {
                     }
                 }
                 
-                // 事件块
-                ForEach(eventsForDay) { event in
+                // 事件块（并列排布）
+                ForEach(eventLayoutInfo, id: \.0.id) { info in
+                    let (event, column, totalColumns) = info
                     EventBlock(
                         event: event,
                         selectedEvent: $selectedEvent,
                         draggedEvent: $draggedEvent,
                         dragOffset: $dragOffset,
                         hourHeight: hourHeight,
-                        selectedDate: selectedDate
+                        selectedDate: selectedDate,
+                        column: column,
+                        totalColumns: totalColumns
                     )
                 }
                 
@@ -307,23 +319,59 @@ struct TimelineView: View {
                 }
         )
     }
+
+    // --- 新增：事件并列排布算法 ---
+    private func computeEventColumns(events: [PomodoroEvent]) -> [(PomodoroEvent, Int, Int)] {
+        // 按开始时间排序
+        let sorted = events.sorted { $0.startTime < $1.startTime }
+        var result: [(PomodoroEvent, Int, Int)] = []
+        var active: [(PomodoroEvent, Int)] = [] // (event, column)
+        for event in sorted {
+            // 移除已结束的事件
+            active.removeAll { $0.0.endTime <= event.startTime }
+            // 查找可用列
+            let usedColumns = Set(active.map { $0.1 })
+            var col = 0
+            while usedColumns.contains(col) { col += 1 }
+            active.append((event, col))
+            // 计算当前重叠的总列数
+            let overlapCount = active.count
+            result.append((event, col, overlapCount))
+        }
+        // 由于每个事件的 totalColumns 需要是与其重叠区间的最大 overlapCount，需再遍历修正
+        var eventToMaxCol: [UUID: Int] = [:]
+        for (event, _, _) in result {
+            let overlapping = result.filter {
+                $0.0.startTime < event.endTime && $0.0.endTime > event.startTime
+            }
+            let maxCol = overlapping.map { $0.2 }.max() ?? 1
+            eventToMaxCol[event.id] = maxCol
+        }
+        return result.map { (event, col, _) in
+            (event, col, eventToMaxCol[event.id] ?? 1)
+        }
+    }
+    // --- END ---
     
     private func createEventFromSelection() {
         guard let start = selectionStart, let end = selectionEnd else { return }
-        
-        let startHour = max(0, min(23, Int(start.y / hourHeight)))
-        let endHour = max(startHour + 1, min(24, Int(end.y / hourHeight) + 1))
-        
-        let startTime = calendar.date(bySettingHour: startHour, minute: 0, second: 0, of: selectedDate) ?? selectedDate
-        let endTime = calendar.date(bySettingHour: endHour, minute: 0, second: 0, of: selectedDate) ?? selectedDate
-        
+        // 支持分钟级别
+        let startY = min(start.y, end.y)
+        let endY = max(start.y, end.y)
+        let totalMinutesStart = max(0, min(24*60-1, Int(startY / hourHeight * 60)))
+        let totalMinutesEnd = max(totalMinutesStart+1, min(24*60, Int(endY / hourHeight * 60)))
+        let startHour = totalMinutesStart / 60
+        let startMinute = totalMinutesStart % 60
+        let endHour = totalMinutesEnd / 60
+        let endMinute = totalMinutesEnd % 60
+        let startTime = calendar.date(bySettingHour: startHour, minute: startMinute, second: 0, of: selectedDate) ?? selectedDate
+        let endTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: selectedDate) ?? selectedDate
         let newEvent = PomodoroEvent(
             title: "新事件",
             startTime: startTime,
             endTime: endTime,
             type: PomodoroEvent.EventType.custom
         )
-        
         eventManager.addEvent(newEvent)
         selectedEvent = newEvent
     }
@@ -343,26 +391,26 @@ struct EventBlock: View {
     @Binding var dragOffset: CGSize
     let hourHeight: CGFloat
     let selectedDate: Date
-    
+    var column: Int = 0
+    var totalColumns: Int = 1
     @EnvironmentObject var eventManager: EventManager
     private let calendar = Calendar.current
-    
     private var eventPosition: (y: CGFloat, height: CGFloat) {
         let startHour = calendar.component(.hour, from: event.startTime)
         let startMinute = calendar.component(.minute, from: event.startTime)
         let endHour = calendar.component(.hour, from: event.endTime)
         let endMinute = calendar.component(.minute, from: event.endTime)
-        
         let startY = CGFloat(startHour) * hourHeight + CGFloat(startMinute) * hourHeight / 60
         let endY = CGFloat(endHour) * hourHeight + CGFloat(endMinute) * hourHeight / 60
         let height = endY - startY
-        
         return (startY, max(20, height))
     }
-    
     var body: some View {
         let position = eventPosition
-        
+        let blockWidth: CGFloat = 180 // 单列宽度
+        let gap: CGFloat = 8
+        let width = (blockWidth - gap * CGFloat(totalColumns - 1)) / CGFloat(totalColumns)
+        let x = 100 + CGFloat(column) * (width + gap)
         RoundedRectangle(cornerRadius: 6)
             .fill(event.type.color.opacity(0.8))
             .overlay(
@@ -372,7 +420,6 @@ struct EventBlock: View {
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                         .lineLimit(2)
-                    
                     Text(event.formattedTimeRange)
                         .font(.caption2)
                         .foregroundColor(.white.opacity(0.8))
@@ -380,19 +427,28 @@ struct EventBlock: View {
                 .padding(4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             )
-            .frame(height: position.height)
-            .position(x: 100, y: position.y + position.height / 2)
+            .frame(width: width, height: position.height)
+            .position(x: x + width / 2, y: position.y + position.height / 2)
             .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
             .scaleEffect(selectedEvent?.id == event.id ? 1.05 : 1.0)
             .shadow(radius: selectedEvent?.id == event.id ? 4 : 2)
             .onTapGesture {
                 selectedEvent = event
             }
+            .contextMenu {
+                Button(role: .destructive) {
+                    eventManager.removeEvent(event)
+                    if selectedEvent?.id == event.id { selectedEvent = nil }
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
             .gesture(
                 DragGesture()
                     .onChanged { value in
                         draggedEvent = event
                         dragOffset = value.translation
+                        selectedEvent = event // 拖动时高亮选中
                     }
                     .onEnded { value in
                         updateEventTime(with: value.translation)
@@ -401,18 +457,16 @@ struct EventBlock: View {
                     }
             )
     }
-    
     private func updateEventTime(with translation: CGSize) {
-        let hourChange = Int(translation.height / hourHeight)
-        guard let newStartTime = calendar.date(byAdding: .hour, value: hourChange, to: event.startTime),
-              let newEndTime = calendar.date(byAdding: .hour, value: hourChange, to: event.endTime) else {
+        // 支持分钟级别
+        let minuteChange = Int(translation.height / hourHeight * 60)
+        guard let newStartTime = calendar.date(byAdding: .minute, value: minuteChange, to: event.startTime),
+              let newEndTime = calendar.date(byAdding: .minute, value: minuteChange, to: event.endTime) else {
             return
         }
-        
         var updatedEvent = event
         updatedEvent.startTime = newStartTime
         updatedEvent.endTime = newEndTime
-        
         eventManager.updateEvent(updatedEvent)
     }
 }
@@ -582,91 +636,99 @@ struct MiniDayCell: View {
 struct EventDetailPanel: View {
     @Binding var selectedEvent: PomodoroEvent?
     @EnvironmentObject var eventManager: EventManager
-    
+    @State private var editSuccessFlag = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let event = selectedEvent {
                 // 事件详情编辑
-                EventEditView(event: event)
-                    .environmentObject(eventManager)
+                EventEditView(event: event, onSave: {
+                    // 保存后刷新右侧面板
+                    editSuccessFlag.toggle()
+                }, onDelete: {
+                    // 删除后自动回到未选中
+                    selectedEvent = nil
+                })
+                .id(event.id) // 保证切换事件时刷新
+                .environmentObject(eventManager)
             } else {
                 // 空状态
-                VStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.largeTitle)
+                VStack(spacing: 16) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    
-                    Text("选择或创建事件")
-                        .font(.headline)
+                    Text("未选中事件")
+                        .font(.title3)
                         .foregroundColor(.secondary)
-                    
-                    Text("点击时间轴上的事件查看详情，或拖拽选择时间段创建新事件")
-                        .font(.caption)
+                    Text("请在左侧时间轴点击事件，或拖拽新建事件后在此编辑详情")
+                        .font(.callout)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+#if os(iOS)
+                .background(Color(.systemGray6))
+#else
+                .background(Color(NSColor.windowBackgroundColor))
+#endif
+                .cornerRadius(12)
             }
         }
         .padding()
+#if os(iOS)
+        .background(Color(.systemBackground))
+#else
+        .background(Color(NSColor.controlBackgroundColor))
+#endif
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
     }
 }
 
 // MARK: - 事件编辑视图
 struct EventEditView: View {
     let event: PomodoroEvent
+    var onSave: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
     @EnvironmentObject var eventManager: EventManager
-    
     @State private var title: String
     @State private var startTime: Date
     @State private var endTime: Date
     @State private var eventType: PomodoroEvent.EventType
     @State private var showingDeleteAlert = false
-    
-    init(event: PomodoroEvent) {
+    init(event: PomodoroEvent, onSave: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
         self.event = event
+        self.onSave = onSave
+        self.onDelete = onDelete
         self._title = State(initialValue: event.title)
         self._startTime = State(initialValue: event.startTime)
         self._endTime = State(initialValue: event.endTime)
         self._eventType = State(initialValue: event.type)
     }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // 标题
             Text("事件详情")
                 .font(.headline)
                 .fontWeight(.semibold)
-            
-            // 事件标题
             VStack(alignment: .leading, spacing: 4) {
                 Text("标题")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
                 TextField("事件标题", text: $title)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
             }
-            
-            // 时间设置
             VStack(alignment: .leading, spacing: 8) {
                 Text("时间")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
                 DatePicker("开始时间", selection: $startTime, displayedComponents: [.hourAndMinute])
                     .datePickerStyle(CompactDatePickerStyle())
-                
                 DatePicker("结束时间", selection: $endTime, displayedComponents: [.hourAndMinute])
                     .datePickerStyle(CompactDatePickerStyle())
             }
-            
-            // 事件类型
             VStack(alignment: .leading, spacing: 4) {
                 Text("类型")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
                 Picker("事件类型", selection: $eventType) {
                     ForEach(["番茄时间", "短休息", "长休息", "自定义"], id: \.self) { (typeName: String) in
                         Text(typeName)
@@ -675,17 +737,14 @@ struct EventEditView: View {
                 }
                 .pickerStyle(MenuPickerStyle())
             }
-            
             Spacer()
-            
-            // 操作按钮
             VStack(spacing: 8) {
                 Button("保存更改") {
                     saveChanges()
+                    onSave?()
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
-                
                 Button("删除事件") {
                     showingDeleteAlert = true
                 }
@@ -698,12 +757,12 @@ struct EventEditView: View {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
                 eventManager.removeEvent(event)
+                onDelete?()
             }
         } message: {
             Text("确定要删除这个事件吗？此操作无法撤销。")
         }
     }
-    
     private func getEventType(from typeName: String) -> PomodoroEvent.EventType {
         switch typeName {
         case "番茄时间": return .pomodoro
@@ -713,14 +772,12 @@ struct EventEditView: View {
         default: return .custom
         }
     }
-    
     private func saveChanges() {
         var updatedEvent = event
         updatedEvent.title = title
         updatedEvent.startTime = startTime
         updatedEvent.endTime = endTime
         updatedEvent.type = eventType
-        
         eventManager.updateEvent(updatedEvent)
     }
 }
