@@ -60,16 +60,19 @@ struct CalendarView: View {
                     dragOffset: $dragOffset
                 )
                 .environmentObject(eventManager)
+                .background(Color.white)
 
             case .week:
                 WeekView(selectedDate: $selectedDate)
                     .environmentObject(eventManager)
                     .environmentObject(activityMonitor)
+                    .background(Color.white)
 
             case .month:
                 MonthView(selectedDate: $selectedDate)
                     .environmentObject(eventManager)
                     .environmentObject(activityMonitor)
+                    .background(Color.white)
             }
         }
         .navigationTitle("日历")
@@ -79,7 +82,11 @@ struct CalendarView: View {
                 startTime: selectedDate,
                 endTime: Calendar.current.date(byAdding: .hour, value: 1, to: selectedDate) ?? selectedDate,
                 type: .custom
-            ))
+            ), onSave: { _ in
+                showingAddEvent = false
+            }, onDelete: {
+                showingAddEvent = false
+            })
                 .environmentObject(eventManager)
         }
     }
@@ -100,36 +107,17 @@ struct CalendarToolbar: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // 简化的工具栏：只保留日期文字、今天按钮和添加事件按钮
             HStack {
-                // 日期显示（只保留文字，删除左右切换按钮）
+                // 左侧：日期显示
                 Text(formattedDateTitle)
                     .font(.title2)
                     .fontWeight(.semibold)
 
                 Spacer()
 
-                // 今天按钮和添加事件按钮
+                // 右侧：功能按钮
                 HStack(spacing: 12) {
-                    // 今天按钮
-                    Button(action: goToToday) {
-                        Text("今天")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.blue, lineWidth: 1)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(isToday ? Color.blue.opacity(0.1) : Color.clear)
-                                    )
-                            )
-                    }
-                    .disabled(isToday)
-
-                    // 视图模式切换（保留功能但移除"视图模式"标签）
+                    // 视图模式切换
                     Picker("", selection: $viewMode) {
                         ForEach(CalendarViewMode.allCases, id: \.self) { mode in
                             Text(mode.rawValue).tag(mode)
@@ -176,6 +164,30 @@ struct CalendarToolbar: View {
     /// 跳转到今天
     private func goToToday() {
         selectedDate = Date()
+    }
+
+    /// 上一个时间段
+    private func previousPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        }
+    }
+
+    /// 下一个时间段
+    private func nextPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
+        }
     }
 
     /// 检查当前选中的日期是否是今天
@@ -226,7 +238,7 @@ struct DayView: View {
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
                     MiniCalendarView(selectedDate: $selectedDate)
-                        .frame(height: 300)
+                        .frame(height: 250)
                         .padding()
                     Divider()
                     EventDetailPanel(selectedEvent: $selectedEvent)
@@ -234,15 +246,7 @@ struct DayView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(
-                    Group {
-                        #if os(iOS)
-                        Color(.systemGray6)
-                        #else
-                        Color(NSColor.windowBackgroundColor)
-                        #endif
-                    }
-                )
+                .background(.regularMaterial, in: Rectangle())
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -463,6 +467,7 @@ struct EventBlock: View {
     var totalColumns: Int = 1
     let containerWidth: CGFloat // 新增：容器宽度参数
     @EnvironmentObject var eventManager: EventManager
+    @State private var showingPopover = false
 
     // 性能优化：缓存计算结果
     private let calendar = Calendar.current
@@ -495,31 +500,56 @@ struct EventBlock: View {
         let totalGapWidth = gap * CGFloat(totalColumns - 1)
         let width = (availableWidth - totalGapWidth) / CGFloat(totalColumns)
         let x = leftPadding + CGFloat(column) * (width + gap)
-        RoundedRectangle(cornerRadius: 6)
-            .fill(event.type.color.opacity(0.8))
-            .overlay(
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(event.title)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                    Text(event.formattedTimeRange)
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .padding(4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        HStack(spacing: 0) {
+            // 左侧深色border
+            Rectangle()
+                .fill(event.type.color)
+                .frame(width: 4)
+
+            // 右侧内容区域
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(selectedEvent?.id == event.id ? .white : event.type.color)
+                    .lineLimit(2)
+                Text(event.formattedTimeRange)
+                    .font(.caption2)
+                    .foregroundColor(selectedEvent?.id == event.id ? .white.opacity(0.8) : event.type.color.opacity(0.7))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                selectedEvent?.id == event.id
+                    ? event.type.color
+                    : event.type.color.opacity(0.2)
             )
-            .frame(width: width, height: position.height)
-            .position(x: x + width / 2, y: position.y + position.height / 2)
-            .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
-            .scaleEffect(selectedEvent?.id == event.id ? 1.05 : 1.0)
-            .shadow(radius: selectedEvent?.id == event.id ? 4 : 2)
-            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: selectedEvent?.id == event.id)
-            .animation(.none, value: draggedEvent?.id == event.id ? dragOffset : .zero) // 拖拽时不使用动画
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .frame(width: width, height: position.height)
+        .position(x: x + width / 2, y: position.y + position.height / 2)
+        .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
+        .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
             .onTapGesture {
                 selectedEvent = event
+            }
+            .onTapGesture(count: 2) {
+                showingPopover = true
+            }
+            .popover(isPresented: $showingPopover) {
+                EventEditView(event: event, onSave: { updatedEvent in
+                    showingPopover = false
+                    // 更新选中事件以同步右侧面板
+                    if selectedEvent?.id == event.id {
+                        selectedEvent = updatedEvent
+                    }
+                }, onDelete: {
+                    showingPopover = false
+                    selectedEvent = nil
+                })
+                .environmentObject(eventManager)
+                .frame(width: 400, height: 500)
             }
             .contextMenu {
                 Button(role: .destructive) {
@@ -607,6 +637,11 @@ struct EventBlock: View {
             updatedEvent.startTime = newStartTime
             updatedEvent.endTime = newEndTime
             eventManager.updateEvent(updatedEvent)
+
+            // 更新选中事件以同步右侧面板
+            if selectedEvent?.id == event.id {
+                selectedEvent = updatedEvent
+            }
         }
     }
 }
@@ -681,21 +716,26 @@ struct MiniCalendarView: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            // 月份导航
+            // 导航按钮组
             HStack {
+                // 上一个月按钮
                 Button(action: previousMonth) {
                     Image(systemName: "chevron.left")
                         .font(.caption)
                 }
-                
+
                 Spacer()
-                
-                Text(monthFormatter.string(from: currentMonth))
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
+
+                // 今天按钮
+                Button(action: goToToday) {
+                    Text("今天")
+                        .font(.caption)
+                }
+                .disabled(isToday)
+
                 Spacer()
-                
+
+                // 下一个月按钮
                 Button(action: nextMonth) {
                     Image(systemName: "chevron.right")
                         .font(.caption)
@@ -728,12 +768,21 @@ struct MiniCalendarView: View {
         return formatter
     }()
     
+    private var isToday: Bool {
+        calendar.isDateInToday(selectedDate)
+    }
+
     private func previousMonth() {
         currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
     }
-    
+
     private func nextMonth() {
         currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
+    }
+
+    private func goToToday() {
+        currentMonth = Date()
+        selectedDate = Date()
     }
 }
 
@@ -763,12 +812,12 @@ struct MiniDayCell: View {
         }) {
             Text("\(calendar.component(.day, from: date))")
                 .font(.caption)
-                .fontWeight(isSelected ? .bold : .regular)
+                .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundColor({
                     if isSelected {
                         return .white
                     } else if isToday {
-                        return .blue
+                        return .accentColor // 使用系统强调色
                     } else if isCurrentMonth {
                         return .primary
                     } else {
@@ -778,17 +827,16 @@ struct MiniDayCell: View {
                 .frame(width: 28, height: 28)
                 .background(
                     Group {
-                        #if os(iOS)
-                        Color(.systemBackground)
-                        #else
-                        Color(NSColor.controlBackgroundColor)
-                        #endif
+                        if isSelected {
+                            // 选中状态使用系统强调色背景
+                            Color.accentColor
+                        } else {
+                            // 未选中状态无背景色
+                            Color.clear
+                        }
                     }
                 )
-                .overlay(
-                    Circle()
-                        .stroke(isToday && !isSelected ? Color.blue : Color.clear, lineWidth: 1)
-                )
+                .clipShape(Circle())
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -800,157 +848,43 @@ struct EventDetailPanel: View {
     @EnvironmentObject var eventManager: EventManager
     @State private var editSuccessFlag = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if let event = selectedEvent {
-                // 事件详情编辑
-                EventEditView(event: event, onSave: {
-                    // 保存后刷新右侧面板
-                    editSuccessFlag.toggle()
-                }, onDelete: {
-                    // 删除后自动回到未选中
-                    selectedEvent = nil
-                })
-                .id(event.id) // 保证切换事件时刷新
-                .environmentObject(eventManager)
-            } else {
-                // 空状态
-                VStack(spacing: 16) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    Text("未选中事件")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                    Text("请在左侧时间轴点击事件，或拖拽新建事件后在此编辑详情")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    Group {
-                        #if os(iOS)
-                        Color(.systemGray6)
-                        #else
-                        Color(NSColor.windowBackgroundColor)
-                        #endif
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let event = selectedEvent {
+                    // 事件详情编辑
+                    EventEditView(event: event, onSave: { updatedEvent in
+                        // 保存后刷新右侧面板并更新选中事件
+                        selectedEvent = updatedEvent
+                        editSuccessFlag.toggle()
+                    }, onDelete: {
+                        // 删除后自动回到未选中
+                        selectedEvent = nil
+                    })
+                    .id(event.id) // 保证切换事件时刷新
+                    .environmentObject(eventManager)
+                } else {
+                    // 空状态
+                    VStack(spacing: 16) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("未选中事件")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        Text("请在左侧时间轴点击事件，或拖拽新建事件后在此编辑详情")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                )
-                .cornerRadius(12)
+                    .frame(maxWidth: .infinity)
+                }
             }
+            .padding()
         }
-        .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
     }
 }
 
-// MARK: - 事件编辑视图
-struct EventEditView: View {
-    let event: PomodoroEvent
-    var onSave: (() -> Void)? = nil
-    var onDelete: (() -> Void)? = nil
-    @EnvironmentObject var eventManager: EventManager
-    @State private var title: String
-    @State private var startTime: Date
-    @State private var endTime: Date
-    @State private var eventType: PomodoroEvent.EventType
-    @State private var showingDeleteAlert = false
-    init(event: PomodoroEvent, onSave: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
-        self.event = event
-        self.onSave = onSave
-        self.onDelete = onDelete
-        self._title = State(initialValue: event.title)
-        self._startTime = State(initialValue: event.startTime)
-        self._endTime = State(initialValue: event.endTime)
-        self._eventType = State(initialValue: event.type)
-    }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("事件详情")
-                .font(.headline)
-                .fontWeight(.semibold)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("标题")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextField("事件标题", text: $title)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("时间")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                DatePicker("开始时间", selection: $startTime, displayedComponents: [.hourAndMinute])
-                    .datePickerStyle(CompactDatePickerStyle())
-                DatePicker("结束时间", selection: $endTime, displayedComponents: [.hourAndMinute])
-                    .datePickerStyle(CompactDatePickerStyle())
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("类型")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Picker("事件类型", selection: $eventType) {
-                    ForEach(["番茄时间", "短休息", "长休息", "自定义"], id: \.self) { (typeName: String) in
-                        Text(typeName)
-                            .tag(getEventType(from: typeName))
-                    }
-                }
-                .pickerStyle(MenuPickerStyle())
-            }
-            Spacer()
-            VStack(spacing: 8) {
-                Button("保存更改") {
-                    saveChanges()
-                    onSave?()
-                }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-                Button("删除事件") {
-                    showingDeleteAlert = true
-                }
-                .buttonStyle(.bordered)
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .alert("删除事件", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
-                eventManager.removeEvent(event)
-                onDelete?()
-            }
-        } message: {
-            Text("确定要删除这个事件吗？此操作无法撤销。")
-        }
-    }
-    private func getEventType(from typeName: String) -> PomodoroEvent.EventType {
-        switch typeName {
-        case "番茄时间": return .pomodoro
-        case "短休息": return .shortBreak
-        case "长休息": return .longBreak
-        case "自定义": return .custom
-        default: return .custom
-        }
-    }
-    private func saveChanges() {
-        var updatedEvent = event
-        updatedEvent.title = title
-        updatedEvent.startTime = startTime
-        updatedEvent.endTime = endTime
-        updatedEvent.type = eventType
-        eventManager.updateEvent(updatedEvent)
-    }
-}
+
 
 // MARK: - 周视图
 struct WeekView: View {
@@ -1020,15 +954,7 @@ struct WeekView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(
-                    Group {
-                        #if os(iOS)
-                        Color(.systemGray6)
-                        #else
-                        Color(NSColor.windowBackgroundColor)
-                        #endif
-                    }
-                )
+                .background(.regularMaterial, in: Rectangle())
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -1037,7 +963,11 @@ struct WeekView: View {
                 startTime: selectedDate,
                 endTime: Calendar.current.date(byAdding: .hour, value: 1, to: selectedDate) ?? selectedDate,
                 type: .custom
-            ))
+            ), onSave: { _ in
+                showingAddEvent = false
+            }, onDelete: {
+                showingAddEvent = false
+            })
                 .environmentObject(eventManager)
         }
     }
@@ -1051,7 +981,7 @@ struct WeekView: View {
                 .frame(width: 60)
 
             // 星期标题
-            ForEach(weekDates, id: \.self) { date in
+            ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
                 VStack(spacing: 4) {
                     Text(dayFormatter.string(from: date))
                         .font(.caption)
@@ -1092,44 +1022,52 @@ struct WeekView: View {
     // 周事件网格视图
     private var weekGridView: some View {
         HStack(alignment: .top, spacing: 0) {
-            ForEach(weekDates, id: \.self) { date in
-                VStack(spacing: 0) {
-                    // 每日网格线
-                    ForEach(Array(0...23), id: \.self) { hour in
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, hourHeight - 1)
-                    }
-                }
-                .background(
-                    // 当日事件 - 使用并列布局算法
-                    GeometryReader { dayGeometry in
-                        ZStack(alignment: .topLeading) {
-                            let dayEvents = eventManager.eventsForDate(date)
-                            let eventLayoutInfo = computeEventColumns(events: dayEvents)
-
-                            ForEach(eventLayoutInfo, id: \.0.id) { info in
-                                let (event, column, totalColumns) = info
-                                WeekEventBlock(
-                                    event: event,
-                                    selectedEvent: $selectedEvent,
-                                    hourHeight: hourHeight,
-                                    date: date,
-                                    column: column,
-                                    totalColumns: totalColumns,
-                                    containerWidth: dayGeometry.size.width
-                                )
-                            }
+            ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        // 移除横线，只保留空间占位
+                        ForEach(Array(0...23), id: \.self) { hour in
+                            Rectangle()
+                                .fill(Color.clear)
+                                .frame(height: hourHeight)
+                                .frame(maxWidth: .infinity)
                         }
                     }
-                )
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture { location in
-                    // 点击创建新事件的逻辑
-                    createEventAt(date: date, location: location)
+                    .background(
+                        // 当日事件 - 使用并列布局算法
+                        GeometryReader { dayGeometry in
+                            ZStack(alignment: .topLeading) {
+                                let dayEvents = eventManager.eventsForDate(date)
+                                let eventLayoutInfo = computeEventColumns(events: dayEvents)
+
+                                ForEach(eventLayoutInfo, id: \.0.id) { info in
+                                    let (event, column, totalColumns) = info
+                                    WeekEventBlock(
+                                        event: event,
+                                        selectedEvent: $selectedEvent,
+                                        hourHeight: hourHeight,
+                                        date: date,
+                                        column: column,
+                                        totalColumns: totalColumns,
+                                        containerWidth: dayGeometry.size.width
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // 点击取消选中事件
+                        selectedEvent = nil
+                    }
+
+                    // 添加竖线分隔（除了最后一列）
+                    if index < weekDates.count - 1 {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 1)
+                    }
                 }
             }
         }
@@ -1195,17 +1133,6 @@ struct WeekView: View {
             .font(.caption)
         }
         .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 
     // 本周热门应用
@@ -1236,17 +1163,6 @@ struct WeekView: View {
             }
         }
         .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 
     // 辅助方法
@@ -1373,6 +1289,11 @@ struct WeekEventBlock: View {
     var totalColumns: Int = 1
     let containerWidth: CGFloat
 
+    @State private var showingPopover = false
+    @State private var dragOffset: CGSize = .zero
+    @State private var isDragging = false
+    @EnvironmentObject var eventManager: EventManager
+
     private let calendar = Calendar.current
 
     // 性能优化：缓存位置计算
@@ -1398,33 +1319,109 @@ struct WeekEventBlock: View {
         let width = (containerWidth - totalGapWidth) / CGFloat(totalColumns)
         let x = CGFloat(column) * (width + gap)
 
-        RoundedRectangle(cornerRadius: 4)
-            .fill(event.type.color.opacity(0.8))
-            .overlay(
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(event.title)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+        HStack(spacing: 0) {
+            // 左侧深色border
+            Rectangle()
+                .fill(event.type.color)
+                .frame(width: 3)
 
-                    if position.height > 30 {
-                        Text(event.formattedTimeRange)
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                    }
+            // 右侧内容区域
+            VStack(alignment: .leading, spacing: 1) {
+                Text(event.title)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(selectedEvent?.id == event.id ? .white : event.type.color)
+                    .lineLimit(1)
+
+                if position.height > 30 {
+                    Text(event.formattedTimeRange)
+                        .font(.caption2)
+                        .foregroundColor(selectedEvent?.id == event.id ? .white.opacity(0.8) : event.type.color.opacity(0.7))
+                        .lineLimit(1)
                 }
-                .padding(2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            )
-            .frame(width: width, height: position.height)
-            .position(x: x + width / 2, y: position.y + position.height / 2)
-            .scaleEffect(selectedEvent?.id == event.id ? 1.05 : 1.0)
-            .shadow(radius: selectedEvent?.id == event.id ? 2 : 1)
-            .onTapGesture {
-                selectedEvent = event
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                selectedEvent?.id == event.id
+                    ? event.type.color
+                    : event.type.color.opacity(0.2)
+            )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .frame(width: width, height: position.height)
+        .position(x: x + width / 2, y: position.y + position.height / 2)
+        .offset(dragOffset)
+        .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
+        .onTapGesture {
+            selectedEvent = event
+        }
+        .onTapGesture(count: 2) {
+            showingPopover = true
+        }
+        .popover(isPresented: $showingPopover) {
+            EventEditView(
+                event: event,
+                onSave: { updatedEvent in
+                    showingPopover = false
+                    // 更新选中事件以同步右侧面板
+                    if selectedEvent?.id == event.id {
+                        selectedEvent = updatedEvent
+                    }
+                },
+                onDelete: {
+                    selectedEvent = nil
+                    showingPopover = false
+                }
+            )
+            .environmentObject(eventManager)
+            .frame(width: 300, height: 400)
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                eventManager.removeEvent(event)
+                if selectedEvent?.id == event.id {
+                    selectedEvent = nil
+                }
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    isDragging = true
+                    dragOffset = value.translation
+                    selectedEvent = event
+                }
+                .onEnded { value in
+                    // 计算新的时间
+                    let timeChange = value.translation.height / hourHeight * 3600 // 转换为秒
+                    let roundedTimeChange = round(timeChange / 300) * 300 // 四舍五入到5分钟
+
+                    if abs(roundedTimeChange) > 0 {
+                        let newStartTime = event.startTime.addingTimeInterval(roundedTimeChange)
+                        let duration = event.endTime.timeIntervalSince(event.startTime)
+                        let newEndTime = newStartTime.addingTimeInterval(duration)
+
+                        // 更新事件
+                        var updatedEvent = event
+                        updatedEvent.startTime = newStartTime
+                        updatedEvent.endTime = newEndTime
+                        eventManager.updateEvent(updatedEvent)
+
+                        // 更新选中事件以同步右侧面板
+                        if selectedEvent?.id == event.id {
+                            selectedEvent = updatedEvent
+                        }
+                    }
+
+                    // 重置拖拽状态
+                    isDragging = false
+                    dragOffset = .zero
+                }
+        )
     }
 }
 
@@ -1471,13 +1468,13 @@ struct MonthView: View {
                 VStack(spacing: 0) {
                     // 月份导航
                     monthNavigationView
-                        .frame(height: 50)
+                        .frame(height: 40)
 
                     Divider()
 
                     // 星期标题
                     weekdayHeaderView
-                        .frame(height: 40)
+                        .frame(height: 30)
 
                     Divider()
 
@@ -1501,15 +1498,7 @@ struct MonthView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(
-                    Group {
-                        #if os(iOS)
-                        Color(.systemGray6)
-                        #else
-                        Color(NSColor.windowBackgroundColor)
-                        #endif
-                    }
-                )
+                .background(.regularMaterial, in: Rectangle())
             }
         }
         .onAppear {
@@ -1526,7 +1515,11 @@ struct MonthView: View {
                 startTime: selectedDate,
                 endTime: Calendar.current.date(byAdding: .hour, value: 1, to: selectedDate) ?? selectedDate,
                 type: .custom
-            ))
+            ), onSave: { _ in
+                showingAddEvent = false
+            }, onDelete: {
+                showingAddEvent = false
+            })
                 .environmentObject(eventManager)
         }
     }
@@ -1560,7 +1553,7 @@ struct MonthView: View {
         HStack(spacing: 0) {
             ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { day in
                 Text(day)
-                    .font(.subheadline)
+                    .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -1590,6 +1583,7 @@ struct MonthView: View {
             }
         }
         .padding(.horizontal, 8)
+        .padding(.vertical, 0)
     }
 
     // 选中日期面板
@@ -1731,17 +1725,6 @@ struct MonthView: View {
             .font(.caption)
         }
         .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 
     // 月度生产力趋势
@@ -1782,17 +1765,6 @@ struct MonthView: View {
             }
         }
         .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 
     // 辅助方法
@@ -1940,68 +1912,84 @@ struct MonthDayCell: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            // 日期数字
-            Text(dayNumber)
-                .font(.system(size: 16, weight: isSelected ? .bold : .regular))
-                .foregroundColor({
-                    if isSelected {
-                        return .white
-                    } else if isToday {
-                        return .blue
-                    } else if isCurrentMonth {
-                        return .primary
-                    } else {
-                        return .secondary
-                    }
-                }())
+            // 顶部：日期数字（右上角）
+            HStack {
+                Spacer()
+                Text(dayNumber)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor({
+                        if isToday {
+                            return .accentColor
+                        } else if isCurrentMonth {
+                            return .primary
+                        } else {
+                            return .secondary
+                        }
+                    }())
+            }
+            .padding(.top, 2)
+            .padding(.trailing, 4)
 
-            // 事件指示器
-            HStack(spacing: 2) {
+            // 事件列表区域
+            VStack(alignment: .leading, spacing: 1) {
                 if hasEvents {
+                    // 最多显示3个事件
                     ForEach(Array(events.prefix(3)), id: \.id) { event in
-                        Circle()
-                            .fill(event.type.color)
-                            .frame(width: 4, height: 4)
+                        eventRow(for: event)
                     }
 
                     if events.count > 3 {
-                        Text("...")
-                            .font(.caption2)
+                        Text("还有\(events.count - 3)项")
+                            .font(.system(size: 9))
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.secondary.opacity(0.1))
+                            )
                     }
-                }
-
-                if hasActivity && !hasEvents {
+                } else if hasActivity {
                     Circle()
                         .fill(Color.gray.opacity(0.6))
                         .frame(width: 4, height: 4)
+                        .padding(.leading, 2)
                 }
             }
-            .frame(height: 8)
+            .padding(.horizontal, 2)
+
+            Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 60)
+        .frame(maxWidth: .infinity, minHeight: 80)
         .background(
-            Group {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue)
-                } else if isToday {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.blue, lineWidth: 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.blue.opacity(0.1))
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.clear)
-                }
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+            Rectangle()
+                .fill(Color.clear)
+                .overlay(
+                    Rectangle()
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 0.5)
+                )
         )
         .contentShape(Rectangle())
+    }
+
+    // 事件行视图
+    private func eventRow(for event: PomodoroEvent) -> some View {
+        HStack(spacing: 2) {
+            Circle()
+                .fill(event.type.color)
+                .frame(width: 3, height: 3)
+
+            Text(event.title)
+                .font(.system(size: 9))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 1)
+        .background(
+            RoundedRectangle(cornerRadius: 2)
+                .fill(event.type.color.opacity(0.1))
+        )
     }
 }

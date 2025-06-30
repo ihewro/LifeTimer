@@ -278,6 +278,37 @@ class ActivityMonitorManager: ObservableObject {
             return "未监控"
         }
     }
+
+    /// 获取数据存储路径
+    var dataStoragePath: String {
+        #if canImport(Cocoa)
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent("system_events.json")
+        return fileURL.path
+        #else
+        return "iOS沙盒文档目录/system_events.json"
+        #endif
+    }
+
+    /// 获取数据文件大小
+    var dataFileSize: String {
+        #if canImport(Cocoa)
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent("system_events.json")
+
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+            }
+        } catch {
+            return "未知"
+        }
+        return "0 KB"
+        #else
+        return "未知"
+        #endif
+    }
 }
 
 // MARK: - 跨平台扩展

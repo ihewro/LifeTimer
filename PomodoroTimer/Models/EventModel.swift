@@ -38,11 +38,11 @@ struct PomodoroEvent: Identifiable, Codable {
         var color: Color {
             switch self {
             case .pomodoro:
-                return .red
+                return .blue
             case .shortBreak:
                 return .green
             case .longBreak:
-                return .blue
+                return .green
             case .custom:
                 return .orange
             }
@@ -81,9 +81,14 @@ struct PomodoroEvent: Identifiable, Codable {
 
 class EventManager: ObservableObject {
     @Published var events: [PomodoroEvent] = []
-    
+
     private let userDefaults = UserDefaults.standard
     private let eventsKey = "PomodoroEvents"
+
+    var dataFilePath: String {
+        let libraryPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first!
+        return "\(libraryPath)/Preferences/\(Bundle.main.bundleIdentifier ?? "PomodoroTimer").plist"
+    }
     
     init() {
         loadEvents()

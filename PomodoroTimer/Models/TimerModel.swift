@@ -8,10 +8,28 @@
 import Foundation
 import Combine
 
-enum TimerMode: String, CaseIterable {
-    case singlePomodoro = "单次番茄"
-    case pureRest = "纯休息"
-    case countUp = "正计时"
+enum TimerMode: Equatable, Hashable {
+    case singlePomodoro
+    case pureRest
+    case countUp
+    case custom(minutes: Int)
+
+    var rawValue: String {
+        switch self {
+        case .singlePomodoro:
+            return "单次番茄"
+        case .pureRest:
+            return "纯休息"
+        case .countUp:
+            return "正计时"
+        case .custom(let minutes):
+            return "自定义 \(minutes)分钟"
+        }
+    }
+
+    static var allCases: [TimerMode] {
+        return [.singlePomodoro, .pureRest, .countUp]
+    }
 }
 
 enum TimerState {
@@ -51,6 +69,10 @@ class TimerModel: ObservableObject {
         case .countUp:
             currentTime = 0
             totalTime = 0
+        case .custom(let minutes):
+            let customTime = TimeInterval(minutes * 60)
+            timeRemaining = customTime
+            totalTime = customTime
         }
     }
     
@@ -84,10 +106,16 @@ class TimerModel: ObservableObject {
         currentMode = mode
         setupTimer()
     }
+
+    func setCustomTime(minutes: Int) {
+        guard timerState == .idle else { return }
+        currentMode = .custom(minutes: minutes)
+        setupTimer()
+    }
     
     private func updateTimer() {
         switch currentMode {
-        case .singlePomodoro, .pureRest:
+        case .singlePomodoro, .pureRest, .custom:
             if timeRemaining > 0 {
                 timeRemaining -= 1
             } else {
@@ -111,21 +139,21 @@ class TimerModel: ObservableObject {
     func formattedTime() -> String {
         let time: TimeInterval
         switch currentMode {
-        case .singlePomodoro, .pureRest:
+        case .singlePomodoro, .pureRest, .custom:
             time = timeRemaining
         case .countUp:
             time = currentTime
         }
-        
+
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
-    
+
     // 计算进度（用于圆形进度条）
     func progress() -> Double {
         switch currentMode {
-        case .singlePomodoro, .pureRest:
+        case .singlePomodoro, .pureRest, .custom:
             guard totalTime > 0 else { return 0 }
             return (totalTime - timeRemaining) / totalTime
         case .countUp:

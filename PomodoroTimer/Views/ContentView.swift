@@ -11,19 +11,16 @@ enum SidebarItem: String, CaseIterable {
     case timer = "timer"
     case calendar = "calendar"
     case activityStats = "activityStats"
-    case activitySettings = "activitySettings"
     case settings = "settings"
 
     var title: String {
         switch self {
         case .timer:
-            return "计时器"
+            return "计时"
         case .calendar:
             return "日历"
         case .activityStats:
-            return "活动统计"
-        case .activitySettings:
-            return "活动设置"
+            return "活动"
         case .settings:
             return "设置"
         }
@@ -37,8 +34,6 @@ enum SidebarItem: String, CaseIterable {
             return "calendar"
         case .activityStats:
             return "chart.bar"
-        case .activitySettings:
-            return "gear.badge"
         case .settings:
             return "gear"
         }
@@ -75,8 +70,6 @@ struct ContentView: View {
                     CalendarView()
                 case .activityStats:
                     ActivityStatsView()
-                case .activitySettings:
-                    ActivitySettingsView(activityMonitor: activityMonitor)
                 case .settings:
                     SettingsView()
                 }
@@ -104,12 +97,6 @@ struct ContentView: View {
                     Label("活动统计", systemImage: "chart.bar")
                 }
                 .tag(SidebarItem.activityStats)
-
-            ActivitySettingsView(activityMonitor: activityMonitor)
-                .tabItem {
-                    Label("活动设置", systemImage: "gear.badge")
-                }
-                .tag(SidebarItem.activitySettings)
 
             SettingsView()
                 .tabItem {

@@ -12,89 +12,86 @@ struct TimerView: View {
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var eventManager: EventManager
     @State private var showingModeSelector = false
+    @State private var showingTimeEditor = false
+    @State private var showingTaskSelector = false
+    @State private var selectedTask = "专注"
+    @State private var editingMinutes = 30
     
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 30) {
-                // 顶部模式选择器
+                // 顶部控制栏
                 HStack {
-                    Button(action: {
-                        showingModeSelector.toggle()
-                    }) {
-                        HStack {
+                    // 模式选择下拉菜单
+                    Menu {
+                        ForEach(TimerMode.allCases, id: \.self) { mode in
+                            Button(action: {
+                                timerModel.changeMode(mode)
+                            }) {
+                                HStack {
+                                    Text(mode.rawValue)
+                                    if timerModel.currentMode == mode {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
                             Text(timerModel.currentMode.rawValue)
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             Image(systemName: "chevron.down")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(20)
                     }
-                    
+                    .buttonStyle(PlainButtonStyle())
+
                     Spacer()
-                    
-                    // 音频控制按钮
-                    HStack(spacing: 16) {
-                        Button(action: {
-                            if audioManager.isPlaying {
-                                audioManager.pausePlayback()
-                            } else if audioManager.currentTrack != nil {
-                                audioManager.resumePlayback()
-                            }
-                        }) {
-                            Image(systemName: audioManager.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
+
+                    // 右侧控制按钮
+                    Button(action: {
+                        if audioManager.isPlaying {
+                            audioManager.pausePlayback()
+                        } else if audioManager.currentTrack != nil {
+                            audioManager.resumePlayback()
                         }
-                        
-                        Button(action: {
-                            // 显示统计信息
-                        }) {
-                            Image(systemName: "chart.bar")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Button(action: {
-                            // 静音/取消静音
-                        }) {
-                            Image(systemName: "bell.slash")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Button(action: {
-                            // 刷新
-                            timerModel.resetTimer()
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Button(action: {
-                            // 更多选项
-                        }) {
-                            Image(systemName: "ellipsis")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                        }
+                    }) {
+                        Image(systemName: audioManager.isPlaying ? "speaker.wave.2" : "speaker.slash")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal)
                 
                 Spacer()
-                
+
+                // 任务标题
+                Button(action: {
+                    showingTaskSelector = true
+                }) {
+                    HStack {
+                        Text(selectedTask)
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.bottom, 20)
+
                 // 主计时器圆环
                 ZStack {
                     // 背景圆环
                     Circle()
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
                         .frame(width: min(geometry.size.width * 0.7, 300))
-                    
+
                     // 进度圆环
                     if timerModel.currentMode != .countUp {
                         Circle()
@@ -111,37 +108,33 @@ struct TimerView: View {
                             .rotationEffect(.degrees(-90))
                             .animation(.easeInOut(duration: 1), value: timerModel.progress())
                     }
-                    
+
                     // 中心时间显示
-                    VStack(spacing: 8) {
-                        Text(timerModel.formattedTime())
-                            .font(.system(size: 48, weight: .light, design: .monospaced))
-                            .foregroundColor(.primary)
-                        
-                        if timerModel.currentMode == .countUp {
-                            Text("正计时模式")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    Button(action: {
+                        if timerModel.timerState == .idle {
+                            showingTimeEditor = true
+                        }
+                    }) {
+                        VStack(spacing: 8) {
+                            Text(timerModel.formattedTime())
+                                .font(.system(size: 48, weight: .light, design: .monospaced))
+                                .foregroundColor(.primary)
+
+                            if timerModel.currentMode == .countUp {
+                                Text("正计时模式")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(timerModel.timerState != .idle)
                 }
                 
                 Spacer()
-                
+
                 // 控制按钮
-                HStack(spacing: 40) {
-                    // 重置按钮
-                    Button(action: {
-                        timerModel.resetTimer()
-                    }) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.title)
-                            .foregroundColor(.secondary)
-                            .frame(width: 50, height: 50)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    
+                VStack(spacing: 16) {
                     // 主控制按钮
                     Button(action: {
                         switch timerModel.timerState {
@@ -153,61 +146,61 @@ struct TimerView: View {
                             timerModel.resetTimer()
                         }
                     }) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 80, height: 80)
-                            
-                            Image(systemName: buttonIcon)
-                                .font(.title)
-                                .foregroundColor(.white)
-                        }
+                        Text(buttonText)
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .frame(width: 200, height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 25)
+                                    .fill(Color.brown)
+                            )
                     }
-                    
-                    // 跳过按钮
-                    Button(action: {
-                        timerModel.resetTimer()
-                    }) {
-                        Image(systemName: "forward.end")
-                            .font(.title)
-                            .foregroundColor(.secondary)
-                            .frame(width: 50, height: 50)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(Circle())
+                    .buttonStyle(PlainButtonStyle())
+
+                    // 结束按钮（仅在暂停时显示）
+                    if timerModel.timerState == .paused {
+                        Button(action: {
+                            timerModel.resetTimer()
+                        }) {
+                            Text("结束")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                                .frame(width: 200, height: 50)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 25)
+                                        .stroke(Color.secondary, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 
-                // 今日统计
-                VStack(spacing: 8) {
-                    Text("今日: 番茄\(eventManager.completedPomodorosToday())个 · \(formatTime(eventManager.totalFocusTimeToday()))分钟 · 智信\(eventManager.completedPomodorosToday())次")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.bottom)
+                Spacer()
             }
         }
-        .sheet(isPresented: $showingModeSelector) {
-            ModeSelectionView()
+        .background(Color.white)
+        .sheet(isPresented: $showingTimeEditor) {
+            TimeEditorView(minutes: $editingMinutes) { newMinutes in
+                timerModel.setCustomTime(minutes: newMinutes)
+            }
+        }
+        .sheet(isPresented: $showingTaskSelector) {
+            TaskSelectorView(selectedTask: $selectedTask)
         }
     }
     
-    private var buttonIcon: String {
+    private var buttonText: String {
         switch timerModel.timerState {
         case .idle:
-            return "play.fill"
+            return "开始"
         case .running:
-            return "pause.fill"
+            return "暂停"
         case .paused:
-            return "play.fill"
+            return "继续"
         case .completed:
-            return "checkmark"
+            return "开始"
         }
     }
     
@@ -217,31 +210,197 @@ struct TimerView: View {
     }
 }
 
-struct ModeSelectionView: View {
-    @EnvironmentObject var timerModel: TimerModel
+// MARK: - 时间编辑器
+struct TimeEditorView: View {
+    @Binding var minutes: Int
+    let onConfirm: (Int) -> Void
     @Environment(\.dismiss) private var dismiss
-    
+    @State private var tempMinutes: Int
+    @State private var inputText: String
+
+    init(minutes: Binding<Int>, onConfirm: @escaping (Int) -> Void) {
+        self._minutes = minutes
+        self.onConfirm = onConfirm
+        self._tempMinutes = State(initialValue: minutes.wrappedValue)
+        self._inputText = State(initialValue: String(minutes.wrappedValue))
+    }
+
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(TimerMode.allCases, id: \.self) { mode in
-                    Button(action: {
-                        timerModel.changeMode(mode)
-                        dismiss()
-                    }) {
-                        HStack {
-                            Text(mode.rawValue)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            if timerModel.currentMode == mode {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+        VStack(spacing: 20) {
+            Text("设置时间")
+                .font(.headline)
+                .padding(.top)
+
+            VStack {
+                Button(action: {
+                    if tempMinutes < 99 {
+                        tempMinutes += 1
+                        inputText = String(tempMinutes)
+                    }
+                }) {
+                    Image(systemName: "chevron.up")
+                        .font(.title2)
+                        .foregroundColor(.primary)
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                HStack {
+                    TextField("", text: $inputText)
+                        .font(.largeTitle)
+                        .fontWeight(.light)
+                        .multilineTextAlignment(.center)
+                        .frame(minWidth: 60)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .onChange(of: inputText) { newValue in
+                            // 只允许数字输入
+                            let filtered = newValue.filter { $0.isNumber }
+                            if filtered != newValue {
+                                inputText = filtered
+                            }
+
+                            // 更新tempMinutes
+                            if let value = Int(filtered), value >= 1, value <= 99 {
+                                tempMinutes = value
                             }
                         }
+
+                    Text("分钟")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+
+                Button(action: {
+                    if tempMinutes > 1 {
+                        tempMinutes -= 1
+                        inputText = String(tempMinutes)
+                    }
+                }) {
+                    Image(systemName: "chevron.down")
+                        .font(.title2)
+                        .foregroundColor(.primary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(12)
+
+            HStack(spacing: 20) {
+                Button("取消") {
+                    dismiss()
+                }
+                .buttonStyle(PlainButtonStyle())
+                .frame(width: 100, height: 44)
+
+                Button("确定") {
+                    minutes = tempMinutes
+                    onConfirm(tempMinutes)
+                    dismiss()
+                }
+                .buttonStyle(PlainButtonStyle())
+                .frame(width: 100, height: 44)
+                .background(Color.brown)
+                .foregroundColor(.white)
+                .cornerRadius(22)
+            }
+            .padding(.bottom)
+        }
+        .frame(width: 300, height: 250)
+    }
+}
+
+// MARK: - 任务选择器
+struct TaskSelectorView: View {
+    @Binding var selectedTask: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    @State private var selectedTab = 0
+
+    private let commonTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考"]
+    private let recentTasks = ["我", "项目A", "项目B", "学习Swift"]
+
+    var filteredTasks: [String] {
+        let tasks = selectedTab == 0 ? recentTasks : commonTasks
+        if searchText.isEmpty {
+            return tasks
+        } else {
+            return tasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // 系统样式的标签切换
+                Picker("", selection: $selectedTab) {
+                    Text("任务").tag(0)
+                    Text("常用专注").tag(1)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                .padding(.top)
+
+                // 搜索框
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+
+                    TextField("搜索", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.top, 16)
+
+                // 任务列表
+                List {
+                    ForEach(filteredTasks, id: \.self) { task in
+                        Button(action: {
+                            selectedTask = task
+                            dismiss()
+                        }) {
+                            HStack {
+                                Circle()
+                                    .stroke(Color.secondary, lineWidth: 1)
+                                    .frame(width: 20, height: 20)
+
+                                Text(task)
+                                    .foregroundColor(.primary)
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    // 如果搜索结果为空且有搜索文本，显示"使用当前输入"选项
+                    if filteredTasks.isEmpty && !searchText.isEmpty {
+                        Button(action: {
+                            selectedTask = searchText
+                            dismiss()
+                        }) {
+                            HStack {
+                                Circle()
+                                    .stroke(Color.secondary, lineWidth: 1)
+                                    .frame(width: 20, height: 20)
+
+                                Text("使用 \"\(searchText)\"")
+                                    .foregroundColor(.primary)
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
+                .listStyle(PlainListStyle())
             }
-            .navigationTitle("选择模式")
+            .navigationTitle("选择任务")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -261,9 +420,7 @@ struct ModeSelectionView: View {
                 #endif
             }
         }
-        #if os(macOS)
-        .frame(width: 300, height: 200)
-        #endif
+        .frame(width: 400, height: 500)
     }
 }
 

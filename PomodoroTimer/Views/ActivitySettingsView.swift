@@ -20,34 +20,86 @@ struct ActivitySettingsView: View {
     private let dataRetentionOptions = [7, 14, 30, 60, 90, 180]
     
     var body: some View {
-        Form {
-            // 监控状态部分
-            Section("监控状态") {
-                monitoringStatusView
-                permissionStatusView
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // 监控状态部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("监控状态")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
 
-            // 权限管理部分
-            Section("权限管理") {
-                permissionManagementView
-            }
+                    VStack(spacing: 12) {
+                        monitoringStatusView
+                        permissionStatusView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
 
-            // 数据管理部分
-            Section("数据管理") {
-                dataManagementView
-            }
+                // 权限管理部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("权限管理")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
 
-            // 隐私设置部分
-            Section("隐私设置") {
-                privacySettingsView
-            }
+                    VStack(spacing: 12) {
+                        permissionManagementView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
 
-            // 关于部分
-            Section("关于") {
-                aboutView
+                // 数据管理部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("数据管理")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        dataManagementView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 隐私设置部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("隐私设置")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        privacySettingsView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 关于部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("关于")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        aboutView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
             }
+            .padding(.vertical, 20)
         }
-        .navigationTitle("活动监控设置")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("完成") {
@@ -80,24 +132,25 @@ struct ActivitySettingsView: View {
                 Circle()
                     .fill(activityMonitor.isMonitoring ? Color.green : Color.red)
                     .frame(width: 12, height: 12)
-                
+
                 Text(activityMonitor.isMonitoring ? "监控中" : "未监控")
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 Toggle("", isOn: Binding(
                     get: { activityMonitor.isMonitoring },
                     set: { _ in activityMonitor.toggleMonitoring() }
                 ))
             }
-            
+
             if activityMonitor.isMonitoring {
                 Text("当前应用: \(activityMonitor.currentApp.isEmpty ? "无" : activityMonitor.currentApp)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
+        .padding(.horizontal, 20)
     }
     
     private var permissionStatusView: some View {
@@ -105,17 +158,17 @@ struct ActivitySettingsView: View {
             HStack {
                 Image(systemName: activityMonitor.hasPermissions ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .foregroundColor(activityMonitor.hasPermissions ? .green : .orange)
-                
+
                 Text("权限状态")
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 Text(activityMonitor.permissionStatusDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             if !activityMonitor.hasPermissions {
                 Text(activityMonitor.permissionAdvice)
                     .font(.caption)
@@ -123,6 +176,7 @@ struct ActivitySettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.horizontal, 20)
     }
     
     // MARK: - 权限管理视图
@@ -141,18 +195,83 @@ struct ActivitySettingsView: View {
                     }
                 }
             )
-            
+
             Button("刷新权限状态") {
                 activityMonitor.checkPermissions()
             }
             .buttonStyle(.bordered)
         }
+        .padding(.horizontal, 20)
     }
     
     // MARK: - 数据管理视图
     
     private var dataManagementView: some View {
         VStack(spacing: 12) {
+            // 存储信息
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "folder")
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("存储位置")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Text(activityMonitor.dataStoragePath)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer()
+
+                    Button("复制路径") {
+                        #if canImport(Cocoa)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(activityMonitor.dataStoragePath, forType: .string)
+                        #endif
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                HStack {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(.green)
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("文件大小")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Text(activityMonitor.dataFileSize)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button("在Finder中显示") {
+                        #if canImport(Cocoa)
+                        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                        NSWorkspace.shared.open(documentsPath)
+                        #endif
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding()
+            .background(Color.primary.opacity(0.05))
+            .cornerRadius(8)
+
+            Divider()
+
             // 数据保留设置
             HStack {
                 Text("数据保留天数")
@@ -164,14 +283,14 @@ struct ActivitySettingsView: View {
                 }
                 .pickerStyle(.menu)
             }
-            
+
             Button("清理旧数据") {
                 activityMonitor.clearOldData(olderThanDays: selectedDataRetentionDays)
             }
             .buttonStyle(.bordered)
-            
+
             Divider()
-            
+
             // 导出数据
             Button("导出数据") {
                 if let data = activityMonitor.exportData() {
@@ -180,7 +299,7 @@ struct ActivitySettingsView: View {
                 }
             }
             .buttonStyle(.bordered)
-            
+
             // 清除所有数据
             Button("清除所有数据") {
                 showingClearDataAlert = true
@@ -188,6 +307,7 @@ struct ActivitySettingsView: View {
             .buttonStyle(.bordered)
             .foregroundColor(.red)
         }
+        .padding(.horizontal, 20)
     }
     
     // MARK: - 隐私设置视图
@@ -196,26 +316,26 @@ struct ActivitySettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("隐私保护")
                 .font(.headline)
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 PrivacyInfoRow(
                     icon: "lock.shield",
                     title: "本地存储",
                     description: "所有数据仅存储在您的设备上"
                 )
-                
+
                 PrivacyInfoRow(
                     icon: "eye.slash",
                     title: "无网络传输",
                     description: "不会向任何服务器发送您的活动数据"
                 )
-                
+
                 PrivacyInfoRow(
                     icon: "trash",
                     title: "随时删除",
                     description: "您可以随时清除所有监控数据"
                 )
-                
+
                 PrivacyInfoRow(
                     icon: "hand.raised",
                     title: "用户控制",
@@ -223,6 +343,7 @@ struct ActivitySettingsView: View {
                 )
             }
         }
+        .padding(.horizontal, 20)
     }
     
     // MARK: - 关于视图
@@ -231,46 +352,47 @@ struct ActivitySettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("功能说明")
                 .font(.headline)
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 FeatureInfoRow(
                     icon: "app.badge",
                     title: "应用监控",
                     description: "记录应用使用时间和切换频率"
                 )
-                
+
                 FeatureInfoRow(
                     icon: "globe",
                     title: "网站监控",
                     description: "跟踪浏览器访问的网站和停留时间"
                 )
-                
+
                 FeatureInfoRow(
                     icon: "chart.line.uptrend.xyaxis",
                     title: "生产力分析",
                     description: "分析工作效率和时间分配"
                 )
-                
+
                 FeatureInfoRow(
                     icon: "moon.zzz",
                     title: "系统事件",
                     description: "记录系统睡眠、唤醒等状态变化"
                 )
             }
-            
+
             Divider()
-            
+
             Text("版本信息")
                 .font(.headline)
-            
+
             Text("PomodoroTimer 系统监控模块")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             Text("版本 1.0.0")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 20)
     }
 }
 
