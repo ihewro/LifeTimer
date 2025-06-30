@@ -1,1 +1,15 @@
-PomodoroTimer.xcodeproj/project.xcworkspace/xcuserdata/hewro.xcuserdatad/UserInterfaceState.xcuserstate
+# Xcode用户数据文件
+*.xcuserstate
+**/xcuserdata/
+**/*.xcuserstate
+
+# Xcode工作空间和项目文件
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# 构建文件
+build/
+DerivedData/
+
+# macOS系统文件
+.DS_Store
