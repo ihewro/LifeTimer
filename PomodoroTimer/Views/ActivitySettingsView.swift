@@ -100,13 +100,6 @@ struct ActivitySettingsView: View {
             }
             .padding(.vertical, 20)
         }
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("完成") {
-                    dismiss()
-                }
-            }
-        }
         .alert("清除数据", isPresented: $showingClearDataAlert) {
             Button("取消", role: .cancel) { }
             Button("清除", role: .destructive) {

@@ -81,47 +81,27 @@ struct SettingsView: View {
     @State private var selectedTab = 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶部标签栏
-            topTabBar
+        // 内容区域
+        contentView
+            .frame(minWidth: 600, minHeight: 500)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar {
+                // 左侧：设置标签 Picker
+                ToolbarItem(placement: .principal) {
+                    Picker("", selection: $selectedTab) {
+                        Label("计时", systemImage: "timer").tag(0)
+                        Label("活动", systemImage: "chart.bar").tag(1)
+                        Label("关于", systemImage: "info.circle").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 300)
+                    .frame(width: 210)
+                }
 
-            Divider()
-
-            // 内容区域
-            contentView
-        }
-        .frame(minWidth: 600, minHeight: 500)
+            }
     }
 
-    private var topTabBar: some View {
-        HStack(spacing: 0) {
-            SettingsTabButton(
-                title: "计时",
-                icon: "timer",
-                isSelected: selectedTab == 0,
-                action: { selectedTab = 0 }
-            )
 
-            SettingsTabButton(
-                title: "活动监控",
-                icon: "chart.bar",
-                isSelected: selectedTab == 1,
-                action: { selectedTab = 1 }
-            )
-
-            SettingsTabButton(
-                title: "关于",
-                icon: "info.circle",
-                isSelected: selectedTab == 2,
-                action: { selectedTab = 2 }
-            )
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(Color(NSColor.windowBackgroundColor))
-    }
 
     private var contentView: some View {
         Group {

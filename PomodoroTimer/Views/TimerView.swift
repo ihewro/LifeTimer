@@ -18,79 +18,31 @@ struct TimerView: View {
     @State private var editingMinutes = 30
     
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 30) {
-                // 顶部控制栏
+        VStack(spacing: 30) {
+            Spacer()
+
+            // 任务标题
+            Button(action: {
+                showingTaskSelector = true
+            }) {
                 HStack {
-                    // 模式选择下拉菜单
-                    Menu {
-                        ForEach(TimerMode.allCases, id: \.self) { mode in
-                            Button(action: {
-                                timerModel.changeMode(mode)
-                            }) {
-                                HStack {
-                                    Text(mode.rawValue)
-                                    if timerModel.currentMode == mode {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(timerModel.currentMode.rawValue)
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Image(systemName: "chevron.down")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    Spacer()
-
-                    // 右侧控制按钮
-                    Button(action: {
-                        if audioManager.isPlaying {
-                            audioManager.pausePlayback()
-                        } else if audioManager.currentTrack != nil {
-                            audioManager.resumePlayback()
-                        }
-                    }) {
-                        Image(systemName: audioManager.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    Text(selectedTask)
+                        .font(.title3)
+                        .foregroundColor(.primary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal)
-                
-                Spacer()
-
-                // 任务标题
-                Button(action: {
-                    showingTaskSelector = true
-                }) {
-                    HStack {
-                        Text(selectedTask)
-                            .font(.title3)
-                            .foregroundColor(.primary)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.bottom, 20)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.bottom, 20)
 
                 // 主计时器圆环
                 ZStack {
                     // 背景圆环
                     Circle()
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
-                        .frame(width: min(geometry.size.width * 0.7, 300))
+                        .frame(width: 300, height: 300)
 
                     // 进度圆环
                     if timerModel.currentMode != .countUp {
@@ -104,7 +56,7 @@ struct TimerView: View {
                                 ),
                                 style: StrokeStyle(lineWidth: 8, lineCap: .round)
                             )
-                            .frame(width: min(geometry.size.width * 0.7, 300))
+                            .frame(width: 300, height: 300)
                             .rotationEffect(.degrees(-90))
                             .animation(.easeInOut(duration: 1), value: timerModel.progress())
                     }
@@ -176,11 +128,62 @@ struct TimerView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
-                
+
                 Spacer()
             }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.controlBackgroundColor))
+        .toolbar {
+            // 左侧：模式选择下拉菜单
+            ToolbarItem(placement: .navigation) {
+                Menu {
+                    ForEach(TimerMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            timerModel.changeMode(mode)
+                        }) {
+                            HStack {
+                                Text(mode.rawValue)
+                                if timerModel.currentMode == mode {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(timerModel.currentMode.rawValue)
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                        Image(systemName: "chevron.down")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            // 中间：占位符确保 toolbar 铺满宽度
+            ToolbarItem(placement: .principal) {
+                Spacer()
+            }
+
+            // 右侧：音频控制按钮
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    if audioManager.isPlaying {
+                        audioManager.pausePlayback()
+                    } else if audioManager.currentTrack != nil {
+                        audioManager.resumePlayback()
+                    }
+                }) {
+                    Image(systemName: audioManager.isPlaying ? "speaker.wave.2" : "speaker.slash")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
-        .background(Color.white)
         .sheet(isPresented: $showingTimeEditor) {
             TimeEditorView(minutes: $editingMinutes) { newMinutes in
                 timerModel.setCustomTime(minutes: newMinutes)

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 import Foundation
 
 // 导入事件模型
@@ -37,45 +38,38 @@ struct CalendarView: View {
     @State private var showingAddEvent = false
     @State private var draggedEvent: PomodoroEvent?
     @State private var dragOffset: CGSize = .zero
+    @State private var searchText = ""
     
     private let calendar = Calendar.current
     
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶部工具栏
-            CalendarToolbar(
-                selectedDate: $selectedDate,
-                viewMode: $currentViewMode,
-                showingAddEvent: $showingAddEvent
-            )
-
+        Group {
             // 主要内容区域
             switch currentViewMode {
-            case .day:
-                DayView(
-                    selectedDate: $selectedDate,
-                    selectedEvent: $selectedEvent,
-                    showingAddEvent: $showingAddEvent,
-                    draggedEvent: $draggedEvent,
-                    dragOffset: $dragOffset
-                )
-                .environmentObject(eventManager)
-                .background(Color.white)
-
-            case .week:
-                WeekView(selectedDate: $selectedDate)
+                case .day:
+                    DayView(
+                        selectedDate: $selectedDate,
+                        selectedEvent: $selectedEvent,
+                        showingAddEvent: $showingAddEvent,
+                        draggedEvent: $draggedEvent,
+                        dragOffset: $dragOffset
+                    )
                     .environmentObject(eventManager)
-                    .environmentObject(activityMonitor)
-                    .background(Color.white)
+                    .background(Color(NSColor.controlBackgroundColor))
 
-            case .month:
-                MonthView(selectedDate: $selectedDate)
-                    .environmentObject(eventManager)
-                    .environmentObject(activityMonitor)
-                    .background(Color.white)
+                case .week:
+                    WeekView(selectedDate: $selectedDate)
+                        .environmentObject(eventManager)
+                        .environmentObject(activityMonitor)
+                        .background(Color(NSColor.controlBackgroundColor))
+
+                case .month:
+                    MonthView(selectedDate: $selectedDate)
+                        .environmentObject(eventManager)
+                        .environmentObject(activityMonitor)
+                        .background(Color(NSColor.controlBackgroundColor))
             }
         }
-        .navigationTitle("日历")
         .sheet(isPresented: $showingAddEvent) {
             EventEditView(event: PomodoroEvent(
                 title: "新事件",
@@ -89,6 +83,44 @@ struct CalendarView: View {
             })
                 .environmentObject(eventManager)
         }
+        .toolbar {
+            // 左侧：添加事件按钮
+            ToolbarItem(placement: .navigation) {
+                Button(action: {
+                    showingAddEvent = true
+                }) {
+                    Image(systemName: "plus")
+                }
+                .help("添加事件")
+            }
+
+            // 中间：完整的工具栏布局
+            ToolbarItem(placement: .principal) {
+                HStack {
+                    // 视图模式选择器
+                    Picker("视图模式", selection: $currentViewMode) {
+                        ForEach(CalendarViewMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+
+
+                    // 搜索框
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 13))
+
+                        TextField("搜索事件", text: $searchText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 13))
+                            .frame(width: 140)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -97,46 +129,68 @@ struct CalendarToolbar: View {
     @Binding var selectedDate: Date
     @Binding var viewMode: CalendarViewMode
     @Binding var showingAddEvent: Bool
-    
+    @State private var searchText = ""
+
     private let calendar = Calendar.current
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy年M月d日"
         return formatter
     }()
-    
+
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                // 左侧：日期显示
-                Text(formattedDateTitle)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+        VStack(spacing: 0) {
+            // 顶部工具栏
+            HStack(spacing: 16) {
+                // 左侧：添加事件按钮
+                Button(action: {
+                    showingAddEvent = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16))
+                        .foregroundColor(.primary)
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.regular)
 
                 Spacer()
 
-                // 右侧：功能按钮
-                HStack(spacing: 12) {
-                    // 视图模式切换
-                    Picker("", selection: $viewMode) {
-                        ForEach(CalendarViewMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 120)
-
-                    // 添加事件按钮
-                    Button(action: {
-                        showingAddEvent = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
+                // 中间：视图模式标签页（居中）
+                Picker("", selection: $viewMode) {
+                    ForEach(CalendarViewMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
                     }
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+
+                Spacer()
+
+                // 右侧：搜索框
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+
+                    TextField("搜索", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .font(.system(size: 14))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                )
+                .frame(width: 150)
             }
-            .padding(.horizontal)
-            .padding(.top, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(NSColor.windowBackgroundColor))
 
             Divider()
         }
@@ -225,7 +279,7 @@ struct DayView: View {
             HStack(spacing: 0) {
                 // 左侧时间轴区域
                 TimelineView(
-                    selectedDate: selectedDate,
+                    selectedDate: $selectedDate,
                     selectedEvent: $selectedEvent,
                     showingAddEvent: $showingAddEvent,
                     draggedEvent: $draggedEvent,
@@ -234,6 +288,7 @@ struct DayView: View {
                 )
                 .environmentObject(eventManager)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.controlBackgroundColor))
 
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
@@ -246,7 +301,7 @@ struct DayView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(.regularMaterial, in: Rectangle())
+                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -255,7 +310,7 @@ struct DayView: View {
 
 // MARK: - 时间轴视图
 struct TimelineView: View {
-    let selectedDate: Date
+    @Binding var selectedDate: Date
     @Binding var selectedEvent: PomodoroEvent?
     @Binding var showingAddEvent: Bool
     @Binding var draggedEvent: PomodoroEvent?
@@ -281,27 +336,36 @@ struct TimelineView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                ZStack(alignment: .topLeading) {
-                    // 时间标签和网格线
-                    VStack(spacing: 0) {
-                        ForEach(hours, id: \.self) { (hour: Int) in
-                            HStack {
-                                // 时间标签
-                                Text(String(format: "%02d:00", hour))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 50, alignment: .trailing)
+        VStack(spacing: 0) {
+            // 日期导航栏
+            DateNavigationBar(selectedDate: $selectedDate)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
-                                // 网格线
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(height: 1)
+            Divider()
+
+            // 时间轴内容
+            GeometryReader { geometry in
+                ScrollView {
+                    ZStack(alignment: .topLeading) {
+                        // 时间标签和网格线
+                        VStack(spacing: 0) {
+                            ForEach(hours, id: \.self) { (hour: Int) in
+                                HStack {
+                                    // 时间标签
+                                    Text(String(format: "%02d:00", hour))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 50, alignment: .trailing)
+
+                                    // 网格线
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(height: 1)
+                                }
+                                .frame(height: hourHeight)
                             }
-                            .frame(height: hourHeight)
                         }
-                    }
 
                     // 事件块（并列排布）- 性能优化，使用动态宽度
                     ForEach(eventLayoutInfo, id: \.0.id) { info in
@@ -327,38 +391,39 @@ struct TimelineView: View {
                 }
             }
             .padding(.leading, 60)
-        }
-        .onTapGesture { location in
-            // 简化的点击处理：点击空白区域取消选中事件
-            // 由于事件块有自己的onTapGesture，这里只处理空白区域的点击
-            selectedEvent = nil
-        }
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    // 改进拖拽体验：只在事件区域内开始选择
-                    let leftPadding: CGFloat = 60
+            .onTapGesture { location in
+                // 简化的点击处理：点击空白区域取消选中事件
+                // 由于事件块有自己的onTapGesture，这里只处理空白区域的点击
+                selectedEvent = nil
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // 改进拖拽体验：只在事件区域内开始选择
+                        let leftPadding: CGFloat = 60
 
-                    if selectionStart == nil {
-                        // 只有在事件区域内点击才开始选择
-                        if value.startLocation.x > leftPadding {
-                            selectionStart = value.startLocation
-                            isSelecting = true
+                        if selectionStart == nil {
+                            // 只有在事件区域内点击才开始选择
+                            if value.startLocation.x > leftPadding {
+                                selectionStart = value.startLocation
+                                isSelecting = true
+                            }
+                        }
+
+                        // 更新选择结束位置
+                        if isSelecting {
+                            selectionEnd = value.location
                         }
                     }
-
-                    // 更新选择结束位置
-                    if isSelecting {
-                        selectionEnd = value.location
+                    .onEnded { value in
+                        if isSelecting {
+                            createEventFromSelection()
+                        }
+                        resetSelection()
                     }
-                }
-                .onEnded { value in
-                    if isSelecting {
-                        createEventFromSelection()
-                    }
-                    resetSelection()
-                }
-        )
+            )
+            }
+        }
         }
     }
 
@@ -475,8 +540,8 @@ struct EventBlock: View {
     @State private var dragStartOffset: CGSize = .zero
     @State private var lastUpdateTime: Date = Date()
 
-    // 拖拽阈值，避免意外触发 - 降低阈值以提高响应性
-    private let dragThreshold: CGFloat = 1.0
+    // 拖拽阈值，避免意外触发 - 增加阈值以避免与双击冲突
+    private let dragThreshold: CGFloat = 10.0
     // 更新频率限制（毫秒）- 提高更新频率以改善响应性
     private let updateThrottleMs: TimeInterval = 8.33 // ~120fps
     private var eventPosition: (y: CGFloat, height: CGFloat) {
@@ -531,14 +596,17 @@ struct EventBlock: View {
         .position(x: x + width / 2, y: position.y + position.height / 2)
         .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
-            .onTapGesture {
-                selectedEvent = event
-            }
             .onTapGesture(count: 2) {
                 showingPopover = true
             }
-            .popover(isPresented: $showingPopover) {
-                EventEditView(event: event, onSave: { updatedEvent in
+            .simultaneousGesture(
+                    TapGesture()
+                        .onEnded { _ in
+                            selectedEvent = event
+                        }
+                )
+            .popover(isPresented: $showingPopover, arrowEdge: .trailing) {
+                EventDetailPopover(event: event, onSave: { updatedEvent in
                     showingPopover = false
                     // 更新选中事件以同步右侧面板
                     if selectedEvent?.id == event.id {
@@ -549,7 +617,7 @@ struct EventBlock: View {
                     selectedEvent = nil
                 })
                 .environmentObject(eventManager)
-                .frame(width: 400, height: 500)
+                .frame(width: 350, height: 400)
             }
             .contextMenu {
                 Button(role: .destructive) {
@@ -715,13 +783,13 @@ struct MiniCalendarView: View {
     }
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             // 导航按钮组
             HStack {
                 // 上一个月按钮
                 Button(action: previousMonth) {
                     Image(systemName: "chevron.left")
-                        .font(.caption)
+                        .font(.caption2)
                 }
 
                 Spacer()
@@ -729,7 +797,7 @@ struct MiniCalendarView: View {
                 // 今天按钮
                 Button(action: goToToday) {
                     Text("今天")
-                        .font(.caption)
+                        .font(.caption2)
                 }
                 .disabled(isToday)
 
@@ -738,10 +806,10 @@ struct MiniCalendarView: View {
                 // 下一个月按钮
                 Button(action: nextMonth) {
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(.caption2)
                 }
             }
-            
+
             // 星期标题
             HStack(spacing: 0) {
                 ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { day in
@@ -752,9 +820,9 @@ struct MiniCalendarView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            
+
             // 日历网格
-            LazyVGrid(columns: columns, spacing: 4) {
+            LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(monthDays, id: \.self) { date in
                     MiniDayCell(date: date, selectedDate: $selectedDate, currentMonth: currentMonth)
                 }
@@ -811,7 +879,7 @@ struct MiniDayCell: View {
             selectedDate = date
         }) {
             Text("\(calendar.component(.day, from: date))")
-                .font(.caption)
+                .font(.caption2)
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundColor({
                     if isSelected {
@@ -824,7 +892,7 @@ struct MiniDayCell: View {
                         return .secondary
                     }
                 }())
-                .frame(width: 28, height: 28)
+                .frame(width: 24, height: 24)
                 .background(
                     Group {
                         if isSelected {
@@ -846,22 +914,71 @@ struct MiniDayCell: View {
 struct EventDetailPanel: View {
     @Binding var selectedEvent: PomodoroEvent?
     @EnvironmentObject var eventManager: EventManager
-    @State private var editSuccessFlag = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let event = selectedEvent {
-                    // 事件详情编辑
-                    EventEditView(event: event, onSave: { updatedEvent in
-                        // 保存后刷新右侧面板并更新选中事件
-                        selectedEvent = updatedEvent
-                        editSuccessFlag.toggle()
-                    }, onDelete: {
-                        // 删除后自动回到未选中
-                        selectedEvent = nil
-                    })
+                    // 事件详情显示
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("事件详情")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+
+                        // 事件标题
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("标题")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(event.title)
+                                .font(.body)
+                                .fontWeight(.medium)
+                        }
+
+                        // 事件类型
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("类型")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                Circle()
+                                    .fill(event.type.color)
+                                    .frame(width: 12, height: 12)
+                                Text(event.type.displayName)
+                                    .font(.body)
+                            }
+                        }
+
+                        // 时间信息
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("时间")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("开始：\(formatTime(event.startTime))")
+                                    .font(.body)
+                                Text("结束：\(formatTime(event.endTime))")
+                                    .font(.body)
+                                Text("时长：\(formatDuration(event.endTime.timeIntervalSince(event.startTime)))")
+                                    .font(.callout)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Divider()
+
+                        // 操作按钮
+                        VStack(spacing: 8) {
+                            Button("删除事件") {
+                                eventManager.removeEvent(event)
+                                selectedEvent = nil
+                            }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
                     .id(event.id) // 保证切换事件时刷新
-                    .environmentObject(eventManager)
                 } else {
                     // 空状态
                     VStack(spacing: 16) {
@@ -871,7 +988,7 @@ struct EventDetailPanel: View {
                         Text("未选中事件")
                             .font(.title3)
                             .foregroundColor(.secondary)
-                        Text("请在左侧时间轴点击事件，或拖拽新建事件后在此编辑详情")
+                        Text("请在左侧时间轴点击事件查看详情，或双击事件进行编辑")
                             .font(.callout)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -880,6 +997,23 @@ struct EventDetailPanel: View {
                 }
             }
             .padding()
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration) / 3600
+        let minutes = Int(duration) % 3600 / 60
+
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
         }
     }
 }
@@ -954,7 +1088,7 @@ struct WeekView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(.regularMaterial, in: Rectangle())
+                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -1354,14 +1488,17 @@ struct WeekEventBlock: View {
         .position(x: x + width / 2, y: position.y + position.height / 2)
         .offset(dragOffset)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
-        .onTapGesture {
-            selectedEvent = event
-        }
         .onTapGesture(count: 2) {
             showingPopover = true
         }
-        .popover(isPresented: $showingPopover) {
-            EventEditView(
+       .simultaneousGesture(
+            TapGesture()
+                .onEnded { _ in
+                    selectedEvent = event
+                }
+        )
+        .popover(isPresented: $showingPopover, arrowEdge: .trailing) {
+            EventDetailPopover(
                 event: event,
                 onSave: { updatedEvent in
                     showingPopover = false
@@ -1376,7 +1513,7 @@ struct WeekEventBlock: View {
                 }
             )
             .environmentObject(eventManager)
-            .frame(width: 300, height: 400)
+            .frame(width: 350, height: 400)
         }
         .contextMenu {
             Button(role: .destructive) {
@@ -1389,7 +1526,7 @@ struct WeekEventBlock: View {
             }
         }
         .gesture(
-            DragGesture()
+            DragGesture(minimumDistance: 10.0)
                 .onChanged { value in
                     isDragging = true
                     dragOffset = value.translation
@@ -1498,7 +1635,7 @@ struct MonthView: View {
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
-                .background(.regularMaterial, in: Rectangle())
+                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
             }
         }
         .onAppear {
@@ -1993,3 +2130,283 @@ struct MonthDayCell: View {
         )
     }
 }
+
+// MARK: - 事件详情弹窗
+struct EventDetailPopover: View {
+    let event: PomodoroEvent
+    let onSave: (PomodoroEvent) -> Void
+    let onDelete: () -> Void
+
+    @EnvironmentObject var eventManager: EventManager
+    @State private var title: String
+    @State private var startTime: Date
+    @State private var endTime: Date
+    @State private var eventType: PomodoroEvent.EventType
+    @State private var isEditing = false
+
+    init(event: PomodoroEvent, onSave: @escaping (PomodoroEvent) -> Void, onDelete: @escaping () -> Void) {
+        self.event = event
+        self.onSave = onSave
+        self.onDelete = onDelete
+        self._title = State(initialValue: event.title)
+        self._startTime = State(initialValue: event.startTime)
+        self._endTime = State(initialValue: event.endTime)
+        self._eventType = State(initialValue: event.type)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 标题栏
+            HStack {
+                Text("事件详情")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(isEditing ? "完成" : "编辑") {
+                    if isEditing {
+                        saveEvent()
+                    }
+                    isEditing.toggle()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+
+            Divider()
+
+            if isEditing {
+                // 编辑模式
+                VStack(alignment: .leading, spacing: 12) {
+                    // 事件标题
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("标题")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("事件标题", text: $title)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    // 事件类型
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("类型")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("事件类型", selection: $eventType) {
+                            ForEach(PomodoroEvent.EventType.allCases, id: \.self) { type in
+                                Text(type.displayName).tag(type)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    // 时间设置
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("时间")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("开始")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                                    .datePickerStyle(.compact)
+                                    .labelsHidden()
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("结束")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
+                                    .datePickerStyle(.compact)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 显示模式
+                VStack(alignment: .leading, spacing: 12) {
+                    // 事件标题
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("标题")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(event.title)
+                            .font(.body)
+                            .fontWeight(.medium)
+                    }
+
+                    // 事件类型
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("类型")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack {
+                            Circle()
+                                .fill(event.type.color)
+                                .frame(width: 12, height: 12)
+                            Text(event.type.displayName)
+                                .font(.body)
+                        }
+                    }
+
+                    // 时间信息
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("时间")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("开始：\(formatTime(event.startTime))")
+                                .font(.body)
+                            Text("结束：\(formatTime(event.endTime))")
+                                .font(.body)
+                            Text("时长：\(formatDuration(event.endTime.timeIntervalSince(event.startTime)))")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+
+            Spacer()
+
+            // 底部按钮
+            HStack {
+                Button("删除", role: .destructive) {
+                    eventManager.removeEvent(event)
+                    onDelete()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func saveEvent() {
+        // 确保结束时间在开始时间之后
+        if endTime <= startTime {
+            endTime = startTime.addingTimeInterval(1800) // 默认30分钟
+        }
+
+        var updatedEvent = event
+        updatedEvent.title = title.isEmpty ? eventType.displayName : title
+        updatedEvent.startTime = startTime
+        updatedEvent.endTime = endTime
+        updatedEvent.type = eventType
+
+        eventManager.updateEvent(updatedEvent)
+        onSave(updatedEvent)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration) / 3600
+        let minutes = Int(duration) % 3600 / 60
+
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+}
+
+// MARK: - 日期导航栏
+struct DateNavigationBar: View {
+    @Binding var selectedDate: Date
+    private let calendar = Calendar.current
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月d日"
+        return formatter
+    }()
+
+    private let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }()
+
+    private let lunarFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .chinese)
+        formatter.dateFormat = "MMMMd"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }()
+
+    var body: some View {
+        HStack {
+            // 左侧：日期信息
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(dateFormatter.string(from: selectedDate))
+                        .font(.title)
+                        .fontWeight(.semibold)
+
+                    Text(weekdayFormatter.string(from: selectedDate))
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+
+                Text(lunarFormatter.string(from: selectedDate))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+        }
+    }
+
+    private var isToday: Bool {
+        calendar.isDateInToday(selectedDate)
+    }
+
+    private func previousDay() {
+        selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+    }
+
+    private func nextDay() {
+        selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+    }
+
+    private func goToToday() {
+        selectedDate = Date()
+    }
+}
+
+// MARK: - VisualEffectView for macOS
+#if os(macOS)
+struct VisualEffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let visualEffectView = NSVisualEffectView()
+        visualEffectView.material = material
+        visualEffectView.blendingMode = blendingMode
+        visualEffectView.state = .active
+        return visualEffectView
+    }
+
+    func updateNSView(_ visualEffectView: NSVisualEffectView, context: Context) {
+        visualEffectView.material = material
+        visualEffectView.blendingMode = blendingMode
+    }
+}
+#endif
