@@ -155,9 +155,6 @@ struct TimerView: View {
                         Text(timerModel.currentMode.rawValue)
                             .font(.title3)
                             .foregroundColor(.primary)
-                        Image(systemName: "chevron.down")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())

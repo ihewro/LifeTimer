@@ -23,8 +23,9 @@ struct PomodoroTimerApp: App {
                 .environmentObject(activityMonitor)
         }
         #if os(macOS)
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.titleBar)
         .windowResizability(.contentSize)
+        .windowToolbarStyle(.unified)
         #endif
     }
 }

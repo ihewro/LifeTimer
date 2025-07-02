@@ -58,7 +58,6 @@ struct ContentView: View {
                     Label(item.title, systemImage: item.iconName)
                 }
             }
-            .navigationTitle("番茄钟")
             .frame(minWidth: 200)
         } detail: {
             // 主内容区域
@@ -77,6 +76,7 @@ struct ContentView: View {
             .frame(minWidth: 600, minHeight: 500)
         }
         .frame(minWidth: 800, minHeight: 600)
+        .navigationTitle("")
         #else
         // iOS 版本使用 TabView
         TabView(selection: $selectedView) {

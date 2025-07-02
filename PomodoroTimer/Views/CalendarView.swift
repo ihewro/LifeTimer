@@ -106,9 +106,15 @@ struct CalendarView: View {
                     .pickerStyle(.segmented)
                     .frame(width: 180)
 
-
-                    // 搜索框
-                    HStack(spacing: 6) {
+                }
+            }
+            // 中间：占位符确保 toolbar 铺满宽度
+            ToolbarItem(placement: .principal) {
+                Spacer()
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                // 搜索框
+                HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.secondary)
                             .font(.system(size: 13))
@@ -117,7 +123,6 @@ struct CalendarView: View {
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
                             .frame(width: 140)
-                    }
                 }
             }
         }
@@ -292,8 +297,14 @@ struct DayView: View {
 
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
+                    // 日期导航栏
+                    DateNavigationBar(selectedDate: $selectedDate, viewMode: .day)
+                        .padding()
+
+                    Divider()
+
                     MiniCalendarView(selectedDate: $selectedDate)
-                        .frame(height: 250)
+                        .frame(height: 200)
                         .padding()
                     Divider()
                     EventDetailPanel(selectedEvent: $selectedEvent)
@@ -338,7 +349,7 @@ struct TimelineView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 日期导航栏
-            DateNavigationBar(selectedDate: $selectedDate)
+            DateNavigationBar(selectedDate: $selectedDate, viewMode: .month)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
 
@@ -390,14 +401,14 @@ struct TimelineView: View {
                     SelectionOverlay(start: start, end: end)
                 }
             }
-            .padding(.leading, 60)
+            .padding(.leading, 0)
+            .contentShape(Rectangle())
             .onTapGesture { location in
                 // 简化的点击处理：点击空白区域取消选中事件
-                // 由于事件块有自己的onTapGesture，这里只处理空白区域的点击
                 selectedEvent = nil
             }
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 5)
                     .onChanged { value in
                         // 改进拖拽体验：只在事件区域内开始选择
                         let leftPadding: CGFloat = 60
@@ -786,28 +797,23 @@ struct MiniCalendarView: View {
         VStack(spacing: 6) {
             // 导航按钮组
             HStack {
+                Spacer()
                 // 上一个月按钮
                 Button(action: previousMonth) {
                     Image(systemName: "chevron.left")
-                        .font(.caption2)
                 }
-
-                Spacer()
-
+                .controlSize(.small)
                 // 今天按钮
                 Button(action: goToToday) {
                     Text("今天")
-                        .font(.caption2)
                 }
+                .controlSize(.small)
                 .disabled(isToday)
-
-                Spacer()
-
                 // 下一个月按钮
                 Button(action: nextMonth) {
                     Image(systemName: "chevron.right")
-                        .font(.caption2)
                 }
+                .controlSize(.small)
             }
 
             // 星期标题
@@ -849,8 +855,9 @@ struct MiniCalendarView: View {
     }
 
     private func goToToday() {
-        currentMonth = Date()
-        selectedDate = Date()
+        let today = Date()
+        currentMonth = today
+        selectedDate = today
     }
 }
 
@@ -1028,6 +1035,12 @@ struct WeekView: View {
     @State private var selectedEvent: PomodoroEvent?
     @State private var showingAddEvent = false
 
+    // 拖拽选择状态
+    @State private var isSelecting = false
+    @State private var selectionStart: CGPoint?
+    @State private var selectionEnd: CGPoint?
+    @State private var selectionDate: Date?
+
     private let calendar = Calendar.current
     private let hourHeight: CGFloat = 50
 
@@ -1076,9 +1089,15 @@ struct WeekView: View {
 
                 // 右侧面板（类似日视图）
                 VStack(spacing: 0) {
+                    // 日期导航栏
+                    DateNavigationBar(selectedDate: $selectedDate, viewMode: .week)
+                        .padding()
+
+                    Divider()
+
                     // 小日历
                     MiniCalendarView(selectedDate: $selectedDate)
-                        .frame(height: 250)
+                        .frame(height: 200)
                         .padding()
 
                     Divider()
@@ -1186,6 +1205,11 @@ struct WeekView: View {
                                         containerWidth: dayGeometry.size.width
                                     )
                                 }
+
+                                // 选择区域覆盖层（只在当前选择的日期显示）
+                                if isSelecting, let start = selectionStart, let end = selectionEnd, selectionDate == date {
+                                    WeekSelectionOverlay(start: start, end: end, containerWidth: dayGeometry.size.width)
+                                }
                             }
                         }
                     )
@@ -1195,6 +1219,28 @@ struct WeekView: View {
                         // 点击取消选中事件
                         selectedEvent = nil
                     }
+                    .gesture(
+                        DragGesture(minimumDistance: 5)
+                            .onChanged { value in
+                                // 开始拖拽选择
+                                if selectionStart == nil {
+                                    selectionStart = value.startLocation
+                                    selectionDate = date
+                                    isSelecting = true
+                                }
+
+                                // 只有在同一天内才更新选择
+                                if selectionDate == date {
+                                    selectionEnd = value.location
+                                }
+                            }
+                            .onEnded { value in
+                                if isSelecting && selectionDate == date {
+                                    createEventFromWeekSelection(date: date)
+                                }
+                                resetSelection()
+                            }
+                    )
 
                     // 添加竖线分隔（除了最后一列）
                     if index < weekDates.count - 1 {
@@ -1410,6 +1456,48 @@ struct WeekView: View {
         return result.map { (event, col, _) in
             (event, col, eventToMaxCol[event.id] ?? 1)
         }
+    }
+
+    // 从周视图选择创建事件
+    private func createEventFromWeekSelection(date: Date) {
+        guard let start = selectionStart, let end = selectionEnd else { return }
+
+        // 支持分钟级别的精确时间计算
+        let startY = min(start.y, end.y)
+        let endY = max(start.y, end.y)
+
+        // 确保选择区域有最小高度（至少15分钟）
+        let minSelectionHeight = hourHeight * 0.25 // 15分钟
+        let adjustedEndY = max(endY, startY + minSelectionHeight)
+
+        let totalMinutesStart = max(0, min(24*60-1, Int(startY / hourHeight * 60)))
+        let totalMinutesEnd = max(totalMinutesStart+15, min(24*60, Int(adjustedEndY / hourHeight * 60)))
+
+        let startHour = totalMinutesStart / 60
+        let startMinute = totalMinutesStart % 60
+        let endHour = totalMinutesEnd / 60
+        let endMinute = totalMinutesEnd % 60
+
+        guard let startTime = calendar.date(bySettingHour: startHour, minute: startMinute, second: 0, of: date),
+              let endTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: date) else {
+            return
+        }
+
+        let newEvent = PomodoroEvent(
+            title: "新事件",
+            startTime: startTime,
+            endTime: endTime,
+            type: PomodoroEvent.EventType.custom
+        )
+        eventManager.addEvent(newEvent)
+        selectedEvent = newEvent
+    }
+
+    private func resetSelection() {
+        selectionStart = nil
+        selectionEnd = nil
+        selectionDate = nil
+        isSelecting = false
     }
 }
 
@@ -1664,23 +1752,23 @@ struct MonthView: View {
     // 月份导航视图
     private var monthNavigationView: some View {
         HStack {
-            Button(action: previousMonth) {
-                Image(systemName: "chevron.left")
-                    .font(.title2)
-            }
-
-            Spacer()
-
             Text(monthFormatter.string(from: currentMonth))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             Spacer()
-
+            Button(action: previousMonth) {
+                Image(systemName: "chevron.left")
+            }
+            .controlSize(.regular)
+            // 今天按钮
+            // Button(_:) {
+            //     Text("今天")
+            // }
             Button(action: nextMonth) {
                 Image(systemName: "chevron.right")
-                    .font(.title2)
             }
+            .controlSize(.regular)
         }
         .padding(.horizontal)
     }
@@ -2326,6 +2414,7 @@ struct EventDetailPopover: View {
 // MARK: - 日期导航栏
 struct DateNavigationBar: View {
     @Binding var selectedDate: Date
+    let viewMode: CalendarViewMode
     private let calendar = Calendar.current
 
     private let dateFormatter: DateFormatter = {
@@ -2350,8 +2439,8 @@ struct DateNavigationBar: View {
     }()
 
     var body: some View {
-        HStack {
-            // 左侧：日期信息
+        VStack(spacing: 12) {
+            // 日期信息
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(dateFormatter.string(from: selectedDate))
@@ -2368,8 +2457,28 @@ struct DateNavigationBar: View {
                     .foregroundColor(.secondary)
             }
 
-            Spacer()
+            // 导航按钮
+            HStack {
+                Button(action: previousPeriod) {
+                    Image(systemName: "chevron.left")
+                }
+                .controlSize(.small)
 
+                Spacer()
+
+                Button("今天") {
+                    goToToday()
+                }
+                .controlSize(.small)
+                .disabled(isToday)
+
+                Spacer()
+
+                Button(action: nextPeriod) {
+                    Image(systemName: "chevron.right")
+                }
+                .controlSize(.small)
+            }
         }
     }
 
@@ -2377,12 +2486,26 @@ struct DateNavigationBar: View {
         calendar.isDateInToday(selectedDate)
     }
 
-    private func previousDay() {
-        selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+    private func previousPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        }
     }
 
-    private func nextDay() {
-        selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+    private func nextPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
+        }
     }
 
     private func goToToday() {
@@ -2410,3 +2533,28 @@ struct VisualEffectView: NSViewRepresentable {
     }
 }
 #endif
+
+// MARK: - 周视图选择覆盖层
+struct WeekSelectionOverlay: View {
+    let start: CGPoint
+    let end: CGPoint
+    let containerWidth: CGFloat
+
+    var body: some View {
+        let rect = CGRect(
+            x: 0,
+            y: min(start.y, end.y),
+            width: containerWidth,
+            height: max(10, abs(end.y - start.y)) // 最小高度
+        )
+
+        Rectangle()
+            .foregroundColor(Color.blue.opacity(0.2))
+            .overlay(
+                Rectangle()
+                    .stroke(Color.blue.opacity(0.6), lineWidth: 1)
+            )
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+    }
+}

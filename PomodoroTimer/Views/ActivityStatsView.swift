@@ -50,27 +50,26 @@ struct ActivityStatsView: View {
                         selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.caption)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .controlSize(.small)
 
                     Button("今天") {
                         selectedDate = Date()
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .controlSize(.small)
 
                     Button(action: {
                         selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
                     }) {
                         Image(systemName: "chevron.right")
-                            .font(.caption)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .controlSize(.small)
                 }
             }
-
+            // 中间：占位符确保 toolbar 铺满宽度
+            ToolbarItem(placement: .principal) {
+                Spacer()
+            }
             // 右侧：监控状态和控制
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 8) {
