@@ -32,7 +32,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "265"
             endingLineNumber = "265"
-            landmarkName = "performSync(mode:)"
+            landmarkName = "performSync(isFullSync:)"
             landmarkType = "7">
             <Locations>
                <Location

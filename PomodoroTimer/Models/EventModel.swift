@@ -150,6 +150,13 @@ class EventManager: ObservableObject {
     func removeEvent(_ event: PomodoroEvent) {
         events.removeAll { $0.id == event.id }
         saveEvents()
+
+        // 发送删除通知给同步管理器
+        NotificationCenter.default.post(
+            name: Notification.Name("EventDeleted"),
+            object: nil,
+            userInfo: ["eventUUID": event.id.uuidString]
+        )
     }
     
     func updateEvent(_ event: PomodoroEvent) {

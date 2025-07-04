@@ -17,12 +17,12 @@ enum SyncStatus {
 }
 
 /// 同步模式 - 类似Git的操作模式
-enum SyncMode {
-    case forceOverwriteLocal    // 强制覆盖本地 (类似 git reset --hard origin/main)
-    case forceOverwriteRemote   // 强制覆盖远程 (类似 git push --force)
-    case pullOnly              // 仅拉取 (类似 git pull)
-    case pushOnly              // 仅推送 (类似 git push)
-    case smartMerge            // 智能同步 (类似 git pull + git push)
+enum SyncMode: String, Codable {
+    case forceOverwriteLocal = "forceOverwriteLocal"    // 强制覆盖本地 (类似 git reset --hard origin/main)
+    case forceOverwriteRemote = "forceOverwriteRemote"   // 强制覆盖远程 (类似 git push --force)
+    case pullOnly = "pullOnly"              // 仅拉取 (类似 git pull)
+    case pushOnly = "pushOnly"              // 仅推送 (类似 git push)
+    case smartMerge = "smartMerge"            // 智能同步 (类似 git pull + git push)
 
     var displayName: String {
         switch self {
@@ -90,6 +90,12 @@ class SyncManager: ObservableObject {
     @Published var isLoadingServerData = false
     @Published var localData: LocalDataPreview? = nil
     @Published var syncWorkspace: SyncWorkspace? = nil
+    @Published var lastSyncRecord: SyncRecord? = nil
+    @Published var syncHistory: [SyncRecord] = []
+
+    // 跟踪删除的事件
+    private var deletedEventUUIDs: Set<String> = []
+    private let deletedEventsKey = "DeletedEventUUIDs"
 
     private let apiClient: APIClient
     private let deviceUUID: String
@@ -134,11 +140,25 @@ class SyncManager: ObservableObject {
         // 初始化时计算待同步数据数量
         updatePendingSyncCount()
 
+        // 加载同步历史
+        loadSyncHistory()
+
+        // 加载删除的事件列表
+        loadDeletedEvents()
+
         // 监听设置变更
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(settingsDidChange),
             name: TimerModel.settingsChangedNotification,
+            object: nil
+        )
+
+        // 监听事件删除
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(eventDeleted(_:)),
+            name: Notification.Name("EventDeleted"),
             object: nil
         )
     }
@@ -155,6 +175,12 @@ class SyncManager: ObservableObject {
             await generateSyncWorkspace()
             loadLocalDataPreview()
             updatePendingSyncCount()
+        }
+    }
+
+    @objc private func eventDeleted(_ notification: Notification) {
+        if let eventUUID = notification.userInfo?["eventUUID"] as? String {
+            trackDeletedEvent(eventUUID)
         }
     }
 
@@ -237,7 +263,13 @@ class SyncManager: ObservableObject {
             } else {
                 try await performIncrementalSyncInternal()
             }
-            
+
+            // 刷新数据预览和工作区状态（如果不是通过performSync调用的）
+            await loadServerDataPreview()
+            loadLocalDataPreview()
+            await generateSyncWorkspace()
+            updatePendingSyncCount()
+
             DispatchQueue.main.async {
                 self.syncStatus = .success
                 self.lastSyncTime = Date()
@@ -255,12 +287,14 @@ class SyncManager: ObservableObject {
     }
     
     private func performFullSyncInternal() async throws {
-        try await performSyncInternal(mode: .smartMerge)
+        _ = try await performSyncInternal(mode: .smartMerge)
     }
 
     /// 执行指定模式的同步
     func performSync(mode: SyncMode) async {
         guard !isSyncing else { return }
+
+        let startTime = Date()
 
         DispatchQueue.main.async {
             self.isSyncing = true
@@ -268,13 +302,20 @@ class SyncManager: ObservableObject {
         }
 
         do {
-            try await performSyncInternal(mode: mode)
+            let (uploadedCount, downloadedCount, conflictCount) = try await performSyncInternal(mode: mode)
 
-            // 同步成功后刷新数据预览和工作区状态
-            // 注意：某些同步模式（如forceOverwriteRemote）可能已经更新了服务端数据预览
-            if mode != .forceOverwriteRemote {
-                await loadServerDataPreview()
-            }
+            let duration = Date().timeIntervalSince(startTime)
+            let record = SyncRecord(
+                syncMode: mode,
+                success: true,
+                uploadedCount: uploadedCount,
+                downloadedCount: downloadedCount,
+                conflictCount: conflictCount,
+                duration: duration
+            )
+
+            // 同步成功后刷新所有数据预览和工作区状态
+            await loadServerDataPreview() // 总是刷新服务端数据
             loadLocalDataPreview()
             await generateSyncWorkspace()
             updatePendingSyncCount() // 重新计算待同步数据数量
@@ -284,35 +325,57 @@ class SyncManager: ObservableObject {
                 self.lastSyncTime = Date()
                 self.userDefaults.set(self.lastSyncTime, forKey: self.lastSyncTimeKey)
                 self.isSyncing = false
+
+                // 清除已同步的删除记录
+                self.clearSyncedDeletions()
+
+                // 记录同步历史
+                self.addSyncRecord(record)
             }
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            let record = SyncRecord(
+                syncMode: mode,
+                success: false,
+                errorMessage: error.localizedDescription,
+                duration: duration
+            )
+
             DispatchQueue.main.async {
                 self.syncStatus = .error(error.localizedDescription)
                 self.isSyncing = false
+
+                // 记录同步历史
+                self.addSyncRecord(record)
             }
         }
     }
 
     /// 内部同步实现
-    private func performSyncInternal(mode: SyncMode) async throws {
+    private func performSyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int) {
         // 确保设备已注册
         try await ensureDeviceRegistered()
 
         switch mode {
         case .forceOverwriteLocal:
             try await performForceOverwriteLocal()
+            return (0, 1, 0) // 简化返回值
 
         case .forceOverwriteRemote:
             try await performForceOverwriteRemote()
+            return (1, 0, 0) // 简化返回值
 
         case .pullOnly:
             try await performPullOnly()
+            return (0, 1, 0) // 简化返回值
 
         case .pushOnly:
             try await performPushOnly()
+            return (1, 0, 0) // 简化返回值
 
         case .smartMerge:
             try await performSmartMerge()
+            return (1, 1, 0) // 简化返回值
         }
     }
 
@@ -459,9 +522,15 @@ class SyncManager: ObservableObject {
         
         // 应用服务器变更
         await applyServerChanges(response.data.serverChanges)
-        
+
         // 更新最后同步时间戳
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
+
+        // 刷新数据预览和工作区状态
+        await loadServerDataPreview()
+        loadLocalDataPreview()
+        await generateSyncWorkspace()
+        updatePendingSyncCount()
     }
     
     private func collectLocalChanges(since timestamp: Int64) async -> SyncChanges {
@@ -496,23 +565,25 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 收集计时器设置变更（如果有的话）
+        // 收集计时器设置变更（只有真正变更时才包含）
         var timerSettings: ServerTimerSettings? = nil
-        if let timerModel = timerModel {
-            // 假设计时器设置总是需要同步（简化处理）
-            timerSettings = ServerTimerSettings(
-                pomodoroTime: Int(timerModel.pomodoroTime),
-                shortBreakTime: Int(timerModel.shortBreakTime),
-                longBreakTime: Int(timerModel.longBreakTime),
-                updatedAt: Int64(Date().timeIntervalSince1970 * 1000)
-            )
+        if let timerModel = timerModel, let serverData = serverData {
+            let hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
+            if hasTimerSettingsChanged {
+                timerSettings = ServerTimerSettings(
+                    pomodoroTime: Int(timerModel.pomodoroTime),
+                    shortBreakTime: Int(timerModel.shortBreakTime),
+                    longBreakTime: Int(timerModel.longBreakTime),
+                    updatedAt: Int64(Date().timeIntervalSince1970 * 1000)
+                )
+            }
         }
 
         return SyncChanges(
             pomodoroEvents: PomodoroEventChanges(
                 created: createdEvents,
                 updated: updatedEvents,
-                deleted: [] // 暂时不处理删除
+                deleted: Array(deletedEventUUIDs) // 包含删除的事件UUID
             ),
             systemEvents: SystemEventChanges(created: createdSystemEvents),
             timerSettings: timerSettings
@@ -970,18 +1041,33 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 3. 分析设置变更（简化处理）
-        if let timerModel = timerModel, staged.count > 0 {
-            // 如果有其他变更，假设设置也可能有变更
+        // 3. 分析删除的事件
+        for deletedUUID in deletedEventUUIDs {
             let item = WorkspaceItem(
-                id: "timer-settings",
-                type: .timerSettings,
-                status: .modified,
-                title: "计时器设置",
-                description: "番茄钟: \(Int(timerModel.pomodoroTime/60))分钟",
+                id: deletedUUID,
+                type: .pomodoroEvent,
+                status: .deleted,
+                title: "已删除的事件",
+                description: "事件已从本地删除",
                 timestamp: Date()
             )
             staged.append(item)
+        }
+
+        // 4. 分析设置变更（真正的变更检测）
+        if let timerModel = timerModel, let serverData = serverData {
+            let hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
+            if hasTimerSettingsChanged {
+                let item = WorkspaceItem(
+                    id: "timer-settings",
+                    type: .timerSettings,
+                    status: .modified,
+                    title: "计时器设置",
+                    description: "番茄钟: \(Int(timerModel.pomodoroTime/60))分钟",
+                    timestamp: Date()
+                )
+                staged.append(item)
+            }
         }
 
         // 分析远程变更（需要先获取服务端数据）
@@ -1199,6 +1285,93 @@ class SyncManager: ObservableObject {
         }
 
         return count
+    }
+
+    /// 添加同步记录
+    private func addSyncRecord(_ record: SyncRecord) {
+        syncHistory.insert(record, at: 0) // 最新的记录在前面
+        lastSyncRecord = record
+
+        // 只保留最近50条记录
+        if syncHistory.count > 50 {
+            syncHistory = Array(syncHistory.prefix(50))
+        }
+
+        // 保存到UserDefaults
+        saveSyncHistory()
+    }
+
+    /// 保存同步历史到UserDefaults
+    private func saveSyncHistory() {
+        if let encoded = try? JSONEncoder().encode(syncHistory) {
+            userDefaults.set(encoded, forKey: "SyncHistory")
+        }
+        if let lastRecord = lastSyncRecord,
+           let encoded = try? JSONEncoder().encode(lastRecord) {
+            userDefaults.set(encoded, forKey: "LastSyncRecord")
+        }
+    }
+
+    /// 从UserDefaults加载同步历史
+    private func loadSyncHistory() {
+        if let data = userDefaults.data(forKey: "SyncHistory"),
+           let history = try? JSONDecoder().decode([SyncRecord].self, from: data) {
+            syncHistory = history
+        }
+        if let data = userDefaults.data(forKey: "LastSyncRecord"),
+           let record = try? JSONDecoder().decode(SyncRecord.self, from: data) {
+            lastSyncRecord = record
+        }
+    }
+
+    /// 跟踪删除的事件
+    private func trackDeletedEvent(_ eventUUID: String) {
+        deletedEventUUIDs.insert(eventUUID)
+        saveDeletedEvents()
+
+        // 更新待同步数据计数
+        updatePendingSyncCount()
+
+        // 重新生成同步工作区
+        Task {
+            await generateSyncWorkspace()
+        }
+    }
+
+    /// 保存删除的事件列表到UserDefaults
+    private func saveDeletedEvents() {
+        let array = Array(deletedEventUUIDs)
+        userDefaults.set(array, forKey: deletedEventsKey)
+    }
+
+    /// 从UserDefaults加载删除的事件列表
+    private func loadDeletedEvents() {
+        if let array = userDefaults.array(forKey: deletedEventsKey) as? [String] {
+            deletedEventUUIDs = Set(array)
+        }
+    }
+
+    /// 清除已同步的删除记录
+    private func clearSyncedDeletions() {
+        deletedEventUUIDs.removeAll()
+        saveDeletedEvents()
+    }
+
+    /// 检查计时器设置是否有变更
+    private func checkTimerSettingsChanged(timerModel: TimerModel, serverData: ServerDataPreview) -> Bool {
+        // 如果服务端没有计时器设置，说明是首次同步，需要上传
+        guard let serverSettings = serverData.timerSettings else {
+            return true
+        }
+
+        // 比较本地和服务端的计时器设置
+        let localPomodoroTime = Int(timerModel.pomodoroTime)
+        let localShortBreakTime = Int(timerModel.shortBreakTime)
+        let localLongBreakTime = Int(timerModel.longBreakTime)
+
+        return localPomodoroTime != serverSettings.pomodoroTime ||
+               localShortBreakTime != serverSettings.shortBreakTime ||
+               localLongBreakTime != serverSettings.longBreakTime
     }
 
     /// 获取待同步数据列表
@@ -1473,5 +1646,30 @@ struct WorkspaceItem: Identifiable {
                 return "冲突"
             }
         }
+    }
+}
+
+// MARK: - 同步记录
+struct SyncRecord: Identifiable, Codable {
+    let id: String
+    let timestamp: Date
+    let syncMode: SyncMode
+    let success: Bool
+    let errorMessage: String?
+    let uploadedCount: Int
+    let downloadedCount: Int
+    let conflictCount: Int
+    let duration: TimeInterval
+
+    init(syncMode: SyncMode, success: Bool, errorMessage: String? = nil, uploadedCount: Int = 0, downloadedCount: Int = 0, conflictCount: Int = 0, duration: TimeInterval = 0) {
+        self.id = UUID().uuidString
+        self.timestamp = Date()
+        self.syncMode = syncMode
+        self.success = success
+        self.errorMessage = errorMessage
+        self.uploadedCount = uploadedCount
+        self.downloadedCount = downloadedCount
+        self.conflictCount = conflictCount
+        self.duration = duration
     }
 }
