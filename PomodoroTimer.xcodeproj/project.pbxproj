@@ -15,6 +15,7 @@
 		1A2B3C4D5E6F7890ABCD1260 /* EventEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */; };
 		1A2B3C4D5E6F7890ABCD123E /* TimerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */; };
+		MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBAR001122334455667799 /* MenuBarManager.swift */; };
 		1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1244 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */; };
 		1A2B3C4D5E6F7890ABCD1246 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */; };
@@ -40,6 +41,7 @@
 		1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
+		MENUBAR001122334455667799 /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -128,6 +130,7 @@
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */,
+				MENUBAR001122334455667799 /* MenuBarManager.swift */,
 
 				893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */,
 				458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */,
@@ -223,6 +226,7 @@
 				1A2B3C4D5E6F7890ABCD1260 /* EventEditView.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD123E /* TimerModel.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */,
+				MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1234 /* PomodoroTimerApp.swift in Sources */,
 			

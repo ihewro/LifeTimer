@@ -14,6 +14,9 @@ struct PomodoroTimerApp: App {
     @StateObject private var eventManager = EventManager()
     @StateObject private var activityMonitor = ActivityMonitorManager()
     @StateObject private var syncManager = SyncManager(serverURL: "http://localhost:8080")
+    #if canImport(Cocoa)
+    @StateObject private var menuBarManager = MenuBarManager()
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +26,9 @@ struct PomodoroTimerApp: App {
                 .environmentObject(eventManager)
                 .environmentObject(activityMonitor)
                 .environmentObject(syncManager)
+                #if canImport(Cocoa)
+                .environmentObject(menuBarManager)
+                #endif
                 .onAppear {
                     // 设置 SyncManager 的依赖
                     syncManager.setDependencies(
@@ -30,6 +36,13 @@ struct PomodoroTimerApp: App {
                         activityMonitor: activityMonitor,
                         timerModel: timerModel
                     )
+
+                    #if canImport(Cocoa)
+                    // 延迟设置 MenuBarManager 的依赖，确保应用完全启动
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        menuBarManager.setTimerModel(timerModel)
+                    }
+                    #endif
                 }
         }
         #if os(macOS)

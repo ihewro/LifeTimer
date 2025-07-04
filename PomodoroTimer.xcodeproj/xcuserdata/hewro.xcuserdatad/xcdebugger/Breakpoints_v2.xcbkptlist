@@ -36,32 +36,60 @@
             landmarkType = "7">
             <Locations>
                <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - b7171088949e09fd"
+                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - 8172dcbdc207dd4"
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "(1) suspend resume partial function for PomodoroTimer.SyncManager.performSync(mode: PomodoroTimer.SyncMode) async -&gt; ()"
+                  symbolName = "(2) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
                   moduleName = "PomodoroTimer"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "265"
-                  endingLineNumber = "265">
+                  startingLineNumber = "268"
+                  endingLineNumber = "268">
                </Location>
                <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - 4219ea3a653811f8"
+                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - bb60596cb8345fd3"
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "closure #1 @Swift.MainActor @Sendable () -&gt; () in PomodoroTimer.SyncManager.performSync(mode: PomodoroTimer.SyncMode) async -&gt; ()"
+                  symbolName = "(3) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
                   moduleName = "PomodoroTimer"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "266"
-                  endingLineNumber = "266">
+                  startingLineNumber = "268"
+                  endingLineNumber = "268">
+               </Location>
+               <Location
+                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - e6b28291645bb9d2"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(4) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "268"
+                  endingLineNumber = "268">
+               </Location>
+               <Location
+                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - aaecda1a0e0d2fd8"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(5) suspend resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "268"
+                  endingLineNumber = "268">
                </Location>
             </Locations>
          </BreakpointContent>
