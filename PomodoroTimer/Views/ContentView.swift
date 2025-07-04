@@ -11,6 +11,7 @@ enum SidebarItem: String, CaseIterable {
     case timer = "timer"
     case calendar = "calendar"
     case activityStats = "activityStats"
+    case sync = "sync"
     case settings = "settings"
 
     var title: String {
@@ -21,6 +22,8 @@ enum SidebarItem: String, CaseIterable {
             return "日历"
         case .activityStats:
             return "活动"
+        case .sync:
+            return "同步"
         case .settings:
             return "设置"
         }
@@ -34,6 +37,8 @@ enum SidebarItem: String, CaseIterable {
             return "calendar"
         case .activityStats:
             return "chart.bar"
+        case .sync:
+            return "arrow.triangle.2.circlepath"
         case .settings:
             return "gear"
         }
@@ -45,7 +50,8 @@ struct ContentView: View {
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
-    
+    @EnvironmentObject var syncManager: SyncManager
+
     @State private var selectedView: SidebarItem = .timer
     
     var body: some View {
@@ -69,6 +75,8 @@ struct ContentView: View {
                     CalendarView()
                 case .activityStats:
                     ActivityStatsView()
+                case .sync:
+                    SyncView()
                 case .settings:
                     SettingsView()
                 }
@@ -98,6 +106,12 @@ struct ContentView: View {
                 }
                 .tag(SidebarItem.activityStats)
 
+            SyncView()
+                .tabItem {
+                    Label("同步", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .tag(SidebarItem.sync)
+
             SettingsView()
                 .tabItem {
                     Label("设置", systemImage: "gear")
@@ -114,4 +128,5 @@ struct ContentView: View {
         .environmentObject(AudioManager())
         .environmentObject(EventManager())
         .environmentObject(ActivityMonitorManager())
+        .environmentObject(SyncManager(serverURL: "http://localhost:8080"))
 }

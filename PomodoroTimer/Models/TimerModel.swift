@@ -47,12 +47,33 @@ class TimerModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0 // 用于正计时模式
     
     // 设置
-    @Published var pomodoroTime: TimeInterval = 25 * 60 // 25分钟
-    @Published var shortBreakTime: TimeInterval = 5 * 60 // 5分钟
-    @Published var longBreakTime: TimeInterval = 15 * 60 // 15分钟
+    @Published var pomodoroTime: TimeInterval = 25 * 60 { // 25分钟
+        didSet {
+            if pomodoroTime != oldValue {
+                notifySettingsChanged()
+            }
+        }
+    }
+    @Published var shortBreakTime: TimeInterval = 5 * 60 { // 5分钟
+        didSet {
+            if shortBreakTime != oldValue {
+                notifySettingsChanged()
+            }
+        }
+    }
+    @Published var longBreakTime: TimeInterval = 15 * 60 { // 15分钟
+        didSet {
+            if longBreakTime != oldValue {
+                notifySettingsChanged()
+            }
+        }
+    }
     
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
+
+    // 设置变更通知
+    static let settingsChangedNotification = Notification.Name("TimerSettingsChanged")
     
     init() {
         setupTimer()
@@ -159,6 +180,12 @@ class TimerModel: ObservableObject {
         case .countUp:
             return 0 // 正计时模式不显示进度
         }
+    }
+
+    // MARK: - 设置变更通知
+
+    private func notifySettingsChanged() {
+        NotificationCenter.default.post(name: TimerModel.settingsChangedNotification, object: self)
     }
 }
 

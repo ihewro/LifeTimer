@@ -16,7 +16,12 @@ require_once 'api/base.php';
 // 简单路由
 $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
-$path = str_replace('/sync_server', '', $path); // 移除基础路径
+// 移除基础路径（如果存在）
+$path = str_replace('/sync_server', '', $path);
+// 确保路径以 / 开头
+if (!str_starts_with($path, '/')) {
+    $path = '/' . $path;
+}
 
 // 路由映射
 $routes = [
@@ -30,6 +35,12 @@ $routes = [
 
 $method = $_SERVER['REQUEST_METHOD'];
 $route_key = "$method $path";
+
+// 调试信息
+error_log("Debug: Request URI: " . $request_uri);
+error_log("Debug: Path: " . $path);
+error_log("Debug: Method: " . $method);
+error_log("Debug: Route key: " . $route_key);
 
 try {
     if (isset($routes[$route_key])) {

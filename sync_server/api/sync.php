@@ -64,28 +64,44 @@ function handleIncrementalSync() {
     try {
         $conflicts = [];
         $server_timestamp = getCurrentTimestamp();
-        
-        // 处理客户端变更
-        if (isset($changes['pomodoro_events'])) {
-            $conflicts = array_merge($conflicts, 
-                processPomodoroEventChanges($db, $device_uuid, $changes['pomodoro_events'], $last_sync_timestamp)
-            );
+
+        // 检查是否为强制覆盖远程操作（lastSyncTimestamp = 0）
+        if ($last_sync_timestamp == 0) {
+            logMessage("Force overwrite remote detected for device: $device_uuid");
+
+            // 强制覆盖：清空现有数据并用客户端数据替换
+            performForceOverwriteRemote($db, $device_uuid, $changes, $server_timestamp);
+
+            // 强制覆盖后不返回服务器变更，因为服务器数据已被完全替换
+            $server_changes = [
+                'pomodoro_events' => [],
+                'system_events' => [],
+                'timer_settings' => null
+            ];
+        } else {
+            // 正常增量同步
+            // 处理客户端变更
+            if (isset($changes['pomodoro_events'])) {
+                $conflicts = array_merge($conflicts,
+                    processPomodoroEventChanges($db, $device_uuid, $changes['pomodoro_events'], $last_sync_timestamp)
+                );
+            }
+
+            if (isset($changes['system_events'])) {
+                processSystemEventChanges($db, $device_uuid, $changes['system_events']);
+            }
+
+            if (isset($changes['timer_settings'])) {
+                processTimerSettingsChanges($db, $device_uuid, $changes['timer_settings'], $last_sync_timestamp);
+            }
+
+            // 获取服务器端的变更
+            $server_changes = [
+                'pomodoro_events' => getPomodoroEventsAfter($db, $device_uuid, $last_sync_timestamp),
+                'system_events' => getSystemEventsAfter($db, $device_uuid, $last_sync_timestamp),
+                'timer_settings' => getTimerSettingsAfter($db, $device_uuid, $last_sync_timestamp)
+            ];
         }
-        
-        if (isset($changes['system_events'])) {
-            processSystemEventChanges($db, $device_uuid, $changes['system_events']);
-        }
-        
-        if (isset($changes['timer_settings'])) {
-            processTimerSettingsChanges($db, $device_uuid, $changes['timer_settings'], $last_sync_timestamp);
-        }
-        
-        // 获取服务器端的变更
-        $server_changes = [
-            'pomodoro_events' => getPomodoroEventsAfter($db, $device_uuid, $last_sync_timestamp),
-            'system_events' => getSystemEventsAfter($db, $device_uuid, $last_sync_timestamp),
-            'timer_settings' => getTimerSettingsAfter($db, $device_uuid, $last_sync_timestamp)
-        ];
         
         // 更新设备最后同步时间
         updateDeviceLastSync($db, $device_uuid, $server_timestamp);
@@ -327,5 +343,88 @@ function processTimerSettingsChanges($db, $device_uuid, $settings, $last_sync_ti
         $settings['long_break_time'],
         $settings['updated_at']
     ]);
+}
+
+// 强制覆盖远程数据
+function performForceOverwriteRemote($db, $device_uuid, $changes, $server_timestamp) {
+    logMessage("Performing force overwrite remote for device: $device_uuid");
+
+    // 1. 清空该设备的所有现有数据（软删除）
+    clearDeviceData($db, $device_uuid, $server_timestamp);
+
+    // 2. 插入客户端发送的所有数据
+    if (isset($changes['pomodoro_events']['created'])) {
+        foreach ($changes['pomodoro_events']['created'] as $event) {
+            $stmt = $db->prepare('
+                INSERT INTO pomodoro_events
+                (uuid, device_uuid, title, start_time, end_time, event_type, is_completed, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            $stmt->execute([
+                $event['uuid'],
+                $device_uuid,
+                $event['title'],
+                $event['start_time'],
+                $event['end_time'],
+                $event['event_type'],
+                $event['is_completed'] ? 1 : 0,
+                $event['created_at'],
+                $event['updated_at']
+            ]);
+        }
+    }
+
+    if (isset($changes['system_events']['created'])) {
+        foreach ($changes['system_events']['created'] as $event) {
+            $stmt = $db->prepare('
+                INSERT INTO system_events
+                (uuid, device_uuid, event_type, timestamp, data, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ');
+            $stmt->execute([
+                $event['uuid'],
+                $device_uuid,
+                $event['event_type'],
+                $event['timestamp'],
+                isset($event['data']) ? json_encode($event['data']) : null,
+                $event['created_at']
+            ]);
+        }
+    }
+
+    if (isset($changes['timer_settings'])) {
+        $settings = $changes['timer_settings'];
+        $stmt = $db->prepare('
+            INSERT OR REPLACE INTO timer_settings
+            (device_uuid, pomodoro_time, short_break_time, long_break_time, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        ');
+        $stmt->execute([
+            $device_uuid,
+            $settings['pomodoro_time'],
+            $settings['short_break_time'],
+            $settings['long_break_time'],
+            $settings['updated_at']
+        ]);
+    }
+
+    logMessage("Force overwrite remote completed for device: $device_uuid");
+}
+
+// 清空设备数据（硬删除，用于强制覆盖）
+function clearDeviceData($db, $device_uuid, $timestamp) {
+    // 硬删除所有番茄事件（强制覆盖时需要完全清空以避免UUID冲突）
+    $stmt = $db->prepare('DELETE FROM pomodoro_events WHERE device_uuid = ?');
+    $stmt->execute([$device_uuid]);
+
+    // 硬删除所有系统事件
+    $stmt = $db->prepare('DELETE FROM system_events WHERE device_uuid = ?');
+    $stmt->execute([$device_uuid]);
+
+    // 删除计时器设置
+    $stmt = $db->prepare('DELETE FROM timer_settings WHERE device_uuid = ?');
+    $stmt->execute([$device_uuid]);
+
+    logMessage("Hard deleted all existing data for device: $device_uuid (force overwrite)");
 }
 ?>

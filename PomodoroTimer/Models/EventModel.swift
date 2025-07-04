@@ -10,7 +10,9 @@ import SwiftUI
 
 struct PomodoroEvent: Identifiable, Codable {
     let id: UUID
-    
+    let createdAt: Date
+    var updatedAt: Date
+
     init(title: String, startTime: Date, endTime: Date, type: EventType, isCompleted: Bool = false) {
         self.id = UUID()
         self.title = title
@@ -18,12 +20,47 @@ struct PomodoroEvent: Identifiable, Codable {
         self.endTime = endTime
         self.type = type
         self.isCompleted = isCompleted
+        let now = Date()
+        self.createdAt = now
+        self.updatedAt = now
     }
-    var title: String
-    var startTime: Date
-    var endTime: Date
-    var type: EventType
-    var isCompleted: Bool = false
+
+    // 从服务端数据创建事件的初始化方法
+    init(id: String, title: String, startTime: Date, endTime: Date, type: EventType, isCompleted: Bool, createdAt: Date, updatedAt: Date) {
+        self.id = UUID(uuidString: id) ?? UUID()
+        self.title = title
+        self.startTime = startTime
+        self.endTime = endTime
+        self.type = type
+        self.isCompleted = isCompleted
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    var title: String {
+        didSet {
+            updatedAt = Date()
+        }
+    }
+    var startTime: Date {
+        didSet {
+            updatedAt = Date()
+        }
+    }
+    var endTime: Date {
+        didSet {
+            updatedAt = Date()
+        }
+    }
+    var type: EventType {
+        didSet {
+            updatedAt = Date()
+        }
+    }
+    var isCompleted: Bool = false {
+        didSet {
+            updatedAt = Date()
+        }
+    }
     
     enum EventType: String, CaseIterable, Codable {
         case pomodoro = "番茄时间"

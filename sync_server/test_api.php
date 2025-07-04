@@ -5,7 +5,7 @@
  */
 
 // 测试配置
-$base_url = 'http://localhost/sync_server'; // 修改为你的服务器地址
+$base_url = 'http://localhost:8080'; // 修改为你的服务器地址
 $test_device_uuid = '550e8400-e29b-41d4-a716-446655440000';
 
 echo "=== 番茄钟同步服务API测试 ===\n\n";
