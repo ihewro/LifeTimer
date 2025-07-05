@@ -438,9 +438,17 @@ struct TimelineView: View {
         let sorted = events.sorted { $0.startTime < $1.startTime }
         var result: [(PomodoroEvent, Int, Int)] = []
         var active: [(PomodoroEvent, Int)] = [] // (event, column)
+
         for event in sorted {
-            // 移除已结束的事件
-            active.removeAll { $0.0.endTime <= event.startTime }
+            // 计算当前事件的视觉位置（考虑最小高度）
+            let eventVisualBounds = getEventVisualBounds(event)
+
+            // 移除已结束的事件（考虑视觉边界而不仅仅是时间边界）
+            active.removeAll { activeEvent in
+                let activeVisualBounds = getEventVisualBounds(activeEvent.0)
+                return activeVisualBounds.maxY <= eventVisualBounds.minY
+            }
+
             // 查找可用列
             let usedColumns = Set(active.map { $0.1 })
             var col = 0
@@ -450,11 +458,16 @@ struct TimelineView: View {
             let overlapCount = active.count
             result.append((event, col, overlapCount))
         }
+
         // 由于每个事件的 totalColumns 需要是与其重叠区间的最大 overlapCount，需再遍历修正
         var eventToMaxCol: [UUID: Int] = [:]
         for (event, _, _) in result {
-            let overlapping = result.filter {
-                $0.0.startTime < event.endTime && $0.0.endTime > event.startTime
+            let eventVisualBounds = getEventVisualBounds(event)
+            let overlapping = result.filter { otherEvent in
+                let otherVisualBounds = getEventVisualBounds(otherEvent.0)
+                // 检查视觉边界是否重叠
+                return eventVisualBounds.minY < otherVisualBounds.maxY &&
+                       eventVisualBounds.maxY > otherVisualBounds.minY
             }
             let maxCol = overlapping.map { $0.2 }.max() ?? 1
             eventToMaxCol[event.id] = maxCol
@@ -462,6 +475,19 @@ struct TimelineView: View {
         return result.map { (event, col, _) in
             (event, col, eventToMaxCol[event.id] ?? 1)
         }
+    }
+
+    // 计算事件的视觉边界（考虑最小高度）
+    private func getEventVisualBounds(_ event: PomodoroEvent) -> (minY: CGFloat, maxY: CGFloat) {
+        let startHour = calendar.component(.hour, from: event.startTime)
+        let startMinute = calendar.component(.minute, from: event.startTime)
+        let endHour = calendar.component(.hour, from: event.endTime)
+        let endMinute = calendar.component(.minute, from: event.endTime)
+        let startY = CGFloat(startHour) * hourHeight + CGFloat(startMinute) * hourHeight / 60
+        let endY = CGFloat(endHour) * hourHeight + CGFloat(endMinute) * hourHeight / 60
+        let actualHeight = endY - startY
+        let visualHeight = max(20, actualHeight) // 最小高度20
+        return (startY, startY + visualHeight)
     }
     // --- END ---
     
@@ -570,8 +596,8 @@ struct EventBlock: View {
         let totalGapWidth = gap * CGFloat(totalColumns - 1)
         let width = (availableWidth - totalGapWidth) / CGFloat(totalColumns)
         let x = leftPadding + CGFloat(column) * (width + gap)
-        HStack(spacing: 0) {
-            // 左侧深色border
+        HStack(alignment: .top, spacing: 0) {
+            // 左侧深色border - 与右侧内容区域高度保持一致
             Rectangle()
                 .fill(event.type.color)
                 .frame(width: 4)
@@ -589,7 +615,7 @@ struct EventBlock: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: max(20, position.height), alignment: .topLeading)
             .background(
                 selectedEvent?.id == event.id
                     ? event.type.color
@@ -597,7 +623,7 @@ struct EventBlock: View {
             )
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .frame(width: width, height: position.height)
+        .frame(width: width, height: max(20, position.height))
         .position(x: x + width / 2, y: position.y + position.height / 2)
         .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
@@ -1416,7 +1442,7 @@ struct WeekView: View {
         }
     }
 
-    // 事件并列排布算法（复用日视图的逻辑）
+    // 事件并列排布算法（使用视觉边界检测）
     private func computeEventColumns(events: [PomodoroEvent]) -> [(PomodoroEvent, Int, Int)] {
         // 按开始时间排序
         let sorted = events.sorted { $0.startTime < $1.startTime }
@@ -1424,33 +1450,54 @@ struct WeekView: View {
         var active: [(PomodoroEvent, Int)] = [] // (event, column)
 
         for event in sorted {
-            // 移除已结束的事件
-            active.removeAll { $0.0.endTime <= event.startTime }
+            // 计算当前事件的视觉位置（考虑最小高度）
+            let eventVisualBounds = getEventVisualBounds(event)
+
+            // 移除已结束的事件（考虑视觉边界而不仅仅是时间边界）
+            active.removeAll { activeEvent in
+                let activeVisualBounds = getEventVisualBounds(activeEvent.0)
+                return activeVisualBounds.maxY <= eventVisualBounds.minY
+            }
 
             // 查找可用列
             let usedColumns = Set(active.map { $0.1 })
             var col = 0
             while usedColumns.contains(col) { col += 1 }
             active.append((event, col))
-
             // 计算当前重叠的总列数
             let overlapCount = active.count
             result.append((event, col, overlapCount))
         }
 
-        // 修正每个事件的 totalColumns 为与其重叠区间的最大 overlapCount
+        // 由于每个事件的 totalColumns 需要是与其重叠区间的最大 overlapCount，需再遍历修正
         var eventToMaxCol: [UUID: Int] = [:]
         for (event, _, _) in result {
-            let overlapping = result.filter {
-                $0.0.startTime < event.endTime && $0.0.endTime > event.startTime
+            let eventVisualBounds = getEventVisualBounds(event)
+            let overlapping = result.filter { otherEvent in
+                let otherVisualBounds = getEventVisualBounds(otherEvent.0)
+                // 检查视觉边界是否重叠
+                return eventVisualBounds.minY < otherVisualBounds.maxY &&
+                       eventVisualBounds.maxY > otherVisualBounds.minY
             }
             let maxCol = overlapping.map { $0.2 }.max() ?? 1
             eventToMaxCol[event.id] = maxCol
         }
-
         return result.map { (event, col, _) in
             (event, col, eventToMaxCol[event.id] ?? 1)
         }
+    }
+
+    // 计算事件的视觉边界（考虑最小高度）- 周视图版本
+    private func getEventVisualBounds(_ event: PomodoroEvent) -> (minY: CGFloat, maxY: CGFloat) {
+        let startHour = calendar.component(.hour, from: event.startTime)
+        let startMinute = calendar.component(.minute, from: event.startTime)
+        let endHour = calendar.component(.hour, from: event.endTime)
+        let endMinute = calendar.component(.minute, from: event.endTime)
+        let startY = CGFloat(startHour) * hourHeight + CGFloat(startMinute) * hourHeight / 60
+        let endY = CGFloat(endHour) * hourHeight + CGFloat(endMinute) * hourHeight / 60
+        let actualHeight = endY - startY
+        let visualHeight = max(20, actualHeight) // 最小高度20
+        return (startY, startY + visualHeight)
     }
 
     // 从周视图选择创建事件
@@ -1537,10 +1584,10 @@ struct WeekEventBlock: View {
         let x = CGFloat(column) * (width + gap)
 
         HStack(spacing: 0) {
-            // 左侧深色border
+            // 左侧深色border - 确保高度与容器一致
             Rectangle()
                 .fill(event.type.color)
-                .frame(width: 3)
+                .frame(width: 3, height: position.height)
 
             // 右侧内容区域
             VStack(alignment: .leading, spacing: 1) {

@@ -623,10 +623,10 @@ class SyncManager: ObservableObject {
         switch type {
         case .pomodoro:
             return "pomodoro"
-        case .shortBreak:
-            return "short_break"
-        case .longBreak:
-            return "long_break"
+        case .rest:
+            return "rest"
+        case .countUp:
+            return "count_up"
         case .custom:
             return "custom"
         }
@@ -637,10 +637,10 @@ class SyncManager: ObservableObject {
         switch eventType {
         case "pomodoro":
             return .pomodoro
-        case "short_break":
-            return .shortBreak
-        case "long_break":
-            return .longBreak
+        case "rest", "short_break", "long_break":
+            return .rest
+        case "count_up":
+            return .countUp
         case "custom":
             return .custom
         default:

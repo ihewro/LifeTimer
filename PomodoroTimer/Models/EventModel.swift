@@ -64,35 +64,35 @@ struct PomodoroEvent: Identifiable, Codable {
     
     enum EventType: String, CaseIterable, Codable {
         case pomodoro = "番茄时间"
-        case shortBreak = "短休息"
-        case longBreak = "长休息"
+        case rest = "休息"
+        case countUp = "正计时"
         case custom = "自定义"
-        
+
         var displayName: String {
             return self.rawValue
         }
-        
+
         var color: Color {
             switch self {
             case .pomodoro:
                 return .blue
-            case .shortBreak:
+            case .rest:
                 return .green
-            case .longBreak:
-                return .green
+            case .countUp:
+                return .purple
             case .custom:
                 return .orange
             }
         }
-        
+
         var icon: String {
             switch self {
             case .pomodoro:
                 return "timer"
-            case .shortBreak:
+            case .rest:
                 return "cup.and.saucer"
-            case .longBreak:
-                return "bed.double"
+            case .countUp:
+                return "stopwatch"
             case .custom:
                 return "star"
             }
@@ -137,8 +137,8 @@ class EventManager: ObservableObject {
             forName: Notification.Name("timerCompleted"),
             object: nil,
             queue: .main
-        ) { _ in
-            self.addCompletedSession()
+        ) { notification in
+            self.addCompletedSession(from: notification)
         }
     }
     
@@ -187,16 +187,64 @@ class EventManager: ObservableObject {
             .reduce(0) { $0 + $1.duration }
     }
     
-    private func addCompletedSession() {
+    private func addCompletedSession(from notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let mode = userInfo["mode"],
+              let startTime = userInfo["startTime"] as? Date,
+              let endTime = userInfo["endTime"] as? Date else {
+            // 如果没有足够的信息，使用默认值
+            addLegacyCompletedSession()
+            return
+        }
+
+        let task = userInfo["task"] as? String ?? ""
+
+        // 根据计时器模式确定事件类型和标题
+        let (eventType, title) = getEventTypeAndTitle(for: mode, task: task)
+
+        let event = PomodoroEvent(
+            title: title,
+            startTime: startTime,
+            endTime: endTime,
+            type: eventType,
+            isCompleted: true
+        )
+        addEvent(event)
+    }
+
+    private func addLegacyCompletedSession() {
+        // 兼容旧版本的方法
         let now = Date()
         let event = PomodoroEvent(
             title: "专注时间",
-            startTime: now.addingTimeInterval(-25 * 60), // 假设是25分钟前开始
+            startTime: now.addingTimeInterval(-25 * 60),
             endTime: now,
             type: .pomodoro,
             isCompleted: true
         )
         addEvent(event)
+    }
+
+    private func getEventTypeAndTitle(for mode: Any, task: String) -> (PomodoroEvent.EventType, String) {
+        // 使用字符串匹配来避免循环依赖
+        let modeString = "\(mode)"
+
+        if modeString.contains("singlePomodoro") {
+            let title = task.isEmpty ? "番茄时间" : task
+            return (.pomodoro, title)
+        } else if modeString.contains("pureRest") {
+            return (.rest, "休息")
+        } else if modeString.contains("countUp") {
+            let title = task.isEmpty ? "正计时" : task
+            return (.countUp, title)
+        } else if modeString.contains("custom") {
+            let title = task.isEmpty ? "自定义时间" : task
+            return (.custom, title)
+        } else {
+            // 默认情况
+            let title = task.isEmpty ? "专注时间" : task
+            return (.pomodoro, title)
+        }
     }
     
     private func saveEvents() {

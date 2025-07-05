@@ -138,7 +138,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
 
                         TimeSettingRow(
-                            title: "短休息",
+                            title: "休息时间",
                             time: Binding(
                                 get: { timerModel.shortBreakTime },
                                 set: { timerModel.shortBreakTime = $0 }
@@ -146,13 +146,15 @@ struct SettingsView: View {
                         )
                         .padding(.horizontal, 20)
 
-                        TimeSettingRow(
-                            title: "长休息",
-                            time: Binding(
-                                get: { timerModel.longBreakTime },
-                                set: { timerModel.longBreakTime = $0 }
-                            )
-                        )
+                        // 自动休息设置
+                        HStack {
+                            Text("番茄结束后自动进入休息")
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { timerModel.autoStartBreak },
+                                set: { timerModel.autoStartBreak = $0 }
+                            ))
+                        }
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
@@ -296,19 +298,10 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
 
                         TimeSettingRow(
-                            title: "短休息",
+                            title: "休息时间",
                             time: Binding(
                                 get: { timerModel.shortBreakTime },
                                 set: { timerModel.shortBreakTime = $0 }
-                            )
-                        )
-                        .padding(.horizontal, 20)
-
-                        TimeSettingRow(
-                            title: "长休息",
-                            time: Binding(
-                                get: { timerModel.longBreakTime },
-                                set: { timerModel.longBreakTime = $0 }
                             )
                         )
                         .padding(.horizontal, 20)

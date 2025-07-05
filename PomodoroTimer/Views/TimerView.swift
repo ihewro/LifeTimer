@@ -16,6 +16,7 @@ struct TimerView: View {
     @State private var showingTaskSelector = false
     @State private var selectedTask = "专注"
     @State private var editingMinutes = 30
+    @State private var isHoveringTimeCircle = false
     
     var body: some View {
         VStack(spacing: 30) {
@@ -64,63 +65,214 @@ struct TimerView: View {
                             .animation(.easeInOut(duration: 1), value: timerModel.progress())
                     }
 
-                    // 中心时间显示
-                    Button(action: {
-                        if timerModel.timerState == .idle {
-                            showingTimeEditor = true
-                        }
-                    }) {
-                        VStack(spacing: 8) {
-                            Text(timerModel.formattedTime())
-                                .font(.system(size: 48, weight: .light, design: .monospaced))
-                                .foregroundColor(.primary)
+                    // 中心时间显示区域
+                    VStack(spacing: 0) {
+                        // 主时间显示区域（居中）
+                        HStack(spacing: 16) {
+                            // 减号按钮（仅在番茄模式运行时hover显示）
+                            if isHoveringTimeCircle && timerModel.canAdjustTime() {
+                                Button(action: {
+                                    timerModel.adjustCurrentTime(by: -5)
+                                }) {
+                                    Image(systemName: "minus")
+                                        .font(.title2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .transition(.opacity)
+                            }
 
-                            if timerModel.currentMode == .countUp {
-                                Text("正计时模式")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            // 时间显示（可点击编辑）
+                            VStack(spacing: 4) {
+                                Button(action: {
+                                    // 正计时模式下不允许编辑时间
+                                    if timerModel.timerState == .idle && timerModel.currentMode != .countUp {
+                                        showingTimeEditor = true
+                                    }
+                                }) {
+                                    Text(timerModel.formattedTime())
+                                        .font(.system(size: 48, weight: .light, design: .monospaced))
+                                        .foregroundColor(.primary)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .disabled(timerModel.timerState != .idle || timerModel.currentMode == .countUp)
+
+                                // 正计时模式标识
+                                if timerModel.currentMode == .countUp {
+                                    Text("正计时模式")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                // 暂停状态显示（不需要hover）
+                                if timerModel.timerState == .paused {
+                                    Text("已暂停")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            // 加号按钮（仅在番茄模式运行时hover显示）
+                            if isHoveringTimeCircle && timerModel.canAdjustTime() {
+                                Button(action: {
+                                    timerModel.adjustCurrentTime(by: 5)
+                                }) {
+                                    Image(systemName: "plus")
+                                        .font(.title2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .transition(.opacity)
                             }
                         }
+
+                        // 时间状态信息（仅在番茄模式hover时显示，位置固定在时间下方）
+                        VStack {
+                            if isHoveringTimeCircle && timerModel.currentMode == .singlePomodoro && timerModel.timerState != .paused {
+                                let timeInfo = timerModel.getTimeStatusInfo()
+                                if !timeInfo.isEmpty {
+                                    Text(timeInfo)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .transition(.opacity)
+                                        .padding(.top, 8)
+                                }
+                            }
+                        }
+                        .frame(minHeight: 20) // 最小高度，防止布局跳动
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(timerModel.timerState != .idle)
+                }
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isHoveringTimeCircle = hovering
+                    }
                 }
                 
                 Spacer()
 
                 // 控制按钮
                 VStack(spacing: 12) {
-                    // 主控制按钮
-                    Button(action: {
-                        switch timerModel.timerState {
-                        case .idle, .paused:
-                            timerModel.startTimer()
-                        case .running:
-                            timerModel.pauseTimer()
-                        case .completed:
-                            timerModel.resetTimer()
-                        }
-                    }) {
-                        Text(buttonText)
-                            .font(.title2)
-                            .fontWeight(.medium)
-                            .frame(width: 180, height: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    // 番茄模式运行时的三按钮布局
+                    if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .running {
+                        HStack(spacing: 12) {
+                            // 暂停按钮
+                            Button(action: {
+                                timerModel.pauseTimer()
+                            }) {
+                                Text("暂停")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .frame(width: 80, height: 36)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
 
-                    // 结束按钮（仅在暂停时显示）
-                    if timerModel.timerState == .paused {
+                            // 放弃按钮
+                            Button(action: {
+                                timerModel.resetTimer()
+                            }) {
+                                Text("放弃")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .frame(width: 80, height: 36)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+
+                            // 提前结束按钮
+                            Button(action: {
+                                timerModel.completeEarly()
+                            }) {
+                                Text("提前结束")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .frame(width: 80, height: 36)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                        }
+                    }
+                    // 番茄模式暂停时只显示继续按钮
+                    else if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .paused {
                         Button(action: {
-                            timerModel.resetTimer()
+                            timerModel.startTimer(with: selectedTask)
                         }) {
-                            Text("结束")
+                            Text("继续")
                                 .font(.title2)
                                 .fontWeight(.medium)
                                 .frame(width: 180, height: 44)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
                         .controlSize(.large)
+                    }
+                    // 其他情况的按钮布局
+                    else {
+                        // 主控制按钮
+                        Button(action: {
+                            switch timerModel.timerState {
+                            case .idle, .paused:
+                                timerModel.startTimer(with: selectedTask)
+                            case .running:
+                                // 休息模式下运行时直接结束，其他模式暂停
+                                if timerModel.currentMode == .pureRest {
+                                    timerModel.stopTimer()
+                                } else {
+                                    timerModel.pauseTimer()
+                                }
+                            case .completed:
+                                timerModel.resetTimer()
+                            }
+                        }) {
+                            Text(buttonText)
+                                .font(.title2)
+                                .fontWeight(.medium)
+                                .frame(width: 180, height: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        // 番茄完成后的两个按钮：开始休息和跳过休息
+                        if timerModel.timerState == .completed && timerModel.currentMode == .singlePomodoro {
+                            HStack(spacing: 12) {
+                                // 开始休息按钮
+                                Button(action: {
+                                    timerModel.startBreakManually()
+                                }) {
+                                    Text("开始休息")
+                                        .font(.title2)
+                                        .fontWeight(.medium)
+                                        .frame(width: 120, height: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+
+                                // 跳过休息按钮
+                                Button(action: {
+                                    timerModel.skipBreak()
+                                }) {
+                                    Text("跳过休息")
+                                        .font(.title2)
+                                        .fontWeight(.medium)
+                                        .frame(width: 120, height: 44)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.large)
+                            }
+                        }
+
+                        // 结束按钮（在正计时运行时显示）
+                        if timerModel.currentMode == .countUp && timerModel.timerState == .running {
+                            Button(action: {
+                                timerModel.stopTimer()
+                            }) {
+                                Text("结束")
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .frame(width: 180, height: 44)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                        }
                     }
                 }
 
@@ -188,7 +340,8 @@ struct TimerView: View {
         case .idle:
             return "开始"
         case .running:
-            return "暂停"
+            // 休息模式下显示"结束"，其他模式显示"暂停"
+            return timerModel.currentMode == .pureRest ? "结束" : "暂停"
         case .paused:
             return "继续"
         case .completed:
@@ -292,15 +445,29 @@ struct TaskSelectorPopoverView: View {
     @Binding var selectedTask: String
     @Binding var isPresented: Bool
     @State private var searchText = ""
+    @EnvironmentObject var eventManager: EventManager
 
     // 预设任务类型
     private let presetTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考", "休息", "运动"]
 
-    // 最近常用任务（这里可以从UserDefaults或其他存储中获取）
-    private let recentTasks = ["项目开发", "英语学习", "阅读技术文档", "代码重构"]
+    // 从事件历史中获取最近常用任务
+    var recentTasksFromHistory: [String] {
+        let allTitles = eventManager.events.map { $0.title }
+        let uniqueTitles = Array(Set(allTitles))
+
+        // 按使用频率排序，取前10个
+        let taskFrequency = Dictionary(grouping: allTitles, by: { $0 })
+            .mapValues { $0.count }
+
+        return uniqueTitles
+            .sorted { taskFrequency[$0] ?? 0 > taskFrequency[$1] ?? 0 }
+            .prefix(10)
+            .map { $0 }
+    }
 
     // 过滤最近常用任务
     var filteredRecentTasks: [String] {
+        let recentTasks = recentTasksFromHistory
         if searchText.isEmpty {
             return recentTasks
         } else {
@@ -321,7 +488,8 @@ struct TaskSelectorPopoverView: View {
     var shouldShowCreateOption: Bool {
         !searchText.isEmpty &&
         !filteredRecentTasks.contains(searchText) &&
-        !filteredPresetTasks.contains(searchText)
+        !filteredPresetTasks.contains(searchText) &&
+        !recentTasksFromHistory.contains(searchText)
     }
 
     var body: some View {

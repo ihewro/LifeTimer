@@ -1288,9 +1288,7 @@ struct SyncView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("番茄钟时长: \(Int(settings.pomodoroTime/60))分钟")
                             .font(.caption)
-                        Text("短休息时长: \(Int(settings.shortBreakTime/60))分钟")
-                            .font(.caption)
-                        Text("长休息时长: \(Int(settings.longBreakTime/60))分钟")
+                        Text("休息时长: \(Int(settings.shortBreakTime/60))分钟")
                             .font(.caption)
                     }
                 } else {
@@ -1303,9 +1301,7 @@ struct SyncView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("番茄钟时长: \(Int(settings.pomodoroTime/60))分钟")
                             .font(.caption)
-                        Text("短休息时长: \(Int(settings.shortBreakTime/60))分钟")
-                            .font(.caption)
-                        Text("长休息时长: \(Int(settings.longBreakTime/60))分钟")
+                        Text("休息时长: \(Int(settings.shortBreakTime/60))分钟")
                             .font(.caption)
                     }
                 } else {
