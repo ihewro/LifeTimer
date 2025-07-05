@@ -36,6 +36,9 @@ struct TimerView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .padding(.bottom, 20)
+            .popover(isPresented: $showingTaskSelector, arrowEdge: .bottom) {
+                TaskSelectorPopoverView(selectedTask: $selectedTask, isPresented: $showingTaskSelector)
+            }
 
                 // 主计时器圆环
                 ZStack {
@@ -86,7 +89,7 @@ struct TimerView: View {
                 Spacer()
 
                 // 控制按钮
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     // 主控制按钮
                     Button(action: {
                         switch timerModel.timerState {
@@ -101,14 +104,10 @@ struct TimerView: View {
                         Text(buttonText)
                             .font(.title2)
                             .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .frame(width: 200, height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .fill(Color.brown)
-                            )
+                            .frame(width: 180, height: 44)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
 
                     // 结束按钮（仅在暂停时显示）
                     if timerModel.timerState == .paused {
@@ -118,14 +117,10 @@ struct TimerView: View {
                             Text("结束")
                                 .font(.title2)
                                 .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                                .frame(width: 200, height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 25)
-                                        .stroke(Color.secondary, lineWidth: 1)
-                                )
+                                .frame(width: 180, height: 44)
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
                     }
                 }
 
@@ -186,9 +181,6 @@ struct TimerView: View {
                 timerModel.setCustomTime(minutes: newMinutes)
             }
         }
-        .sheet(isPresented: $showingTaskSelector) {
-            TaskSelectorView(selectedTask: $selectedTask)
-        }
     }
     
     private var buttonText: String {
@@ -215,212 +207,227 @@ struct TimeEditorView: View {
     @Binding var minutes: Int
     let onConfirm: (Int) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var tempMinutes: Int
-    @State private var inputText: String
+    @State private var tempMinutes: Double
 
     init(minutes: Binding<Int>, onConfirm: @escaping (Int) -> Void) {
         self._minutes = minutes
         self.onConfirm = onConfirm
-        self._tempMinutes = State(initialValue: minutes.wrappedValue)
-        self._inputText = State(initialValue: String(minutes.wrappedValue))
+        self._tempMinutes = State(initialValue: Double(minutes.wrappedValue))
     }
 
     var body: some View {
         VStack(spacing: 20) {
+            // 标题
             Text("设置时间")
                 .font(.headline)
-                .padding(.top)
+                .padding(.top, 20)
 
-            VStack {
-                Button(action: {
-                    if tempMinutes < 99 {
-                        tempMinutes += 1
-                        inputText = String(tempMinutes)
+            // 时间设置区域
+            VStack(spacing: 16) {
+                // 当前时间显示
+                Text("\(Int(tempMinutes)) 分钟")
+                    .font(.title)
+                    .fontWeight(.medium)
+
+                // 滑块控制
+                VStack(spacing: 8) {
+                    Slider(value: $tempMinutes, in: 1...99, step: 1)
+                        .frame(width: 200)
+
+                    // 刻度标签
+                    HStack {
+                        Text("1")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("25")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("50")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("99")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                }) {
-                    Image(systemName: "chevron.up")
-                        .font(.title2)
-                        .foregroundColor(.primary)
+                    .frame(width: 200)
                 }
-                .buttonStyle(PlainButtonStyle())
 
-                HStack {
-                    TextField("", text: $inputText)
-                        .font(.largeTitle)
-                        .fontWeight(.light)
-                        .multilineTextAlignment(.center)
-                        .frame(minWidth: 60)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .onChange(of: inputText) { newValue in
-                            // 只允许数字输入
-                            let filtered = newValue.filter { $0.isNumber }
-                            if filtered != newValue {
-                                inputText = filtered
-                            }
-
-                            // 更新tempMinutes
-                            if let value = Int(filtered), value >= 1, value <= 99 {
-                                tempMinutes = value
-                            }
-                        }
-
-                    Text("分钟")
-                        .font(.title2)
+                // 步进器控制
+                Stepper(value: $tempMinutes, in: 1...99, step: 1) {
+                    Text("精确调整")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
-
-                Button(action: {
-                    if tempMinutes > 1 {
-                        tempMinutes -= 1
-                        inputText = String(tempMinutes)
-                    }
-                }) {
-                    Image(systemName: "chevron.down")
-                        .font(.title2)
-                        .foregroundColor(.primary)
-                }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 200)
             }
-            .padding()
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(12)
+            .padding(.vertical, 16)
 
-            HStack(spacing: 20) {
+            // 按钮区域
+            HStack(spacing: 12) {
                 Button("取消") {
                     dismiss()
                 }
-                .buttonStyle(PlainButtonStyle())
-                .frame(width: 100, height: 44)
+                .keyboardShortcut(.cancelAction)
 
                 Button("确定") {
-                    minutes = tempMinutes
-                    onConfirm(tempMinutes)
+                    let newMinutes = Int(tempMinutes)
+                    minutes = newMinutes
+                    onConfirm(newMinutes)
                     dismiss()
                 }
-                .buttonStyle(PlainButtonStyle())
-                .frame(width: 100, height: 44)
-                .background(Color.brown)
-                .foregroundColor(.white)
-                .cornerRadius(22)
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
             }
-            .padding(.bottom)
+            .padding(.bottom, 20)
         }
-        .frame(width: 300, height: 250)
+        .frame(width: 280, height: 280)
     }
 }
 
-// MARK: - 任务选择器
-struct TaskSelectorView: View {
+// MARK: - 任务选择器 Popover
+struct TaskSelectorPopoverView: View {
     @Binding var selectedTask: String
-    @Environment(\.dismiss) private var dismiss
+    @Binding var isPresented: Bool
     @State private var searchText = ""
-    @State private var selectedTab = 0
 
-    private let commonTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考"]
-    private let recentTasks = ["我", "项目A", "项目B", "学习Swift"]
+    // 预设任务类型
+    private let presetTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考", "休息", "运动"]
 
-    var filteredTasks: [String] {
-        let tasks = selectedTab == 0 ? recentTasks : commonTasks
+    // 最近常用任务（这里可以从UserDefaults或其他存储中获取）
+    private let recentTasks = ["项目开发", "英语学习", "阅读技术文档", "代码重构"]
+
+    // 过滤最近常用任务
+    var filteredRecentTasks: [String] {
         if searchText.isEmpty {
-            return tasks
+            return recentTasks
         } else {
-            return tasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
+            return recentTasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
         }
     }
 
+    // 过滤预设任务
+    var filteredPresetTasks: [String] {
+        if searchText.isEmpty {
+            return presetTasks
+        } else {
+            return presetTasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+
+    // 检查是否需要显示"创建新任务"选项
+    var shouldShowCreateOption: Bool {
+        !searchText.isEmpty &&
+        !filteredRecentTasks.contains(searchText) &&
+        !filteredPresetTasks.contains(searchText)
+    }
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // 系统样式的标签切换
-                Picker("", selection: $selectedTab) {
-                    Text("任务").tag(0)
-                    Text("常用专注").tag(1)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .padding(.top)
-
-                // 搜索框
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-
-                    TextField("搜索", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
-                .padding(.horizontal)
+        VStack(spacing: 0) {
+            // 搜索框
+            TextField("搜索或输入新任务", text: $searchText)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding(.horizontal, 16)
                 .padding(.top, 16)
+                .padding(.bottom, 12)
 
-                // 任务列表
-                List {
-                    ForEach(filteredTasks, id: \.self) { task in
-                        Button(action: {
-                            selectedTask = task
-                            dismiss()
-                        }) {
-                            HStack {
-                                Circle()
-                                    .stroke(Color.secondary, lineWidth: 1)
-                                    .frame(width: 20, height: 20)
-
-                                Text(task)
-                                    .foregroundColor(.primary)
-
-                                Spacer()
+            // 任务列表
+            List {
+                // 最近常用分组
+                if !filteredRecentTasks.isEmpty {
+                    Section("最近常用") {
+                        ForEach(filteredRecentTasks, id: \.self) { task in
+                            TaskRowView(task: task, isSelected: task == selectedTask) {
+                                selectedTask = task
+                                isPresented = false
                             }
-                            .padding(.vertical, 4)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
+                }
 
-                    // 如果搜索结果为空且有搜索文本，显示"使用当前输入"选项
-                    if filteredTasks.isEmpty && !searchText.isEmpty {
-                        Button(action: {
+                // 预设任务分组
+                if !filteredPresetTasks.isEmpty {
+                    Section("预设任务") {
+                        ForEach(filteredPresetTasks, id: \.self) { task in
+                            TaskRowView(task: task, isSelected: task == selectedTask) {
+                                selectedTask = task
+                                isPresented = false
+                            }
+                        }
+                    }
+                }
+
+                // 创建新任务选项
+                if shouldShowCreateOption {
+                    Section("创建新任务") {
+                        TaskRowView(task: searchText, isSelected: false, isNewTask: true) {
                             selectedTask = searchText
-                            dismiss()
-                        }) {
-                            HStack {
-                                Circle()
-                                    .stroke(Color.secondary, lineWidth: 1)
-                                    .frame(width: 20, height: 20)
-
-                                Text("使用 \"\(searchText)\"")
-                                    .foregroundColor(.primary)
-
-                                Spacer()
-                            }
-                            .padding(.vertical, 4)
+                            isPresented = false
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
-                .listStyle(PlainListStyle())
             }
-            .navigationTitle("选择任务")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
-                        dismiss()
-                    }
+            .listStyle(SidebarListStyle())
+        }
+        .frame(width: 280, height: 320)
+    }
+}
+
+// MARK: - 任务行视图
+struct TaskRowView: View {
+    let task: String
+    let isSelected: Bool
+    let isNewTask: Bool
+    let onTap: () -> Void
+
+    init(task: String, isSelected: Bool, isNewTask: Bool = false, onTap: @escaping () -> Void) {
+        self.task = task
+        self.isSelected = isSelected
+        self.isNewTask = isNewTask
+        self.onTap = onTap
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 选择指示器
+            ZStack {
+                Circle()
+                    .foregroundColor(isSelected ? Color.accentColor : Color.clear)
+                    .overlay(
+                        Circle()
+                            .stroke(isSelected ? Color.clear : Color.secondary.opacity(0.5), lineWidth: 1)
+                    )
+                    .frame(width: 16, height: 16)
+
+                if isSelected {
+                    Circle()
+                        .foregroundColor(Color.white)
+                        .frame(width: 6, height: 6)
                 }
-                #else
-                ToolbarItem(placement: .automatic) {
-                    Button("完成") {
-                        dismiss()
-                    }
+            }
+
+            // 任务名称
+            HStack(spacing: 8) {
+                if isNewTask {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 16))
                 }
-                #endif
+
+                Text(isNewTask ? "创建 \"\(task)\"" : task)
+                    .font(.system(size: 14))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Spacer()
             }
         }
-        .frame(width: 400, height: 500)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 

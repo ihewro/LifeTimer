@@ -297,12 +297,6 @@ struct DayView: View {
 
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
-                    // 日期导航栏
-                    DateNavigationBar(selectedDate: $selectedDate, viewMode: .day)
-                        .padding()
-
-                    Divider()
-
                     MiniCalendarView(selectedDate: $selectedDate)
                         .frame(height: 200)
                         .padding()
@@ -348,8 +342,8 @@ struct TimelineView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 日期导航栏
-            DateNavigationBar(selectedDate: $selectedDate, viewMode: .month)
+            // 日期显示区域（只显示日期信息，不显示导航按钮）
+            DateDisplayOnly(selectedDate: $selectedDate)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
 
@@ -1067,6 +1061,13 @@ struct WeekView: View {
             HStack(spacing: 0) {
                 // 主要周视图区域
                 VStack(spacing: 0) {
+                    // 日期显示区域（只显示日期信息，不显示导航按钮）
+                    DateDisplayOnly(selectedDate: $selectedDate)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+
+                    Divider()
+
                     // 星期标题行
                     weekHeaderView
                         .frame(height: 60)
@@ -1089,12 +1090,6 @@ struct WeekView: View {
 
                 // 右侧面板（类似日视图）
                 VStack(spacing: 0) {
-                    // 日期导航栏
-                    DateNavigationBar(selectedDate: $selectedDate, viewMode: .week)
-                        .padding()
-
-                    Divider()
-
                     // 小日历
                     MiniCalendarView(selectedDate: $selectedDate)
                         .frame(height: 200)
@@ -1257,9 +1252,9 @@ struct WeekView: View {
     private var weekStatsPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("本周统计")
-                    .font(.headline)
-                    .padding(.horizontal)
+                // Text("本周统计")
+                //     .font(.headline)
+                //     .padding(.horizontal)
 
                 // 本周活动概览
                 weekActivityOverview
@@ -2411,10 +2406,9 @@ struct EventDetailPopover: View {
     }
 }
 
-// MARK: - 日期导航栏
-struct DateNavigationBar: View {
+// MARK: - 仅日期显示组件
+struct DateDisplayOnly: View {
     @Binding var selectedDate: Date
-    let viewMode: CalendarViewMode
     private let calendar = Calendar.current
 
     private let dateFormatter: DateFormatter = {
@@ -2439,22 +2433,79 @@ struct DateNavigationBar: View {
     }()
 
     var body: some View {
-        VStack(spacing: 12) {
-            // 日期信息
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(dateFormatter.string(from: selectedDate))
-                        .font(.title)
-                        .fontWeight(.semibold)
+        // 只显示日期信息，不显示导航按钮
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(dateFormatter.string(from: selectedDate))
+                    .font(.title)
+                    .fontWeight(.semibold)
 
-                    Text(weekdayFormatter.string(from: selectedDate))
-                        .font(.title2)
+                Text(weekdayFormatter.string(from: selectedDate))
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+            }
+
+            Text(lunarFormatter.string(from: selectedDate))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - 日期导航栏
+struct DateNavigationBar: View {
+    @Binding var selectedDate: Date
+    let viewMode: CalendarViewMode
+    let showDateInfo: Bool
+    private let calendar = Calendar.current
+
+    // 便利初始化器，默认显示日期信息
+    init(selectedDate: Binding<Date>, viewMode: CalendarViewMode, showDateInfo: Bool = true) {
+        self._selectedDate = selectedDate
+        self.viewMode = viewMode
+        self.showDateInfo = showDateInfo
+    }
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月d日"
+        return formatter
+    }()
+
+    private let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }()
+
+    private let lunarFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .chinese)
+        formatter.dateFormat = "MMMMd"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // 日期信息（可选显示）
+            if showDateInfo {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(dateFormatter.string(from: selectedDate))
+                            .font(.title)
+                            .fontWeight(.semibold)
+
+                        Text(weekdayFormatter.string(from: selectedDate))
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text(lunarFormatter.string(from: selectedDate))
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-
-                Text(lunarFormatter.string(from: selectedDate))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
             }
 
             // 导航按钮
