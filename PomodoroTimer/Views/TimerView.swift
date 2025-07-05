@@ -46,7 +46,7 @@ struct TimerView: View {
                     // 背景圆环
                     Circle()
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
-                        .frame(width: 300, height: 300)
+                        .frame(width: 400, height: 400)
 
                     // 进度圆环
                     if timerModel.currentMode != .countUp {
@@ -60,87 +60,93 @@ struct TimerView: View {
                                 ),
                                 style: StrokeStyle(lineWidth: 8, lineCap: .round)
                             )
-                            .frame(width: 300, height: 300)
+                            .frame(width: 400, height: 400)
                             .rotationEffect(.degrees(-90))
                             .animation(.easeInOut(duration: 1), value: timerModel.progress())
                     }
 
                     // 中心时间显示区域
-                    VStack(spacing: 0) {
-                        // 主时间显示区域（居中）
-                        HStack(spacing: 16) {
-                            // 减号按钮（仅在番茄模式运行时hover显示）
-                            if isHoveringTimeCircle && timerModel.canAdjustTime() {
-                                Button(action: {
-                                    timerModel.adjustCurrentTime(by: -5)
-                                }) {
-                                    Image(systemName: "minus")
-                                        .font(.title2)
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .transition(.opacity)
+                    ZStack {
+                        // 时间显示按钮（绝对居中，不受其他元素影响）
+                        Button(action: {
+                            // 正计时模式下不允许编辑时间
+                            if timerModel.timerState == .idle && timerModel.currentMode != .countUp {
+                                showingTimeEditor = true
+                            }
+                        }) {
+                            Text(timerModel.formattedTime())
+                                .font(.system(size: 48, weight: .light, design: .monospaced))
+                                .foregroundColor(Color(NSColor.labelColor)) // 强制使用系统标签颜色（黑色）
+                                .multilineTextAlignment(.center)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .disabled(timerModel.timerState != .idle || timerModel.currentMode == .countUp)
+
+                        // 其他信息显示区域（使用绝对定位，不影响时间居中）
+                        VStack(spacing: 4) {
+                            // 正计时模式标识
+                            if timerModel.currentMode == .countUp {
+                                Text("正计时模式")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
 
-                            // 时间显示（可点击编辑）
-                            VStack(spacing: 4) {
-                                Button(action: {
-                                    // 正计时模式下不允许编辑时间
-                                    if timerModel.timerState == .idle && timerModel.currentMode != .countUp {
-                                        showingTimeEditor = true
-                                    }
-                                }) {
-                                    Text(timerModel.formattedTime())
-                                        .font(.system(size: 48, weight: .light, design: .monospaced))
-                                        .foregroundColor(.primary)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .disabled(timerModel.timerState != .idle || timerModel.currentMode == .countUp)
-
-                                // 正计时模式标识
-                                if timerModel.currentMode == .countUp {
-                                    Text("正计时模式")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                // 暂停状态显示（不需要hover）
+                            // 状态信息显示
+                            VStack {
+                                // 暂停状态显示
                                 if timerModel.timerState == .paused {
                                     Text("已暂停")
                                         .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(.secondary)
-                                }
-                            }
-
-                            // 加号按钮（仅在番茄模式运行时hover显示）
-                            if isHoveringTimeCircle && timerModel.canAdjustTime() {
-                                Button(action: {
-                                    timerModel.adjustCurrentTime(by: 5)
-                                }) {
-                                    Image(systemName: "plus")
-                                        .font(.title2)
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .transition(.opacity)
-                            }
-                        }
-
-                        // 时间状态信息（仅在番茄模式hover时显示，位置固定在时间下方）
-                        VStack {
-                            if isHoveringTimeCircle && timerModel.currentMode == .singlePomodoro && timerModel.timerState != .paused {
-                                let timeInfo = timerModel.getTimeStatusInfo()
-                                if !timeInfo.isEmpty {
-                                    Text(timeInfo)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                        .transition(.opacity)
+                                        .multilineTextAlignment(.center)
                                         .padding(.top, 8)
                                 }
+                                // 时间状态信息（仅在番茄模式hover时显示）
+                                else if isHoveringTimeCircle && timerModel.currentMode == .singlePomodoro && timerModel.timerState != .paused {
+                                    let timeInfo = timerModel.getTimeStatusInfo()
+                                    if !timeInfo.isEmpty {
+                                        Text(timeInfo)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                            .transition(.opacity)
+                                            .multilineTextAlignment(.center)
+                                            .padding(.top, 8)
+                                    }
+                                }
                             }
                         }
-                        .frame(minHeight: 20) // 最小高度，防止布局跳动
+                        .position(x: 150, y: 220) // 绝对定位在时间下方，不影响时间居中
+
+                        // 左侧减号按钮（在圆圈内部，距离时间合适的位置）
+                        if isHoveringTimeCircle && timerModel.canAdjustTime() {
+                            Button(action: {
+                                timerModel.adjustCurrentTime(by: -5)
+                            }) {
+                                Image(systemName: "minus")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(TimeAdjustButtonStyle())
+                            .transition(.opacity)
+                            .position(x: 30, y: 150) // 绝对位置：左侧，垂直居中
+                        }
+
+                        // 右侧加号按钮（在圆圈内部，距离时间合适的位置）
+                        if isHoveringTimeCircle && timerModel.canAdjustTime() {
+                            Button(action: {
+                                timerModel.adjustCurrentTime(by: 5)
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(TimeAdjustButtonStyle())
+                            .transition(.opacity)
+                            .position(x: 250, y: 150) // 绝对位置：右侧，垂直居中
+                        }
                     }
+                    .frame(width: 300, height: 300) // 限制在圆圈内部
                 }
                 .onHover { hovering in
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -155,41 +161,38 @@ struct TimerView: View {
                     // 番茄模式运行时的三按钮布局
                     if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .running {
                         HStack(spacing: 12) {
-                            // 暂停按钮
+                            // 暂停按钮 - 黄色背景
                             Button(action: {
                                 timerModel.pauseTimer()
                             }) {
                                 Text("暂停")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .frame(width: 80, height: 36)
+                                    .frame(width: 80)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.orange)
 
-                            // 放弃按钮
+                            // 放弃按钮 - 橙色背景
                             Button(action: {
                                 timerModel.resetTimer()
                             }) {
                                 Text("放弃")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .frame(width: 80, height: 36)
+                                    .frame(width: 80)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.red)
 
-                            // 提前结束按钮
+                            // 提前结束按钮 - 灰色背景
                             Button(action: {
                                 timerModel.completeEarly()
                             }) {
                                 Text("提前结束")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .frame(width: 80, height: 36)
+                                    .frame(width: 80)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.gray)
                         }
                     }
                     // 番茄模式暂停时只显示继续按钮
@@ -198,12 +201,35 @@ struct TimerView: View {
                             timerModel.startTimer(with: selectedTask)
                         }) {
                             Text("继续")
-                                .font(.title2)
-                                .fontWeight(.medium)
-                                .frame(width: 180, height: 44)
+                                .frame(width: 180)
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
+                        .tint(.blue)
+                    }
+                    // 番茄完成后只显示开始休息和跳过休息按钮
+                    else if timerModel.timerState == .completed && timerModel.currentMode == .singlePomodoro {
+                        HStack(spacing: 12) {
+                            // 开始休息按钮
+                            Button(action: {
+                                timerModel.startBreakManually()
+                            }) {
+                                Text("开始休息")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.green)
+
+                            // 跳过休息按钮
+                            Button(action: {
+                                timerModel.skipBreak()
+                            }) {
+                                Text("跳过休息")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.gray)
+                        }
                     }
                     // 其他情况的按钮布局
                     else {
@@ -224,41 +250,11 @@ struct TimerView: View {
                             }
                         }) {
                             Text(buttonText)
-                                .font(.title2)
-                                .fontWeight(.medium)
-                                .frame(width: 180, height: 44)
+                                .frame(width: 180)
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-
-                        // 番茄完成后的两个按钮：开始休息和跳过休息
-                        if timerModel.timerState == .completed && timerModel.currentMode == .singlePomodoro {
-                            HStack(spacing: 12) {
-                                // 开始休息按钮
-                                Button(action: {
-                                    timerModel.startBreakManually()
-                                }) {
-                                    Text("开始休息")
-                                        .font(.title2)
-                                        .fontWeight(.medium)
-                                        .frame(width: 120, height: 44)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.large)
-
-                                // 跳过休息按钮
-                                Button(action: {
-                                    timerModel.skipBreak()
-                                }) {
-                                    Text("跳过休息")
-                                        .font(.title2)
-                                        .fontWeight(.medium)
-                                        .frame(width: 120, height: 44)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                            }
-                        }
+                        .tint(buttonColor)
 
                         // 结束按钮（在正计时运行时显示）
                         if timerModel.currentMode == .countUp && timerModel.timerState == .running {
@@ -266,12 +262,11 @@ struct TimerView: View {
                                 timerModel.stopTimer()
                             }) {
                                 Text("结束")
-                                    .font(.title2)
-                                    .fontWeight(.medium)
-                                    .frame(width: 180, height: 44)
+                                    .frame(width: 180)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.borderedProminent)
                             .controlSize(.large)
+                            .tint(.gray)
                         }
                     }
                 }
@@ -346,6 +341,18 @@ struct TimerView: View {
             return "继续"
         case .completed:
             return "开始"
+        }
+    }
+
+    private var buttonColor: Color {
+        switch timerModel.timerState {
+        case .idle, .completed:
+            return .green // 开始按钮是绿色
+        case .running:
+            // 休息模式下显示"结束"，其他模式显示"暂停"
+            return timerModel.currentMode == .pureRest ? .secondary : .yellow
+        case .paused:
+            return .blue // 继续按钮是蓝色
         }
     }
     
@@ -596,6 +603,105 @@ struct TaskRowView: View {
         .onTapGesture {
             onTap()
         }
+    }
+}
+
+// MARK: - 时间调整按钮样式
+struct TimeAdjustButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 32, height: 32)
+            .background(
+                Circle()
+                    .fill(Color.secondary.opacity(configuration.isPressed ? 0.3 : 0.1))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// MARK: - 统一按钮样式
+struct UnifiedButtonStyle: ButtonStyle {
+    let color: Color
+    let isProminent: Bool
+
+    init(color: Color = .accentColor, isProminent: Bool = false) {
+        self.color = color
+        self.isProminent = isProminent
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: NSFont.systemFontSize)) // 使用系统默认文字大小
+            .fontWeight(.medium)
+            .padding(.vertical, 6) // 上下padding 12pt
+            .padding(.horizontal, 24) // 左右padding 24pt
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color)
+            )
+            .foregroundColor(.white) // 文字始终为白色
+            .opacity(configuration.isPressed ? 0.7 : 1.0) // 系统原生的按下效果
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// MARK: - 原生按钮样式（类似 UIButton 效果）
+struct NativeButtonStyle: ButtonStyle {
+    let color: Color
+    let isProminent: Bool
+
+    init(color: Color = .accentColor, isProminent: Bool = false) {
+        self.color = color
+        self.isProminent = isProminent
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: NSFont.systemFontSize))
+            .fontWeight(.medium)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: configuration.isPressed ? color.opacity(0.8) : color.opacity(0.9), location: 0),
+                                .init(color: configuration.isPressed ? color.opacity(0.6) : color.opacity(0.7), location: 1)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: Color.black.opacity(0.2), location: 0),
+                                        .init(color: Color.black.opacity(0.1), location: 1)
+                                    ]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 0.5
+                            )
+                    )
+                    .shadow(
+                        color: Color.black.opacity(configuration.isPressed ? 0.1 : 0.2),
+                        radius: configuration.isPressed ? 1 : 2,
+                        x: 0,
+                        y: configuration.isPressed ? 0.5 : 1
+                    )
+            )
+            .foregroundColor(.white)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
