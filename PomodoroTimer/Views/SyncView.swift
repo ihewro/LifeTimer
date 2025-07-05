@@ -7,8 +7,28 @@
 
 import SwiftUI
 
+// 弹窗数据管理器
+class FullChangesManager: ObservableObject {
+    @Published var isPresented = false
+    @Published var selectedChanges: SelectedChanges?
+
+    func showChanges(_ changes: SelectedChanges) {
+        selectedChanges = changes
+        isPresented = true
+    }
+
+    func hide() {
+        isPresented = false
+        // 延迟清理数据，避免弹窗关闭时闪烁
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.selectedChanges = nil
+        }
+    }
+}
+
 struct SyncView: View {
     @EnvironmentObject var syncManager: SyncManager
+    @StateObject private var fullChangesManager = FullChangesManager()
     @State private var serverURL = ""
     @State private var debugMode = true // Debug模式默认开启
     @State private var showingLocalDataDetail = false
@@ -73,6 +93,14 @@ struct SyncView: View {
         }
         .popover(isPresented: $showingServerDataDetail) {
             dataDetailPopover(isLocal: false)
+        }
+        .popover(isPresented: $fullChangesManager.isPresented) {
+            if let changes = fullChangesManager.selectedChanges {
+                fullChangesDetailView(changes: changes)
+            } else {
+                Text("数据加载中...")
+                    .padding()
+            }
         }
     }
 
@@ -820,7 +848,10 @@ struct SyncView: View {
                 Spacer()
             }
 
-            ForEach(items.prefix(3)) { item in
+            // 按时间倒序排序，最新的变更在前面
+            let sortedItems = items.sorted { $0.timestamp > $1.timestamp }
+
+            ForEach(sortedItems.prefix(3)) { item in
                 HStack {
                     Image(systemName: item.status.icon)
                         .foregroundColor(Color(item.status.color))
@@ -830,7 +861,7 @@ struct SyncView: View {
                         Text(item.title)
                             .font(.caption2)
                             .lineLimit(1)
-                        Text(item.description)
+                        Text(enhancedItemDescription(item))
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
@@ -846,10 +877,14 @@ struct SyncView: View {
             }
 
             if items.count > 3 {
-                Text("... 还有 \(items.count - 3) 个项目")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 16)
+                Button("... 还有 \(items.count - 3) 个项目") {
+                    let changes = SelectedChanges(title: title, items: sortedItems, color: color, icon: icon)
+                    fullChangesManager.showChanges(changes)
+                }
+                .font(.caption2)
+                .foregroundColor(.blue)
+                .buttonStyle(PlainButtonStyle())
+                .padding(.leading, 16)
             }
         }
     }
@@ -1007,9 +1042,67 @@ struct SyncView: View {
 
     /// 格式化工作区时间
     private func formatWorkspaceTime(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 检查是否是今天
+        if calendar.isDate(date, inSameDayAs: now) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        }
+
+        // 检查是否是昨天
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return "昨天 " + formatter.string(from: date)
+        }
+
+        // 检查是否是今年
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MM-dd HH:mm"
+            return formatter.string(from: date)
+        }
+
+        // 不同年份，显示完整日期
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    /// 增强的项目描述，为事件类型添加时间范围信息
+    private func enhancedItemDescription(_ item: WorkspaceItem) -> String {
+        // 如果是番茄事件，尝试从本地数据中获取详细信息
+        if item.type == .pomodoroEvent, let event = syncManager.getLocalEvent(by: item.id) {
+            let startTime = formatTimeOnly(event.startTime)
+            let endTime = formatTimeOnly(event.endTime)
+            let duration = formatDuration(event.duration)
+            return "\(event.type.displayName) - \(startTime)-\(endTime) (\(duration))"
+        }
+
+        // 如果找不到本地事件或不是事件类型，返回原始描述
+        return item.description
+    }
+
+    /// 格式化时间（只显示时分）
+    private func formatTimeOnly(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    /// 格式化时长
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return "\(minutes)分\(seconds)秒"
+        } else {
+            return "\(seconds)秒"
+        }
     }
 
     enum CustomButtonStyle {
@@ -1026,6 +1119,71 @@ struct SyncView: View {
                 .fontWeight(.medium)
                 .foregroundColor(count > 0 ? color : .secondary)
         }
+    }
+
+    /// 完整变更详情视图
+    private func fullChangesDetailView(changes: SelectedChanges) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+
+            // 标题
+            HStack {
+                Image(systemName: changes.icon)
+                    .foregroundColor(changes.color)
+                Text(changes.title)
+                    .font(.headline)
+                Text("(\(changes.items.count))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button("关闭") {
+                    fullChangesManager.hide()
+                }
+            }
+
+            Divider()
+
+            // 变更列表（按时间倒序排序）
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(changes.items.sorted { $0.timestamp > $1.timestamp }) { item in
+                        HStack {
+                            Image(systemName: item.status.icon)
+                                .foregroundColor(Color(item.status.color))
+                                .font(.caption)
+                                .frame(width: 16)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.caption)
+                                    .lineLimit(2)
+                                Text(enhancedItemDescription(item))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(item.status.displayName)
+                                    .font(.caption2)
+                                    .foregroundColor(Color(item.status.color))
+                                Text(formatWorkspaceTime(item.timestamp))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                        .cornerRadius(6)
+                    }
+                }
+            }
+            .frame(maxHeight: 400)
+        }
+        .padding()
+        .frame(width: 500, height: 500)
     }
 
     /// 同步历史详情视图
@@ -1360,6 +1518,13 @@ struct SyncView: View {
             return .gray
         }
     }
+}
+
+struct SelectedChanges {
+    let title: String
+    let items: [WorkspaceItem]
+    let color: Color
+    let icon: String
 }
 
 #Preview {

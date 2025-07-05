@@ -1129,6 +1129,11 @@ class SyncManager: ObservableObject {
         return formatDuration(duration)
     }
 
+    /// 根据ID获取本地事件（供UI使用）
+    func getLocalEvent(by id: String) -> PomodoroEvent? {
+        return eventManager?.events.first { $0.id.uuidString == id }
+    }
+
     /// 收集所有本地数据（用于强制覆盖远程）
     private func collectAllLocalData() async -> SyncChanges {
         var allEvents: [ServerPomodoroEvent] = []
