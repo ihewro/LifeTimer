@@ -45,7 +45,7 @@ struct TimerView: View {
                 ZStack {
                     // 背景圆环
                     Circle()
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 6)
                         .frame(width: 400, height: 400)
 
                     // 进度圆环
@@ -58,7 +58,7 @@ struct TimerView: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                                style: StrokeStyle(lineWidth: 6, lineCap: .round)
                             )
                             .frame(width: 400, height: 400)
                             .rotationEffect(.degrees(-90))
@@ -75,12 +75,11 @@ struct TimerView: View {
                             }
                         }) {
                             Text(timerModel.formattedTime())
-                                .font(.system(size: 48, weight: .light, design: .monospaced))
+                                .font(.system(size: 58, weight: .light, design: .monospaced))
                                 .foregroundColor(Color(NSColor.labelColor)) // 强制使用系统标签颜色（黑色）
                                 .multilineTextAlignment(.center)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .disabled(timerModel.timerState != .idle || timerModel.currentMode == .countUp)
 
                         // 其他信息显示区域（使用绝对定位，不影响时间居中）
                         VStack(spacing: 4) {
@@ -97,7 +96,7 @@ struct TimerView: View {
                                 // 暂停状态显示
                                 if timerModel.timerState == .paused {
                                     Text("已暂停")
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
                                         .padding(.top, 8)
@@ -107,7 +106,7 @@ struct TimerView: View {
                                     let timeInfo = timerModel.getTimeStatusInfo()
                                     if !timeInfo.isEmpty {
                                         Text(timeInfo)
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.caption)
                                             .foregroundColor(.secondary)
                                             .transition(.opacity)
                                             .multilineTextAlignment(.center)
@@ -116,7 +115,7 @@ struct TimerView: View {
                                 }
                             }
                         }
-                        .position(x: 150, y: 220) // 绝对定位在时间下方，不影响时间居中
+                        .position(x: 150, y: 200) // 绝对定位在时间下方，不影响时间居中
 
                         // 左侧减号按钮（在圆圈内部，距离时间合适的位置）
                         if isHoveringTimeCircle && timerModel.canAdjustTime() {
@@ -143,7 +142,7 @@ struct TimerView: View {
                             }
                             .buttonStyle(TimeAdjustButtonStyle())
                             .transition(.opacity)
-                            .position(x: 250, y: 150) // 绝对位置：右侧，垂直居中
+                            .position(x: 270, y: 150) // 绝对位置：右侧，垂直居中
                         }
                     }
                     .frame(width: 300, height: 300) // 限制在圆圈内部
@@ -236,8 +235,12 @@ struct TimerView: View {
                         // 主控制按钮
                         Button(action: {
                             switch timerModel.timerState {
-                            case .idle, .paused:
+                            case .idle:
                                 timerModel.startTimer(with: selectedTask)
+                            case .paused:
+                                timerModel.startTimer(with: selectedTask)
+                                // 恢复计时器时也恢复音乐播放
+                                audioManager.resumeTimerPlayback()
                             case .running:
                                 // 休息模式下运行时直接结束，其他模式暂停
                                 if timerModel.currentMode == .pureRest {
@@ -275,48 +278,81 @@ struct TimerView: View {
             }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.controlBackgroundColor))
+        .onAppear {
+            // 设置TimerModel对AudioManager的引用
+            timerModel.audioManager = audioManager
+        }
         .toolbar {
-            // 左侧：模式选择下拉菜单
+            // 左侧：占位符
             ToolbarItem(placement: .navigation) {
-                Menu {
-                    ForEach(TimerMode.allCases, id: \.self) { mode in
-                        Button(action: {
-                            timerModel.changeMode(mode)
-                        }) {
-                            HStack {
-                                Text(mode.rawValue)
-                                if timerModel.currentMode == mode {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(timerModel.currentMode.rawValue)
-                            .font(.title3)
-                            .foregroundColor(.primary)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            // 中间：占位符确保 toolbar 铺满宽度
-            ToolbarItem(placement: .principal) {
                 Spacer()
             }
 
-            // 右侧：音频控制按钮
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: {
-                    if audioManager.isPlaying {
-                        audioManager.pausePlayback()
-                    } else if audioManager.currentTrack != nil {
-                        audioManager.resumePlayback()
+            // 中间：模式选择 Picker
+            ToolbarItem(placement: .principal) {
+                Picker("模式", selection: Binding(
+                    get: { timerModel.currentMode },
+                    set: { timerModel.changeMode($0) }
+                )) {
+                    ForEach(TimerMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
                     }
-                }) {
-                    Image(systemName: audioManager.isPlaying ? "speaker.wave.2" : "speaker.slash")
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 400)
+            }
+
+            // 右侧：音频控制菜单
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    // 静音选项
+                    Button(action: {
+                        audioManager.clearSelection()
+                    }) {
+                        HStack {
+                            Image(systemName: "speaker.slash")
+                            Text("静音")
+                            if audioManager.selectedTrack == nil {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    if !audioManager.tracks.isEmpty {
+                        Divider()
+
+                        // 音乐列表
+                        ForEach(audioManager.tracks) { track in
+                            Button(action: {
+                                // 试听功能：点击音乐进行10秒试听
+                                audioManager.previewTrack(track)
+                            }) {
+                                HStack {
+                                    Image(systemName: getTrackIcon(for: track))
+                                    Text(track.name)
+                                        .lineLimit(1)
+                                    if audioManager.selectedTrack?.id == track.id {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Divider()
+                        Button(action: {
+                            // 这里可以打开设置页面或显示提示
+                        }) {
+                            HStack {
+                                Image(systemName: "gear")
+                                Text("请在设置中配置音乐文件夹")
+                            }
+                        }
+                        .disabled(true)
+                    }
+                } label: {
+                    Image(systemName: getAudioButtonIcon())
                         .font(.title2)
                         .foregroundColor(.secondary)
                 }
@@ -341,6 +377,26 @@ struct TimerView: View {
             return "继续"
         case .completed:
             return "开始"
+        }
+    }
+
+    // 获取音频按钮图标
+    private func getAudioButtonIcon() -> String {
+        if audioManager.isPlaying {
+            return "speaker.wave.2"
+        } else if audioManager.selectedTrack != nil {
+            return "speaker"
+        } else {
+            return "speaker.slash"
+        }
+    }
+
+    // 获取音乐项图标
+    private func getTrackIcon(for track: AudioTrack) -> String {
+        if audioManager.currentTrack?.id == track.id && audioManager.isPlaying {
+            return "speaker.wave.2"
+        } else {
+            return "music.note"
         }
     }
 

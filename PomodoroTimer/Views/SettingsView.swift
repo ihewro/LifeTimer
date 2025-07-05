@@ -545,7 +545,7 @@ struct MusicTrackRow: View {
             if isCurrentTrack && audioManager.isPlaying {
                 audioManager.pausePlayback()
             } else {
-                audioManager.playTrack(track)
+                audioManager.previewTrack(track)
             }
         }) {
             HStack {

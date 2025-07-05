@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-enum TimerMode: Equatable, Hashable {
+enum TimerMode: Equatable, Hashable, CaseIterable {
     case singlePomodoro
     case pureRest
     case countUp
@@ -49,6 +49,9 @@ class TimerModel: ObservableObject {
     // 计时器会话记录
     @Published var sessionStartTime: Date?
     @Published var sessionTask: String = ""
+
+    // 音频管理器引用（用于计时器联动）
+    weak var audioManager: AudioManager?
 
     // 设置
     @Published var pomodoroTime: TimeInterval = 25 * 60 { // 25分钟
@@ -132,6 +135,11 @@ class TimerModel: ObservableObject {
 
         timerState = .running
 
+        // 开始计时器时播放音乐（仅在番茄模式和正计时模式）
+        if currentMode == .singlePomodoro || currentMode == .countUp {
+            audioManager?.startTimerPlayback()
+        }
+
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             DispatchQueue.main.async {
                 self.updateTimer()
@@ -143,14 +151,20 @@ class TimerModel: ObservableObject {
         timerState = .paused
         timer?.invalidate()
         timer = nil
+
+        // 暂停计时器时暂停音乐
+        audioManager?.pauseTimerPlayback()
     }
-    
+
     func resetTimer() {
         timerState = .idle
         timer?.invalidate()
         timer = nil
         sessionStartTime = nil
         setupTimer()
+
+        // 重置计时器时停止音乐
+        audioManager?.stopTimerPlayback()
     }
     
     func changeMode(_ mode: TimerMode) {

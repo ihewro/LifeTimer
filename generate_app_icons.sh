@@ -1,38 +1,22 @@
 #!/bin/bash
 
 # 生成应用图标脚本
-# 将 SVG 图标转换为各种尺寸的 PNG 文件
+# 将 PNG 图标转换为各种尺寸的 PNG 文件
 
-# 检查是否有可用的转换工具，优先使用 macOS 内置工具
-if command -v qlmanage &> /dev/null && command -v sips &> /dev/null; then
-    CONVERTER="qlmanage_sips"
-elif command -v rsvg-convert &> /dev/null; then
-    CONVERTER="rsvg-convert"
-elif command -v inkscape &> /dev/null; then
-    # 测试 inkscape 是否真的可用
-    if inkscape --version &> /dev/null; then
-        CONVERTER="inkscape"
-    else
-        echo "警告: inkscape 已安装但无法正常工作，使用 macOS 内置工具"
-        CONVERTER="qlmanage_sips"
-    fi
-else
-    echo "错误: 需要安装图像转换工具"
-    echo "可用选项:"
-    echo "  brew install librsvg  # 安装 rsvg-convert"
-    echo "  brew install inkscape  # 安装 inkscape"
-    echo "  或使用 macOS 内置工具 (qlmanage + sips)"
+# 检查是否有 sips 工具（macOS 内置）
+if ! command -v sips &> /dev/null; then
+    echo "错误: 需要 sips 工具 (macOS 内置)"
     exit 1
 fi
 
-# 源 SVG 文件
-SVG_FILE="app_icon.svg"
+# 源 PNG 文件
+SOURCE_PNG="icons/icon.png"
 # 目标目录
 ICON_DIR="PomodoroTimer/Assets.xcassets/AppIcon.appiconset"
 
 # 检查源文件是否存在
-if [ ! -f "$SVG_FILE" ]; then
-    echo "错误: 找不到源文件 $SVG_FILE"
+if [ ! -f "$SOURCE_PNG" ]; then
+    echo "错误: 找不到源文件 $SOURCE_PNG"
     exit 1
 fi
 
@@ -76,22 +60,8 @@ generate_icon() {
     local size=$2
     local output_path="$ICON_DIR/$filename"
 
-    if [ "$CONVERTER" = "rsvg-convert" ]; then
-        rsvg-convert -w $size -h $size "$SVG_FILE" -o "$output_path"
-    elif [ "$CONVERTER" = "inkscape" ]; then
-        inkscape --export-png="$output_path" --export-width=$size --export-height=$size "$SVG_FILE"
-    elif [ "$CONVERTER" = "qlmanage_sips" ]; then
-        # 使用 qlmanage 生成临时 PNG，然后用 sips 调整尺寸
-        local temp_file="/tmp/temp_icon_$$.png"
-        qlmanage -t -s 1024 -o /tmp "$SVG_FILE" > /dev/null 2>&1
-        local ql_output="/tmp/$(basename "$SVG_FILE").png"
-        if [ -f "$ql_output" ]; then
-            sips -z $size $size "$ql_output" --out "$output_path" > /dev/null 2>&1
-            rm -f "$ql_output"
-        else
-            return 1
-        fi
-    fi
+    # 使用 sips 调整尺寸
+    sips -z $size $size "$SOURCE_PNG" --out "$output_path" > /dev/null 2>&1
 
     if [ $? -eq 0 ] && [ -f "$output_path" ]; then
         echo "✓ 生成 $filename (${size}x${size})"
