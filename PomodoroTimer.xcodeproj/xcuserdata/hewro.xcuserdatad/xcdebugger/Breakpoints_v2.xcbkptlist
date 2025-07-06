@@ -7,47 +7,31 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "92DF1591-76DF-4E3C-83A0-23BDF81630F6"
-            shouldBeEnabled = "Yes"
+            uuid = "972DD4F4-5D42-4329-BFE8-BFFAED66EDC1"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
+            filePath = "PomodoroTimer/Managers/SystemEventStore.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "203"
-            endingLineNumber = "203"
-            landmarkName = "timelineTab"
-            landmarkType = "24">
+            startingLineNumber = "179"
+            endingLineNumber = "179"
+            landmarkName = "getTodayOverview()"
+            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "BF6D15F4-284B-4EF4-81B1-EA2DAA5EBCB1"
+            uuid = "E7A1979D-3BF1-486B-85CD-4F74AF25796C"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "184"
-            endingLineNumber = "184"
-            landmarkName = "timelineTab"
-            landmarkType = "24">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "2D87F6A5-07C9-469C-BAE7-51F59171B117"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "519"
-            endingLineNumber = "519"
+            startingLineNumber = "502"
+            endingLineNumber = "502"
             landmarkName = "generateTimelineEvents()"
             landmarkType = "7">
          </BreakpointContent>

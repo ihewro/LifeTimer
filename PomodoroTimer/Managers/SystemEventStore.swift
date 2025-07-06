@@ -177,18 +177,96 @@ class SystemEventStore: ObservableObject {
     /// 获取今日总体统计
     func getTodayOverview() -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
         let todayEvents = getEvents(for: Date())
-        
+
         let appSwitches = todayEvents.filter { $0.type == .appActivated }.count
         let websiteVisits = todayEvents.filter { $0.type == .urlVisit }.count
-        
-        // 计算活跃时间（简化计算）
-        let activeEvents = todayEvents.filter { 
-            $0.type == .userActive || $0.type == .appActivated 
-        }
-        let activeTime = TimeInterval(activeEvents.count * 60) // 假设每个事件代表1分钟活跃时间
-        
+
+        // 计算真实的活跃时间
+        let activeTime = calculateRealActiveTime(from: todayEvents)
+
         return (activeTime: activeTime, appSwitches: appSwitches, websiteVisits: websiteVisits)
     }
+
+    /// 计算真实的活跃时间（与活动页面时间轴总计逻辑保持一致）
+    private func calculateRealActiveTime(from events: [SystemEvent]) -> TimeInterval {
+        // 使用与活动页面时间轴相同的逻辑：累加所有应用使用时间段
+        var totalTime: TimeInterval = 0
+        var currentApp: String?
+        var appStartTime: Date?
+
+        let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
+
+        for event in sortedEvents {
+            switch event.type {
+            case .appActivated:
+                // 获取当前事件的应用名称
+                guard let eventAppName = event.appName else { break }
+
+                // 如果是同一个应用的重复激活事件，跳过处理
+                if currentApp == eventAppName {
+                    break
+                }
+
+                // 结束上一个应用的计时
+                if let startTime = appStartTime {
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+                    // 只记录使用时间超过10秒的应用会话（与时间轴逻辑一致）
+                    if duration > 10 {
+                        totalTime += duration
+                    }
+                }
+
+                // 开始新应用的计时
+                currentApp = eventAppName
+                appStartTime = event.timestamp
+
+            case .appTerminated:
+                // 如果终止的是当前应用，结束计时
+                if let appName = event.appName, appName == currentApp,
+                   let startTime = appStartTime {
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+                    if duration > 10 {
+                        totalTime += duration
+                    }
+                    currentApp = nil
+                    appStartTime = nil
+                }
+
+            case .systemSleep:
+                // 系统休眠时结束当前应用计时
+                if let startTime = appStartTime {
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+                    if duration > 10 {
+                        totalTime += duration
+                    }
+                    appStartTime = nil
+                }
+
+            // case .systemWake:
+                // 系统唤醒时重新开始计时（如果有当前应用）
+                // if currentApp != nil {
+                //     appStartTime = event.timestamp
+                // }
+
+            default:
+                break
+            }
+        }
+
+        // 如果还有正在运行的应用，计算到当前时间（只对今天的数据）
+        let calendar = Calendar.current
+        if calendar.isDateInToday(Date()), // 确保是今天的数据
+           let startTime = appStartTime {
+            let duration = Date().timeIntervalSince(startTime)
+            if duration > 10 {
+                totalTime += duration
+            }
+        }
+
+        return totalTime
+    }
+
+
     
     // MARK: - Private Methods
     
