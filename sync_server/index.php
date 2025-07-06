@@ -28,6 +28,7 @@ $routes = [
     'POST /api/device/register' => 'api/device.php',
     'GET /api/sync/full' => 'api/sync.php',
     'POST /api/sync/incremental' => 'api/sync.php',
+    'GET /get_week_statistic' => 'statistic.php',
     'GET /api/health' => function() {
         return ['status' => 'ok', 'timestamp' => time() * 1000];
     }
