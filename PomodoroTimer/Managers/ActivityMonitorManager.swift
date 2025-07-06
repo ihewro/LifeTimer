@@ -11,12 +11,130 @@ import SwiftUI
 import Cocoa
 #endif
 
+/// 应用分类配置管理器
+class AppCategoryManager: ObservableObject {
+    @Published var productiveApps: [String] = []
+    @Published var entertainmentApps: [String] = []
+
+    private let userDefaults = UserDefaults.standard
+    private let productiveAppsKey = "ProductiveApps"
+    private let entertainmentAppsKey = "EntertainmentApps"
+
+    // 默认应用列表
+    private let defaultProductiveApps = [
+        "Xcode", "Visual Studio Code", "Terminal", "Finder", "TextEdit",
+        "Pages", "Numbers", "Keynote", "Code", "IntelliJ IDEA", "PyCharm",
+        "WebStorm", "Sublime Text", "Atom", "Vim", "Emacs", "Word", "Excel",
+        "PowerPoint", "Notion", "Obsidian", "Bear", "Typora", "MindNode",
+        "OmniGraffle", "Sketch", "Figma", "Adobe Photoshop", "Adobe Illustrator"
+    ]
+
+    private let defaultEntertainmentApps = [
+        "Safari", "Chrome", "Firefox", "YouTube", "Netflix", "Spotify",
+        "网易云音乐", "IINA", "VLC", "QuickTime Player", "Steam", "Epic Games",
+        "Discord", "Telegram", "WeChat", "QQ", "TikTok", "Instagram",
+        "Twitter", "Facebook", "Reddit", "Twitch", "Bilibili", "爱奇艺",
+        "腾讯视频", "优酷", "抖音", "小红书", "微博"
+    ]
+
+    init() {
+        loadConfiguration()
+    }
+
+    /// 加载配置
+    private func loadConfiguration() {
+        if let productiveData = userDefaults.array(forKey: productiveAppsKey) as? [String] {
+            productiveApps = productiveData
+        } else {
+            productiveApps = defaultProductiveApps
+            saveConfiguration()
+        }
+
+        if let entertainmentData = userDefaults.array(forKey: entertainmentAppsKey) as? [String] {
+            entertainmentApps = entertainmentData
+        } else {
+            entertainmentApps = defaultEntertainmentApps
+            saveConfiguration()
+        }
+    }
+
+    /// 保存配置
+    func saveConfiguration() {
+        userDefaults.set(productiveApps, forKey: productiveAppsKey)
+        userDefaults.set(entertainmentApps, forKey: entertainmentAppsKey)
+    }
+
+    /// 添加生产力应用
+    func addProductiveApp(_ appName: String) {
+        let trimmedName = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty && !productiveApps.contains(trimmedName) else { return }
+
+        // 如果在娱乐应用中，先移除
+        if let index = entertainmentApps.firstIndex(of: trimmedName) {
+            entertainmentApps.remove(at: index)
+        }
+
+        productiveApps.append(trimmedName)
+        productiveApps.sort()
+        saveConfiguration()
+    }
+
+    /// 添加娱乐应用
+    func addEntertainmentApp(_ appName: String) {
+        let trimmedName = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty && !entertainmentApps.contains(trimmedName) else { return }
+
+        // 如果在生产力应用中，先移除
+        if let index = productiveApps.firstIndex(of: trimmedName) {
+            productiveApps.remove(at: index)
+        }
+
+        entertainmentApps.append(trimmedName)
+        entertainmentApps.sort()
+        saveConfiguration()
+    }
+
+    /// 删除生产力应用
+    func removeProductiveApp(at index: Int) {
+        guard index < productiveApps.count else { return }
+        productiveApps.remove(at: index)
+        saveConfiguration()
+    }
+
+    /// 删除娱乐应用
+    func removeEntertainmentApp(at index: Int) {
+        guard index < entertainmentApps.count else { return }
+        entertainmentApps.remove(at: index)
+        saveConfiguration()
+    }
+
+    /// 重置为默认设置
+    func resetToDefaults() {
+        productiveApps = defaultProductiveApps
+        entertainmentApps = defaultEntertainmentApps
+        saveConfiguration()
+    }
+
+    /// 检查应用是否为生产力应用
+    func isProductiveApp(_ appName: String) -> Bool {
+        return productiveApps.contains(where: { appName.contains($0) })
+    }
+
+    /// 检查应用是否为娱乐应用
+    func isEntertainmentApp(_ appName: String) -> Bool {
+        return entertainmentApps.contains(where: { appName.contains($0) })
+    }
+}
+
 /// 活动监控管理器 - 统一管理所有系统监控功能
 class ActivityMonitorManager: ObservableObject {
     @Published var isMonitoring = false
     @Published var hasPermissions = false
     @Published var permissionStatus: PermissionStatus = .unknown
     @Published var showPermissionAlert = false
+
+    // 应用分类管理器
+    let appCategoryManager = AppCategoryManager()
 
     // 自动启动监控设置
     @Published var autoStartMonitoring: Bool = true {
@@ -447,16 +565,13 @@ extension ActivityMonitorManager {
         let appStats = getAppUsageStats(for: date)
         let websiteStats = getWebsiteStats(for: date)
 
-        // 简单的生产力分类（可以根据需要扩展）
-        let productiveApps = ["Xcode", "Visual Studio Code", "Terminal", "Finder", "TextEdit", "Pages", "Numbers", "Keynote"]
-        let entertainmentApps = ["Safari", "Chrome", "Firefox", "YouTube", "Netflix", "Spotify"]
-
+        // 使用配置管理器中的应用分类
         let productiveTime = appStats
-            .filter { stat in productiveApps.contains(where: { stat.appName.contains($0) }) }
+            .filter { stat in appCategoryManager.isProductiveApp(stat.appName) }
             .reduce(0) { $0 + $1.totalTime }
 
         let entertainmentTime = appStats
-            .filter { stat in entertainmentApps.contains(where: { stat.appName.contains($0) }) }
+            .filter { stat in appCategoryManager.isEntertainmentApp(stat.appName) }
             .reduce(0) { $0 + $1.totalTime }
 
         let totalTime = appStats.reduce(0) { $0 + $1.totalTime }
@@ -470,7 +585,7 @@ extension ActivityMonitorManager {
             otherTime: otherTime,
             productivityScore: productivityScore,
             topProductiveApp: appStats.first { stat in
-                productiveApps.contains(where: { stat.appName.contains($0) })
+                appCategoryManager.isProductiveApp(stat.appName)
             }?.appName ?? "无",
             totalWebsiteVisits: websiteStats.reduce(0) { $0 + $1.visits }
         )

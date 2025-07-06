@@ -10,7 +10,13 @@ import SwiftUI
 /// 活动监控设置视图
 struct ActivitySettingsView: View {
     @ObservedObject var activityMonitor: ActivityMonitorManager
+    @ObservedObject var appCategoryManager: AppCategoryManager
     @Environment(\.dismiss) private var dismiss
+
+    init(activityMonitor: ActivityMonitorManager) {
+        self.activityMonitor = activityMonitor
+        self.appCategoryManager = activityMonitor.appCategoryManager
+    }
     
     @State private var showingClearDataAlert = false
     @State private var showingExportSheet = false
@@ -62,6 +68,21 @@ struct ActivitySettingsView: View {
 
                     VStack(spacing: 12) {
                         dataManagementView
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 应用分类设置部分
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("应用分类设置")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        appCategorySettingsView
                     }
                     .padding(.vertical, 12)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -321,7 +342,71 @@ struct ActivitySettingsView: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
+    // MARK: - 应用分类设置视图
+
+    private var appCategorySettingsView: some View {
+        VStack(spacing: 16) {
+            // 说明文字
+            VStack(alignment: .leading, spacing: 8) {
+                Text("自定义应用分类")
+                    .font(.headline)
+
+                Text("配置哪些应用属于生产力应用或娱乐应用，用于生产力分析统计")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+
+            // 生产力应用配置
+            AppCategoryConfigView(
+                title: "生产力应用",
+                icon: "briefcase.fill",
+                iconColor: .blue,
+                apps: appCategoryManager.productiveApps,
+                onAdd: { appName in
+                    appCategoryManager.addProductiveApp(appName)
+                },
+                onRemove: { index in
+                    appCategoryManager.removeProductiveApp(at: index)
+                }
+            )
+
+            Divider()
+
+            // 娱乐应用配置
+            AppCategoryConfigView(
+                title: "娱乐应用",
+                icon: "gamecontroller.fill",
+                iconColor: .orange,
+                apps: appCategoryManager.entertainmentApps,
+                onAdd: { appName in
+                    appCategoryManager.addEntertainmentApp(appName)
+                },
+                onRemove: { index in
+                    appCategoryManager.removeEntertainmentApp(at: index)
+                }
+            )
+
+            Divider()
+
+            // 重置按钮
+            HStack {
+                Spacer()
+
+                Button("重置为默认设置") {
+                    appCategoryManager.resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .foregroundColor(.red)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
     // MARK: - 隐私设置视图
     
     private var privacySettingsView: some View {
@@ -541,6 +626,141 @@ struct ExportDataView: View {
     }
 }
 
+// MARK: - 应用分类配置组件
+
+struct AppCategoryConfigView: View {
+    let title: String
+    let icon: String
+    let iconColor: Color
+    let apps: [String]
+    let onAdd: (String) -> Void
+    let onRemove: (Int) -> Void
+
+    @State private var newAppName = ""
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 标题和展开按钮
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack {
+                    Image(systemName: icon)
+                        .foregroundColor(iconColor)
+                        .frame(width: 20)
+
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    Text("(\(apps.count))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+
+            if isExpanded {
+                VStack(spacing: 8) {
+                    // 添加新应用
+                    HStack {
+                        TextField("输入应用名称", text: $newAppName)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit {
+                                addApp()
+                            }
+
+                        Button("添加") {
+                            addApp()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(newAppName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    // 应用列表
+                    if !apps.isEmpty {
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 120), spacing: 8)
+                        ], spacing: 8) {
+                            ForEach(Array(apps.enumerated()), id: \.offset) { index, app in
+                                AppTagView(
+                                    appName: app,
+                                    onRemove: {
+                                        onRemove(index)
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.top, 8)
+                    } else {
+                        Text("暂无应用")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
+    }
+
+    private func addApp() {
+        let trimmedName = newAppName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        onAdd(trimmedName)
+        newAppName = ""
+    }
+}
+
+struct AppTagView: View {
+    let appName: String
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(appName)
+                .font(.caption)
+                .lineLimit(1)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .opacity(isHovered ? 1.0 : 0.6)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.1))
+        .cornerRadius(12)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .contextMenu {
+            Button("删除") {
+                onRemove()
+            }
+        }
+    }
+}
+
 #Preview {
-    ActivitySettingsView(activityMonitor: ActivityMonitorManager())
+    let activityMonitor = ActivityMonitorManager()
+    return ActivitySettingsView(activityMonitor: activityMonitor)
 }
