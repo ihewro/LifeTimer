@@ -57,6 +57,7 @@ class TimerModel: ObservableObject {
     @Published var pomodoroTime: TimeInterval = 25 * 60 { // 25分钟
         didSet {
             if pomodoroTime != oldValue {
+                saveSettings()
                 notifySettingsChanged()
                 // 如果当前是番茄模式且处于idle状态，更新时间
                 if currentMode == .singlePomodoro && timerState == .idle {
@@ -68,6 +69,7 @@ class TimerModel: ObservableObject {
     @Published var shortBreakTime: TimeInterval = 5 * 60 { // 5分钟
         didSet {
             if shortBreakTime != oldValue {
+                saveSettings()
                 notifySettingsChanged()
                 // 如果当前是休息模式且处于idle状态，更新时间
                 if currentMode == .pureRest && timerState == .idle {
@@ -79,6 +81,7 @@ class TimerModel: ObservableObject {
     @Published var longBreakTime: TimeInterval = 15 * 60 { // 15分钟
         didSet {
             if longBreakTime != oldValue {
+                saveSettings()
                 notifySettingsChanged()
             }
         }
@@ -88,6 +91,7 @@ class TimerModel: ObservableObject {
     @Published var autoStartBreak: Bool = false {
         didSet {
             if autoStartBreak != oldValue {
+                saveSettings()
                 notifySettingsChanged()
             }
         }
@@ -98,11 +102,19 @@ class TimerModel: ObservableObject {
 
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    private let userDefaults = UserDefaults.standard
 
     // 设置变更通知
     static let settingsChangedNotification = Notification.Name("TimerSettingsChanged")
-    
+
+    // UserDefaults 键
+    private let pomodoroTimeKey = "PomodoroTime"
+    private let shortBreakTimeKey = "ShortBreakTime"
+    private let longBreakTimeKey = "LongBreakTime"
+    private let autoStartBreakKey = "AutoStartBreak"
+
     init() {
+        loadSettings()
         setupTimer()
     }
     
@@ -374,6 +386,38 @@ class TimerModel: ObservableObject {
 
     private func notifySettingsChanged() {
         NotificationCenter.default.post(name: TimerModel.settingsChangedNotification, object: self)
+    }
+
+    // MARK: - 设置持久化
+
+    private func saveSettings() {
+        userDefaults.set(pomodoroTime, forKey: pomodoroTimeKey)
+        userDefaults.set(shortBreakTime, forKey: shortBreakTimeKey)
+        userDefaults.set(longBreakTime, forKey: longBreakTimeKey)
+        userDefaults.set(autoStartBreak, forKey: autoStartBreakKey)
+    }
+
+    private func loadSettings() {
+        // 加载时间设置，如果没有保存的值则使用默认值
+        let savedPomodoroTime = userDefaults.double(forKey: pomodoroTimeKey)
+        if savedPomodoroTime > 0 {
+            pomodoroTime = savedPomodoroTime
+        }
+
+        let savedShortBreakTime = userDefaults.double(forKey: shortBreakTimeKey)
+        if savedShortBreakTime > 0 {
+            shortBreakTime = savedShortBreakTime
+        }
+
+        let savedLongBreakTime = userDefaults.double(forKey: longBreakTimeKey)
+        if savedLongBreakTime > 0 {
+            longBreakTime = savedLongBreakTime
+        }
+
+        // 加载自动休息设置
+        if userDefaults.object(forKey: autoStartBreakKey) != nil {
+            autoStartBreak = userDefaults.bool(forKey: autoStartBreakKey)
+        }
     }
 }
 
