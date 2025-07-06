@@ -16,11 +16,25 @@ class ActivityMonitorManager: ObservableObject {
     @Published var isMonitoring = false
     @Published var hasPermissions = false
     @Published var permissionStatus: PermissionStatus = .unknown
+    @Published var showPermissionAlert = false
+
+    // 自动启动监控设置
+    @Published var autoStartMonitoring: Bool = true {
+        didSet {
+            if autoStartMonitoring != oldValue {
+                saveSettings()
+            }
+        }
+    }
 
     #if canImport(Cocoa)
     private let systemEventMonitor = SystemEventMonitor()
     #endif
     private let eventStore = SystemEventStore.shared
+    private let userDefaults = UserDefaults.standard
+
+    // UserDefaults 键
+    private let autoStartMonitoringKey = "AutoStartMonitoring"
 
     enum PermissionStatus {
         case unknown
@@ -30,6 +44,7 @@ class ActivityMonitorManager: ObservableObject {
     }
 
     init() {
+        loadSettings()
         #if canImport(Cocoa)
         checkPermissions()
         #else
@@ -67,23 +82,36 @@ class ActivityMonitorManager: ObservableObject {
             // 如果已经有权限，直接更新状态
             permissionStatus = .granted
             hasPermissions = true
+            handlePermissionGranted()
             return
         }
 
         // 请求辅助功能权限
         let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
-        let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
 
         // 立即检查一次
         checkPermissions()
 
-        // 延迟再次检查权限状态
+        // 延迟再次检查权限状态，并在获得权限后自动启动
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.checkPermissions()
+            if self.hasPermissions {
+                self.handlePermissionGranted()
+            }
+        }
+
+        // 再次延迟检查，确保权限状态正确更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.checkPermissions()
+            if self.hasPermissions {
+                self.handlePermissionGranted()
+            }
         }
         #else
         hasPermissions = true
         permissionStatus = .granted
+        handlePermissionGranted()
         #endif
     }
 
@@ -288,6 +316,58 @@ class ActivityMonitorManager: ObservableObject {
         #else
         return "iOS沙盒文档目录/system_events.json"
         #endif
+    }
+
+    // MARK: - 自动启动逻辑
+
+    /// 应用启动时的自动监控逻辑
+    func handleAppLaunch() {
+        #if canImport(Cocoa)
+        // 检查权限状态
+        checkPermissions()
+
+        // 如果启用了自动启动监控
+        if autoStartMonitoring {
+            if hasPermissions {
+                // 有权限，直接开始监控
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.startMonitoring()
+                }
+            } else {
+                // 没有权限，显示权限请求提示
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.showPermissionAlert = true
+                }
+            }
+        }
+        #else
+        // iOS版本直接启动
+        if autoStartMonitoring {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.startMonitoring()
+            }
+        }
+        #endif
+    }
+
+    /// 权限授予后的自动启动逻辑
+    func handlePermissionGranted() {
+        if autoStartMonitoring && !isMonitoring {
+            startMonitoring()
+        }
+    }
+
+    // MARK: - 设置持久化
+
+    private func saveSettings() {
+        userDefaults.set(autoStartMonitoring, forKey: autoStartMonitoringKey)
+    }
+
+    private func loadSettings() {
+        // 加载自动启动设置，默认为true
+        if userDefaults.object(forKey: autoStartMonitoringKey) != nil {
+            autoStartMonitoring = userDefaults.bool(forKey: autoStartMonitoringKey)
+        }
     }
 
     /// 获取数据文件大小

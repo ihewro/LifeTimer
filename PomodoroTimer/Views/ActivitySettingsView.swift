@@ -30,6 +30,7 @@ struct ActivitySettingsView: View {
 
                     VStack(spacing: 12) {
                         monitoringStatusView
+                        autoStartSettingView
                         permissionStatusView
                     }
                     .padding(.vertical, 12)
@@ -145,7 +146,25 @@ struct ActivitySettingsView: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
+    private var autoStartSettingView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("应用启动时自动开始监控")
+                    .font(.body)
+
+                Text("启用后，应用启动时将自动检查权限并开始活动监控")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $activityMonitor.autoStartMonitoring)
+        }
+        .padding(.horizontal, 20)
+    }
+
     private var permissionStatusView: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {

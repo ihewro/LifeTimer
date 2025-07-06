@@ -85,6 +85,20 @@ struct ContentView: View {
         }
         .frame(minWidth: 800, minHeight: 600)
         .navigationTitle("")
+        .overlay(
+            // 权限请求弹窗
+            Group {
+                if activityMonitor.showPermissionAlert {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            activityMonitor.showPermissionAlert = false
+                        }
+
+                    PermissionRequestAlert(isPresented: $activityMonitor.showPermissionAlert)
+                }
+            }
+        )
         #else
         // iOS 版本使用 TabView
         TabView(selection: $selectedView) {

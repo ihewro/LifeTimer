@@ -19,12 +19,93 @@ enum CalendarViewMode: String, CaseIterable {
     case day = "日"
     case week = "周"
     case month = "月"
-    
+
     var icon: String {
         switch self {
         case .day: return "calendar.day.timeline.left"
         case .week: return "calendar"
         case .month: return "calendar.month"
+        }
+    }
+}
+
+// MARK: - 可重用的日历导航工具栏组件
+struct CalendarNavigationToolbar: View {
+    let viewMode: CalendarViewMode
+    @Binding var selectedDate: Date
+
+    private let calendar = Calendar.current
+
+    // 根据视图模式计算是否为今天
+    private var isToday: Bool {
+        switch viewMode {
+        case .day:
+            return calendar.isDateInToday(selectedDate)
+        case .week:
+            let today = Date()
+            guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: selectedDate),
+                  let todayWeekInterval = calendar.dateInterval(of: .weekOfYear, for: today) else {
+                return false
+            }
+            return weekInterval.start == todayWeekInterval.start
+        case .month:
+            let today = Date()
+            return calendar.isDate(selectedDate, equalTo: today, toGranularity: .month)
+        }
+    }
+
+    var body: some View {
+        HStack {
+            Spacer()
+            // 上一个时间段按钮
+            Button(action: previousPeriod) {
+                Image(systemName: "chevron.left")
+            }
+            .controlSize(.small)
+
+            // 今天按钮
+            Button(action: goToToday) {
+                Text("今天")
+            }
+            .controlSize(.small)
+            .disabled(isToday)
+
+            // 下一个时间段按钮
+            Button(action: nextPeriod) {
+                Image(systemName: "chevron.right")
+            }
+            .controlSize(.small)
+        }
+    }
+
+    // MARK: - 导航方法
+
+    /// 跳转到今天
+    private func goToToday() {
+        selectedDate = Date()
+    }
+
+    /// 上一个时间段
+    private func previousPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        }
+    }
+
+    /// 下一个时间段
+    private func nextPeriod() {
+        switch viewMode {
+        case .day:
+            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+        case .week:
+            selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
+        case .month:
+            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
         }
     }
 }
@@ -55,6 +136,7 @@ struct CalendarView: View {
                         dragOffset: $dragOffset
                     )
                     .environmentObject(eventManager)
+                    .environmentObject(activityMonitor)
                     .background(Color(NSColor.controlBackgroundColor))
 
                 case .week:
@@ -64,7 +146,7 @@ struct CalendarView: View {
                         .background(Color(NSColor.controlBackgroundColor))
 
                 case .month:
-                    MonthView(selectedDate: $selectedDate)
+                    MonthView(viewMode: currentViewMode, selectedDate: $selectedDate)
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
                         .background(Color(NSColor.controlBackgroundColor))
@@ -129,145 +211,6 @@ struct CalendarView: View {
     }
 }
 
-// MARK: - 日历工具栏
-struct CalendarToolbar: View {
-    @Binding var selectedDate: Date
-    @Binding var viewMode: CalendarViewMode
-    @Binding var showingAddEvent: Bool
-    @State private var searchText = ""
-
-    private let calendar = Calendar.current
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月d日"
-        return formatter
-    }()
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // 顶部工具栏
-            HStack(spacing: 16) {
-                // 左侧：添加事件按钮
-                Button(action: {
-                    showingAddEvent = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16))
-                        .foregroundColor(.primary)
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.regular)
-
-                Spacer()
-
-                // 中间：视图模式标签页（居中）
-                Picker("", selection: $viewMode) {
-                    ForEach(CalendarViewMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-
-                Spacer()
-
-                // 右侧：搜索框
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 14))
-
-                    TextField("搜索", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .font(.system(size: 14))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(NSColor.controlBackgroundColor))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                )
-                .frame(width: 150)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(NSColor.windowBackgroundColor))
-
-            Divider()
-        }
-    }
-    
-    private var formattedDateTitle: String {
-        switch viewMode {
-        case .day:
-            return dateFormatter.string(from: selectedDate)
-        case .week:
-            let weekStart = calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDate
-            let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? selectedDate
-            let formatter = DateFormatter()
-            formatter.dateFormat = "M月d日"
-            return "\(formatter.string(from: weekStart)) - \(formatter.string(from: weekEnd))"
-        case .month:
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy年M月"
-            return formatter.string(from: selectedDate)
-        }
-    }
-    
-
-
-    /// 跳转到今天
-    private func goToToday() {
-        selectedDate = Date()
-    }
-
-    /// 上一个时间段
-    private func previousPeriod() {
-        switch viewMode {
-        case .day:
-            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
-        case .week:
-            selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
-        case .month:
-            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
-        }
-    }
-
-    /// 下一个时间段
-    private func nextPeriod() {
-        switch viewMode {
-        case .day:
-            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
-        case .week:
-            selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
-        case .month:
-            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
-        }
-    }
-
-    /// 检查当前选中的日期是否是今天
-    private var isToday: Bool {
-        switch viewMode {
-        case .day:
-            return calendar.isDateInToday(selectedDate)
-        case .week:
-            let today = Date()
-            guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: selectedDate),
-                  let todayWeekInterval = calendar.dateInterval(of: .weekOfYear, for: today) else {
-                return false
-            }
-            return weekInterval.start == todayWeekInterval.start
-        case .month:
-            let today = Date()
-            return calendar.isDate(selectedDate, equalTo: today, toGranularity: .month)
-        }
-    }
-}
-
 // MARK: - 日视图
 struct DayView: View {
     @Binding var selectedDate: Date
@@ -276,6 +219,7 @@ struct DayView: View {
     @Binding var draggedEvent: PomodoroEvent?
     @Binding var dragOffset: CGSize
     @EnvironmentObject var eventManager: EventManager
+    @EnvironmentObject var activityMonitor: ActivityMonitorManager
     private let calendar = Calendar.current
     private let hourHeight: CGFloat = 60
     
@@ -297,12 +241,13 @@ struct DayView: View {
 
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
-                    MiniCalendarView(selectedDate: $selectedDate)
+                    MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
                         .frame(height: 200)
                         .padding()
                     Divider()
-                    EventDetailPanel(selectedEvent: $selectedEvent)
+                    DayStatsPanel(selectedDate: $selectedDate)
                         .environmentObject(eventManager)
+                        .environmentObject(activityMonitor)
                         .frame(maxHeight: .infinity)
                 }
                 .frame(width: 300)
@@ -341,11 +286,12 @@ struct TimelineView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             // 日期显示区域（只显示日期信息，不显示导航按钮）
             DateDisplayOnly(selectedDate: $selectedDate)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
 
@@ -648,7 +594,7 @@ struct EventBlock: View {
                     selectedEvent = nil
                 })
                 .environmentObject(eventManager)
-                .frame(width: 350, height: 400)
+                .frame(width: 300)
             }
             .contextMenu {
                 Button(role: .destructive) {
@@ -784,6 +730,7 @@ struct SelectionOverlay: View {
 
 // MARK: - 小日历视图
 struct MiniCalendarView: View {
+    let viewMode: CalendarViewMode
     @Binding var selectedDate: Date
     @State private var currentMonth = Date()
     
@@ -816,25 +763,10 @@ struct MiniCalendarView: View {
     var body: some View {
         VStack(spacing: 6) {
             // 导航按钮组
-            HStack {
-                Spacer()
-                // 上一个月按钮
-                Button(action: previousMonth) {
-                    Image(systemName: "chevron.left")
-                }
-                .controlSize(.small)
-                // 今天按钮
-                Button(action: goToToday) {
-                    Text("今天")
-                }
-                .controlSize(.small)
-                .disabled(isToday)
-                // 下一个月按钮
-                Button(action: nextMonth) {
-                    Image(systemName: "chevron.right")
-                }
-                .controlSize(.small)
-            }
+            CalendarNavigationToolbar(
+                viewMode: viewMode,
+                selectedDate: $selectedDate
+            )
 
             // 星期标题
             HStack(spacing: 0) {
@@ -862,23 +794,7 @@ struct MiniCalendarView: View {
         return formatter
     }()
     
-    private var isToday: Bool {
-        calendar.isDateInToday(selectedDate)
-    }
 
-    private func previousMonth() {
-        currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
-    }
-
-    private func nextMonth() {
-        currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
-    }
-
-    private func goToToday() {
-        let today = Date()
-        currentMonth = today
-        selectedDate = today
-    }
 }
 
 // MARK: - 小日历日期单元格
@@ -937,110 +853,158 @@ struct MiniDayCell: View {
     }
 }
 
-// MARK: - 事件详情面板
-struct EventDetailPanel: View {
-    @Binding var selectedEvent: PomodoroEvent?
+// MARK: - 当日统计面板
+struct DayStatsPanel: View {
+    @Binding var selectedDate: Date
     @EnvironmentObject var eventManager: EventManager
+    @EnvironmentObject var activityMonitor: ActivityMonitorManager
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if let event = selectedEvent {
-                    // 事件详情显示
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("事件详情")
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                // 当日活动概览
+                dayActivityOverview
 
-                        // 事件标题
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("标题")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(event.title)
-                                .font(.body)
-                                .fontWeight(.medium)
-                        }
+                // 当日热门应用
+                dayTopApps
 
-                        // 事件类型
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("类型")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            HStack {
-                                Circle()
-                                    .fill(event.type.color)
-                                    .frame(width: 12, height: 12)
-                                Text(event.type.displayName)
-                                    .font(.body)
-                            }
-                        }
-
-                        // 时间信息
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("时间")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("开始：\(formatTime(event.startTime))")
-                                    .font(.body)
-                                Text("结束：\(formatTime(event.endTime))")
-                                    .font(.body)
-                                Text("时长：\(formatDuration(event.endTime.timeIntervalSince(event.startTime)))")
-                                    .font(.callout)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        Divider()
-
-                        // 操作按钮
-                        VStack(spacing: 8) {
-                            Button("删除事件") {
-                                eventManager.removeEvent(event)
-                                selectedEvent = nil
-                            }
-                            .buttonStyle(.bordered)
-                            .foregroundColor(.red)
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .id(event.id) // 保证切换事件时刷新
-                } else {
-                    // 空状态
-                    VStack(spacing: 16) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("未选中事件")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                        Text("请在左侧时间轴点击事件查看详情，或双击事件进行编辑")
-                            .font(.callout)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
+                Spacer()
             }
-            .padding()
         }
     }
 
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+    // 当日活动概览
+    private var dayActivityOverview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("活动概览")
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            // 计算当日统计
+            let dayStats = calculateDayStats()
+
+            VStack(spacing: 8) {
+                HStack {
+                    Image(systemName: "timer")
+                        .foregroundColor(.blue)
+                    Text("活跃时间")
+                    Spacer()
+                    Text(formatTime(dayStats.totalActiveTime))
+                        .fontWeight(.medium)
+                }
+
+                HStack {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundColor(.green)
+                    Text("番茄时钟")
+                    Spacer()
+                    Text("\(dayStats.pomodoroSessions)")
+                        .fontWeight(.medium)
+                }
+
+                HStack {
+                    Image(systemName: "app.badge")
+                        .foregroundColor(.orange)
+                    Text("应用切换")
+                    Spacer()
+                    Text("\(dayStats.appSwitches)")
+                        .fontWeight(.medium)
+                }
+            }
+            .font(.caption)
+        }
+        .padding()
     }
 
-    private func formatDuration(_ duration: TimeInterval) -> String {
+    // 当日热门应用
+    private var dayTopApps: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("热门应用")
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            let topApps = getTopApps()
+
+            if topApps.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "app.dashed")
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary)
+                    Text("暂无应用使用记录")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(Array(topApps.enumerated()), id: \.offset) { index, appStat in
+                        HStack {
+                            // 排名
+                            Text("\(index + 1)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                                .frame(width: 16)
+
+                            // 应用名称
+                            Text(appStat.appName)
+                                .font(.caption)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            // 使用时长
+                            Text(formatTime(appStat.totalTime))
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+
+    // 计算当日统计数据
+    private func calculateDayStats() -> (totalActiveTime: TimeInterval, pomodoroSessions: Int, appSwitches: Int) {
+        // 获取当日事件
+        let dayEvents = eventManager.eventsForDate(selectedDate)
+
+        // 计算活跃时间（番茄时间+正计时间+自定义事件，不包含休息）
+        var totalActiveTime: TimeInterval = 0
+        for event in dayEvents {
+            if event.type == .pomodoro || event.type == .countUp || event.type == .custom {
+                totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
+            }
+        }
+
+        // 计算番茄时钟个数
+        let pomodoroSessions = dayEvents.filter { $0.type == .pomodoro }.count
+
+        // 获取应用切换次数
+        let overview = activityMonitor.getTodayOverview()
+        let appSwitches = overview.appSwitches
+
+        return (totalActiveTime, pomodoroSessions, appSwitches)
+    }
+
+    // 获取当日热门应用Top5
+    private func getTopApps() -> [AppUsageStats] {
+        let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
+        return Array(appStats.prefix(5))
+    }
+
+    // 格式化时间显示
+    private func formatTime(_ duration: TimeInterval) -> String {
         let hours = Int(duration) / 3600
         let minutes = Int(duration) % 3600 / 60
 
         if hours > 0 {
-            return "\(hours)小时\(minutes)分钟"
+            return "\(hours)h\(minutes)m"
         } else {
-            return "\(minutes)分钟"
+            return "\(minutes)m"
         }
     }
 }
@@ -1086,11 +1050,12 @@ struct WeekView: View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
                 // 主要周视图区域
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
                     // 日期显示区域（只显示日期信息，不显示导航按钮）
                     DateDisplayOnly(selectedDate: $selectedDate)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Divider()
 
@@ -1117,7 +1082,7 @@ struct WeekView: View {
                 // 右侧面板（类似日视图）
                 VStack(spacing: 0) {
                     // 小日历
-                    MiniCalendarView(selectedDate: $selectedDate)
+                    MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
                         .frame(height: 200)
                         .padding()
 
@@ -1694,12 +1659,19 @@ struct WeekEventBlock: View {
 
 // MARK: - 月视图
 struct MonthView: View {
+    let viewMode: CalendarViewMode
     @Binding var selectedDate: Date
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @State private var selectedEvent: PomodoroEvent?
     @State private var showingAddEvent = false
     @State private var currentMonth = Date()
+
+    // Popover 状态管理
+    @State private var showingDayEventsPopover = false
+    @State private var showingEventDetailPopover = false
+    @State private var popoverDate: Date = Date()
+    @State private var popoverEvent: PomodoroEvent?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 7)
@@ -1735,7 +1707,6 @@ struct MonthView: View {
                 VStack(spacing: 0) {
                     // 月份导航
                     monthNavigationView
-                        .frame(height: 40)
 
                     Divider()
 
@@ -1753,16 +1724,18 @@ struct MonthView: View {
 
                 // 右侧面板
                 VStack(spacing: 0) {
-                    // 选中日期详情
-                    selectedDatePanel
-                        .frame(height: 200)
+                    VStack(spacing: 6) {
+                        CalendarNavigationToolbar(
+                            viewMode: viewMode,
+                            selectedDate: $selectedDate
+                        )
                         .padding()
+                        .padding(.top, 2)
 
-                    Divider()
-
-                    // 月度统计
-                    monthStatsPanel
-                        .frame(maxHeight: .infinity)
+                        // 月度统计
+                        monthStatsPanel
+                            .frame(maxHeight: .infinity)
+                    }
                 }
                 .frame(width: 300)
                 .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
@@ -1793,26 +1766,14 @@ struct MonthView: View {
 
     // 月份导航视图
     private var monthNavigationView: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(monthFormatter.string(from: currentMonth))
-                .font(.title2)
+                .font(.title)
                 .fontWeight(.semibold)
-
-            Spacer()
-            Button(action: previousMonth) {
-                Image(systemName: "chevron.left")
-            }
-            .controlSize(.regular)
-            // 今天按钮
-            // Button(_:) {
-            //     Text("今天")
-            // }
-            Button(action: nextMonth) {
-                Image(systemName: "chevron.right")
-            }
-            .controlSize(.regular)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // 星期标题视图
@@ -1831,107 +1792,57 @@ struct MonthView: View {
 
     // 月历网格视图
     private var monthGridView: some View {
-        LazyVGrid(columns: columns, spacing: 1) {
-            ForEach(monthDays, id: \.self) { date in
-                MonthDayCell(
-                    date: date,
-                    selectedDate: $selectedDate,
-                    currentMonth: currentMonth,
-                    events: eventManager.eventsForDate(date),
-                    activityStats: activityMonitor.getAppUsageStats(for: date)
-                )
+        GeometryReader { geometry in
+            let availableHeight = geometry.size.height
+            let cellHeight = availableHeight / 6 // 6 rows for calendar weeks
+
+            LazyVGrid(columns: columns, spacing: 1) {
+                ForEach(monthDays, id: \.self) { date in
+                    MonthDayCell(
+                        date: date,
+                        selectedDate: $selectedDate,
+                        currentMonth: currentMonth,
+                        events: eventManager.eventsForDate(date),
+                        activityStats: activityMonitor.getAppUsageStats(for: date),
+                        cellHeight: cellHeight
+                    )
                 .onTapGesture {
                     selectedDate = date
+                    popoverDate = date
+                    showingDayEventsPopover = true
                 }
                 .onLongPressGesture {
                     selectedDate = date
                     showingAddEvent = true
                 }
+                .popover(isPresented: Binding<Bool>(
+                    get: { showingDayEventsPopover && Calendar.current.isDate(popoverDate, inSameDayAs: date) },
+                    set: { newValue in
+                        if !newValue {
+                            showingDayEventsPopover = false
+                        }
+                    }
+                )) {
+                    DayEventsPopover(
+                        date: popoverDate,
+                        selectedEvent: $popoverEvent,
+                        showingEventDetail: $showingEventDetailPopover
+                    )
+                    .environmentObject(eventManager)
+                }
+            }
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 0)
     }
 
-    // 选中日期面板
-    private var selectedDatePanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(selectedDateFormatter.string(from: selectedDate))
-                .font(.headline)
-                .fontWeight(.semibold)
 
-            let dayEvents = eventManager.eventsForDate(selectedDate)
-
-            if dayEvents.isEmpty {
-                Text("无事件")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("今日事件 (\(dayEvents.count))")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(dayEvents.prefix(3), id: \.id) { event in
-                            HStack {
-                                Circle()
-                                    .fill(event.type.color)
-                                    .frame(width: 8, height: 8)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(event.title)
-                                        .font(.caption)
-                                        .lineLimit(1)
-
-                                    Text(event.formattedTimeRange)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Spacer()
-                            }
-                            .onTapGesture {
-                                selectedEvent = event
-                            }
-                        }
-
-                        if dayEvents.count > 3 {
-                            Text("还有 \(dayEvents.count - 3) 个事件...")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-            }
-
-            Button("添加事件") {
-                showingAddEvent = true
-            }
-            .buttonStyle(.bordered)
-            .frame(maxWidth: .infinity)
-        }
-        .padding()
-        .background(
-            Group {
-                #if os(iOS)
-                Color(.systemBackground)
-                #else
-                Color(NSColor.controlBackgroundColor)
-                #endif
-            }
-        )
-        .cornerRadius(8)
-    }
 
     // 月度统计面板
     private var monthStatsPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("本月统计")
-                    .font(.headline)
-                    .padding(.horizontal)
-
                 // 月度活动概览
                 monthActivityOverview
 
@@ -2047,13 +1958,7 @@ struct MonthView: View {
         return formatter
     }()
 
-    private func previousMonth() {
-        currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
-    }
 
-    private func nextMonth() {
-        currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
-    }
 
     private func calculateMonthStats() -> (activeDays: Int, totalActiveTime: TimeInterval, pomodoroSessions: Int, avgProductivity: Double) {
         let monthDates = getMonthDates()
@@ -2150,6 +2055,7 @@ struct MonthDayCell: View {
     let currentMonth: Date
     let events: [PomodoroEvent]
     let activityStats: [AppUsageStats]
+    let cellHeight: CGFloat
 
     private let calendar = Calendar.current
 
@@ -2177,6 +2083,26 @@ struct MonthDayCell: View {
         "\(calendar.component(.day, from: date))"
     }
 
+    // 根据单元格高度动态计算可显示的事件数量
+    private var maxVisibleEvents: Int {
+        // 预留空间：日期数字区域(~20pt) + 顶部padding(2pt) + 底部padding(2pt) + Spacer
+        // 每个事件行大约需要 14pt (字体10pt + padding 4pt)
+        // "还有X项"指示器大约需要 12pt
+        let reservedSpace: CGFloat = 26 // 日期数字和padding
+        let eventRowHeight: CGFloat = 16 // 增加事件行高度以适应更大字体
+        let moreIndicatorHeight: CGFloat = 14
+
+        let availableForEvents = cellHeight - reservedSpace
+
+        if events.count <= 1 {
+            return max(1, Int(availableForEvents / eventRowHeight))
+        } else {
+            // 如果有多个事件，需要为"还有X项"指示器预留空间
+            let spaceForEventsAndIndicator = availableForEvents - moreIndicatorHeight
+            return max(1, Int(spaceForEventsAndIndicator / eventRowHeight))
+        }
+    }
+
     var body: some View {
         VStack(spacing: 2) {
             // 顶部：日期数字（右上角）
@@ -2198,21 +2124,21 @@ struct MonthDayCell: View {
             .padding(.trailing, 4)
 
             // 事件列表区域
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 if hasEvents {
-                    // 最多显示3个事件
-                    ForEach(Array(events.prefix(3)), id: \.id) { event in
+                    // 动态显示事件数量
+                    ForEach(Array(events.prefix(maxVisibleEvents)), id: \.id) { event in
                         eventRow(for: event)
                     }
 
-                    if events.count > 3 {
-                        Text("还有\(events.count - 3)项")
-                            .font(.system(size: 9))
+                    if events.count > maxVisibleEvents {
+                        Text("还有\(events.count - maxVisibleEvents)项")
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                            .padding(.horizontal, 2)
-                            .padding(.vertical, 1)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 2)
                             .background(
-                                RoundedRectangle(cornerRadius: 2)
+                                RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.secondary.opacity(0.1))
                             )
                     }
@@ -2223,11 +2149,11 @@ struct MonthDayCell: View {
                         .padding(.leading, 2)
                 }
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 3)
 
             Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 80)
+        .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         .background(
             Rectangle()
                 .fill(Color.clear)
@@ -2241,21 +2167,24 @@ struct MonthDayCell: View {
 
     // 事件行视图
     private func eventRow(for event: PomodoroEvent) -> some View {
-        HStack(spacing: 2) {
+        HStack(alignment: .center, spacing: 3) {
             Circle()
                 .fill(event.type.color)
-                .frame(width: 3, height: 3)
+                .frame(width: 4, height: 4)
 
             Text(event.title)
-                .font(.system(size: 9))
+                .font(.caption)  // 从 .system(size: 9) 升级到 .caption (约11pt)
                 .foregroundColor(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)  // 确保左对齐
+
+            Spacer(minLength: 0)  // 确保文本左对齐
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 1)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 2)
         .background(
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: 3)
                 .fill(event.type.color.opacity(0.1))
         )
     }
@@ -2499,117 +2428,6 @@ struct DateDisplayOnly: View {
     }
 }
 
-// MARK: - 日期导航栏
-struct DateNavigationBar: View {
-    @Binding var selectedDate: Date
-    let viewMode: CalendarViewMode
-    let showDateInfo: Bool
-    private let calendar = Calendar.current
-
-    // 便利初始化器，默认显示日期信息
-    init(selectedDate: Binding<Date>, viewMode: CalendarViewMode, showDateInfo: Bool = true) {
-        self._selectedDate = selectedDate
-        self.viewMode = viewMode
-        self.showDateInfo = showDateInfo
-    }
-
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月d日"
-        return formatter
-    }()
-
-    private let weekdayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter
-    }()
-
-    private let lunarFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .chinese)
-        formatter.dateFormat = "MMMMd"
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter
-    }()
-
-    var body: some View {
-        VStack(spacing: 12) {
-            // 日期信息（可选显示）
-            if showDateInfo {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(dateFormatter.string(from: selectedDate))
-                            .font(.title)
-                            .fontWeight(.semibold)
-
-                        Text(weekdayFormatter.string(from: selectedDate))
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Text(lunarFormatter.string(from: selectedDate))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            // 导航按钮
-            HStack {
-                Button(action: previousPeriod) {
-                    Image(systemName: "chevron.left")
-                }
-                .controlSize(.small)
-
-                Spacer()
-
-                Button("今天") {
-                    goToToday()
-                }
-                .controlSize(.small)
-                .disabled(isToday)
-
-                Spacer()
-
-                Button(action: nextPeriod) {
-                    Image(systemName: "chevron.right")
-                }
-                .controlSize(.small)
-            }
-        }
-    }
-
-    private var isToday: Bool {
-        calendar.isDateInToday(selectedDate)
-    }
-
-    private func previousPeriod() {
-        switch viewMode {
-        case .day:
-            selectedDate = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
-        case .week:
-            selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
-        case .month:
-            selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
-        }
-    }
-
-    private func nextPeriod() {
-        switch viewMode {
-        case .day:
-            selectedDate = calendar.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
-        case .week:
-            selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
-        case .month:
-            selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
-        }
-    }
-
-    private func goToToday() {
-        selectedDate = Date()
-    }
-}
 
 // MARK: - VisualEffectView for macOS
 #if os(macOS)
@@ -2656,3 +2474,179 @@ struct WeekSelectionOverlay: View {
             .position(x: rect.midX, y: rect.midY)
     }
 }
+
+// MARK: - 日期事件列表 Popover
+struct DayEventsPopover: View {
+    let date: Date
+    @Binding var selectedEvent: PomodoroEvent?
+    @Binding var showingEventDetail: Bool
+    @EnvironmentObject var eventManager: EventManager
+
+    // 预计算的数据，避免重复计算
+    private var dayEvents: [PomodoroEvent] {
+        eventManager.eventsForDate(date)
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日 EEEE"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.string(from: date)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 日期标题
+            Text(formattedDate)
+                .font(.headline)
+                .fontWeight(.semibold)
+
+            if dayEvents.isEmpty {
+                // 空状态 - 简化版本
+                emptyStateView
+            } else {
+                // 事件列表 - 优化版本
+                eventListView
+            }
+        }
+        .padding()
+        .frame(width: 280)
+    }
+
+    // 空状态视图 - 预构建避免重复创建
+    private var emptyStateView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.system(size: 24))
+                .foregroundColor(.secondary)
+            Text("当日无事件")
+                .font(.callout)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+    }
+
+    // 事件列表视图 - 优化性能
+    private var eventListView: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(dayEvents, id: \.id) { event in
+                    OptimizedEventRowView(
+                        event: event,
+                        selectedEvent: $selectedEvent,
+                        showingEventDetail: $showingEventDetail
+                    )
+                    .environmentObject(eventManager)
+                }
+            }
+        }
+        .frame(maxHeight: 300)
+    }
+}
+
+// MARK: - 优化的事件行视图
+struct OptimizedEventRowView: View {
+    let event: PomodoroEvent
+    @Binding var selectedEvent: PomodoroEvent?
+    @Binding var showingEventDetail: Bool
+    @EnvironmentObject var eventManager: EventManager
+
+    // 预计算的属性，避免重复计算
+    private var formattedDuration: String {
+        let duration = event.endTime.timeIntervalSince(event.startTime)
+        let hours = Int(duration) / 3600
+        let minutes = Int(duration) % 3600 / 60
+
+        if hours > 0 {
+            return "\(hours)h\(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 事件类型指示器
+            Circle()
+                .fill(event.type.color)
+                .frame(width: 12, height: 12)
+
+            // 事件信息
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(.callout)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                Text(event.formattedTimeRange)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // 时长 - 使用预计算的值
+            Text(formattedDuration)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(4)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .contentShape(Rectangle()) // 确保整个区域都可以点击
+        .onTapGesture {
+            // 立即响应，无延迟
+            selectedEvent = event
+            showingEventDetail = true
+        }
+        .buttonStyle(PlainButtonStyle()) // 避免按钮样式干扰
+        .popover(
+            isPresented: Binding<Bool>(
+                get: { showingEventDetail && selectedEvent?.id == event.id },
+                set: { newValue in
+                    if !newValue {
+                        showingEventDetail = false
+                        selectedEvent = nil
+                    }
+                }
+            ),
+            attachmentAnchor: .point(.trailing),
+            arrowEdge: .trailing
+        ) {
+            // 事件详情popover
+            if let selectedEvent = selectedEvent, selectedEvent.id == event.id {
+                EventDetailPopover(
+                    event: selectedEvent,
+                    onSave: { updatedEvent in
+                        // 更新事件
+                        eventManager.updateEvent(updatedEvent)
+                        showingEventDetail = false
+                        self.selectedEvent = nil
+                    },
+                    onDelete: {
+                        // 删除事件
+                        eventManager.removeEvent(selectedEvent)
+                        showingEventDetail = false
+                        self.selectedEvent = nil
+                    }
+                )
+                .frame(width: 300)
+                .environmentObject(eventManager)
+            }
+        }
+    }
+}
+
+

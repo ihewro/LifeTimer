@@ -43,6 +43,9 @@ struct PomodoroTimerApp: App {
                         menuBarManager.setTimerModel(timerModel)
                     }
                     #endif
+
+                    // 处理应用启动时的自动监控逻辑
+                    activityMonitor.handleAppLaunch()
                 }
         }
         #if os(macOS)
