@@ -25,9 +25,26 @@ if (!str_starts_with($path, '/')) {
 
 // 路由映射
 $routes = [
+    // 传统设备注册
     'POST /api/device/register' => 'api/device.php',
+
+    // 用户认证系统
+    'POST /api/auth/device-init' => 'api/auth.php',
+    'POST /api/auth/device-bind' => 'api/auth.php',
+    'POST /api/auth/token-refresh' => 'api/auth.php',
+    'POST /api/auth/logout' => 'api/auth.php',
+
+    // 同步API
     'GET /api/sync/full' => 'api/sync.php',
     'POST /api/sync/incremental' => 'api/sync.php',
+    'POST /api/sync/migrate' => 'api/sync_user.php',
+
+    // 用户同步API
+    'GET /api/user/sync/full' => 'api/sync_user.php',
+    'POST /api/user/sync/incremental' => 'api/sync_user.php',
+    'POST /api/user/sync/migrate' => 'api/sync_user.php',
+
+    // 统计和健康检查
     'GET /get_week_statistic' => 'statistic.php',
     'GET /api/health' => function() {
         return ['status' => 'ok', 'timestamp' => time() * 1000];
@@ -44,6 +61,10 @@ error_log("Debug: Method: " . $method);
 error_log("Debug: Route key: " . $route_key);
 
 try {
+    error_log("Debug: Available routes: " . print_r(array_keys($routes), true));
+    error_log("Debug: Looking for route: " . $route_key);
+    error_log("Debug: Route exists: " . (isset($routes[$route_key]) ? 'yes' : 'no'));
+
     if (isset($routes[$route_key])) {
         if (is_callable($routes[$route_key])) {
             $result = $routes[$route_key]();
@@ -53,13 +74,14 @@ try {
                 'timestamp' => time() * 1000
             ]);
         } else {
+            error_log("Debug: Including file: " . $routes[$route_key]);
             require_once $routes[$route_key];
         }
     } else {
         http_response_code(404);
         echo json_encode([
             'success' => false,
-            'message' => 'API endpoint not found',
+            'message' => 'Endpoint not found',
             'timestamp' => time() * 1000
         ]);
     }

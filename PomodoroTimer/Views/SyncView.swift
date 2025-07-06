@@ -35,6 +35,7 @@ class FullChangesManager: ObservableObject {
 
 struct SyncView: View {
     @EnvironmentObject var syncManager: SyncManager
+    @EnvironmentObject var authManager: AuthManager
     @StateObject private var fullChangesManager = FullChangesManager()
     @State private var serverURL = ""
     @State private var debugMode = true // Debug模式默认开启
@@ -44,6 +45,7 @@ struct SyncView: View {
     @State private var selectedDataType: DataType = .pomodoroEvents
     @State private var showingDeletionDebug = false
     @State private var showingDeletionLog = false
+    @State private var showingAuthView = false
 
     enum DataType: String, CaseIterable {
         case pomodoroEvents = "番茄钟事件"
@@ -52,8 +54,26 @@ struct SyncView: View {
     }
 
     var body: some View {
+        Group {
+            if authManager.isAuthenticated {
+                authenticatedSyncView
+            } else {
+                unauthenticatedView
+            }
+        }
+        .sheet(isPresented: $showingAuthView) {
+            if let migrationManager = createMigrationManager() {
+                AuthenticationView(authManager: authManager, migrationManager: migrationManager)
+            }
+        }
+    }
+
+    private var authenticatedSyncView: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // 用户信息区域
+                userInfoSection
+
                 // 服务器配置
                 serverConfigurationSection
 
@@ -1018,6 +1038,16 @@ struct SyncView: View {
     private var syncStatusIndicator: some View {
         HStack {
             switch syncManager.syncStatus {
+            case .notAuthenticated:
+                Image(systemName: "person.crop.circle.badge.exclamationmark")
+                    .foregroundColor(.orange)
+                Text("未认证")
+                    .foregroundColor(.orange)
+            case .authenticating:
+                ProgressView()
+                    .controlSize(.small)
+                Text("认证中")
+                    .foregroundColor(.blue)
             case .idle:
                 Image(systemName: "circle")
                     .foregroundColor(.secondary)
@@ -1045,6 +1075,11 @@ struct SyncView: View {
                         .font(.caption)
                         .lineLimit(3)
                 }
+            case .tokenExpired:
+                Image(systemName: "key.slash")
+                    .foregroundColor(.orange)
+                Text("Token已过期")
+                    .foregroundColor(.orange)
             }
         }
         .font(.subheadline)
@@ -2202,10 +2237,170 @@ extension SyncView {
         .padding()
         .frame(width: 600, height: 500)
     }
+
+    // MARK: - Authentication Views
+
+    private var unauthenticatedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "person.circle")
+                    .font(.system(size: 60))
+                    .foregroundColor(.secondary)
+
+                Text("需要用户认证")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("请先完成用户认证以使用同步功能")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button("开始认证") {
+                showingAuthView = true
+            }
+            .buttonStyle(.borderedProminent)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var userInfoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "person.circle.fill")
+                    .foregroundColor(.accentColor)
+                Text("用户信息")
+                    .font(.headline)
+                Spacer()
+
+                Button("管理账户") {
+                    showingAuthView = true
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            if let user = authManager.currentUser {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("用户名：")
+                            .foregroundColor(.secondary)
+                        Text(user.name ?? "未设置")
+                        Spacer()
+                    }
+
+                    HStack {
+                        Text("用户ID：")
+                            .foregroundColor(.secondary)
+                        Text(user.id)
+                            .font(.monospaced(.caption)())
+                            .textSelection(.enabled)
+
+                        Button(action: {
+                            #if canImport(AppKit)
+                            NSPasteboard.general.setString(user.id, forType: .string)
+                            #endif
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+
+                        Spacer()
+                    }
+
+                    if let email = user.email {
+                        HStack {
+                            Text("邮箱：")
+                                .foregroundColor(.secondary)
+                            Text(email)
+                            Spacer()
+                        }
+                    }
+                }
+                .font(.caption)
+            }
+
+            // 认证状态指示器
+            HStack {
+                Circle()
+                    .fill(getAuthStatusColor())
+                    .frame(width: 8, height: 8)
+
+                Text(getAuthStatusText())
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if let expiresAt = authManager.tokenExpiresAt {
+                    let isExpired = expiresAt <= Date()
+                    Text("• 过期时间：\(formatTokenExpiry(expiresAt))")
+                        .font(.caption)
+                        .foregroundColor(isExpired ? .red : .secondary)
+
+                    if isExpired {
+                        Text("(已过期)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+
+    // MARK: - Helper Methods
+
+    private func createMigrationManager() -> MigrationManager? {
+        // 创建APIClient实例
+        let apiClient = APIClient(baseURL: syncManager.serverURL)
+        // 创建MigrationManager实例
+        return MigrationManager(authManager: authManager, apiClient: apiClient)
+    }
+
+    private func formatTokenExpiry(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        let calendar = Calendar.current
+
+        // 检查是否是今天
+        if calendar.isDateInToday(date) {
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        } else {
+            // 不是今天，显示完整的日期和时间
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        }
+    }
+
+    private func getAuthStatusColor() -> Color {
+        if let expiresAt = authManager.tokenExpiresAt, expiresAt <= Date() {
+            return .orange // Token已过期
+        }
+        return authManager.isAuthenticated ? .green : .red
+    }
+
+    private func getAuthStatusText() -> String {
+        if let expiresAt = authManager.tokenExpiresAt, expiresAt <= Date() {
+            return "认证已过期"
+        }
+        return authManager.isAuthenticated ? "已认证" : "未认证"
+    }
 }
 
 #Preview {
     SyncView()
-        .environmentObject(SyncManager(serverURL: "http://localhost:8080"))
+        .environmentObject(SyncManager(serverURL: "http://localhost:8080", authManager: AuthManager(serverURL: "http://localhost:8080")))
+        .environmentObject(AuthManager(serverURL: "http://localhost:8080"))
         .frame(width: 600, height: 800)
 }

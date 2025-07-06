@@ -19,14 +19,40 @@ struct APIResponse<T: Codable>: Codable {
 class APIClient {
     private let baseURL: String
     private let session: URLSession
-    
+
     init(baseURL: String) {
         self.baseURL = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        
+
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: config)
+    }
+
+    // MARK: - Authentication Methods
+
+    /// 设备初始化
+    func deviceInit(_ request: DeviceInitRequest) async throws -> APIResponse<DeviceInitResponse> {
+        let url = URL(string: "\(baseURL)/api/auth/device-init")!
+        return try await performRequest(url: url, method: "POST", body: request)
+    }
+
+    /// 设备绑定
+    func deviceBind(_ request: DeviceBindRequest) async throws -> APIResponse<DeviceBindResponse> {
+        let url = URL(string: "\(baseURL)/api/auth/device-bind")!
+        return try await performRequest(url: url, method: "POST", body: request)
+    }
+
+    /// Token刷新
+    func refreshToken(token: String) async throws -> APIResponse<TokenRefreshResponse> {
+        let url = URL(string: "\(baseURL)/api/auth/refresh")!
+        return try await performAuthenticatedRequest(url: url, method: "POST", token: token)
+    }
+
+    /// 登出
+    func logout(token: String) async throws -> APIResponse<EmptyResponse> {
+        let url = URL(string: "\(baseURL)/api/auth/logout")!
+        return try await performAuthenticatedRequest(url: url, method: "POST", token: token)
     }
     
     /// 注册设备
@@ -57,55 +83,126 @@ class APIClient {
         return apiResponse.data
     }
     
-    /// 全量同步
-    func fullSync(deviceUUID: String) async throws -> APIResponse<FullSyncData> {
-        let url = URL(string: "\(baseURL)/api/sync/full?device_uuid=\(deviceUUID)")!
-        
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "GET"
-        
-        let (data, response) = try await session.data(for: urlRequest)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.httpError(httpResponse.statusCode)
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .millisecondsSince1970
-        
-        return try decoder.decode(APIResponse<FullSyncData>.self, from: data)
+    /// 全量同步（用户认证版本）
+    func fullSync(token: String) async throws -> APIResponse<FullSyncData> {
+        let url = URL(string: "\(baseURL)/api/user/sync/full")!
+        print("Full sync token: \(token)")
+        return try await performAuthenticatedRequest(url: url, method: "GET", token: token)
     }
-    
-    /// 增量同步
-    func incrementalSync(_ request: IncrementalSyncRequest) async throws -> APIResponse<IncrementalSyncResponse> {
-        let url = URL(string: "\(baseURL)/api/sync/incremental")!
-        
+
+    /// 增量同步（用户认证版本）
+    func incrementalSync(_ request: IncrementalSyncRequest, token: String) async throws -> APIResponse<IncrementalSyncResponse> {
+        let url = URL(string: "\(baseURL)/api/user/sync/incremental")!
+        return try await performAuthenticatedRequest(url: url, method: "POST", body: request, token: token)
+    }
+
+    /// 数据迁移
+    func performMigration(_ request: MigrationRequest) async throws -> APIResponse<MigrationResult> {
+        let url = URL(string: "\(baseURL)/api/user/sync/migrate")!
+        return try await performRequest(url: url, method: "POST", body: request)
+    }
+
+    // MARK: - Private Helper Methods
+
+    /// 执行认证请求
+    private func performAuthenticatedRequest<T: Codable, U: Codable>(
+        url: URL,
+        method: String,
+        body: T? = nil,
+        token: String
+    ) async throws -> APIResponse<U> {
         var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
+        urlRequest.httpMethod = method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .millisecondsSince1970
-        urlRequest.httpBody = try encoder.encode(request)
-        
-        let (data, response) = try await session.data(for: urlRequest)
-        
+        urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        // GET 请求不应该包含 HTTP body
+        if let body = body, method.uppercased() != "GET" {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .millisecondsSince1970
+            urlRequest.httpBody = try encoder.encode(body)
+        }
+
+        return try await executeRequest(urlRequest)
+    }
+
+    /// 执行认证请求（无 body）
+    private func performAuthenticatedRequest<U: Codable>(
+        url: URL,
+        method: String,
+        token: String
+    ) async throws -> APIResponse<U> {
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        return try await executeRequest(urlRequest)
+    }
+
+    /// 执行普通请求
+    private func performRequest<T: Codable, U: Codable>(
+        url: URL,
+        method: String,
+        body: T? = nil
+    ) async throws -> APIResponse<U> {
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // GET 请求不应该包含 HTTP body
+        if let body = body, method.uppercased() != "GET" {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .millisecondsSince1970
+            urlRequest.httpBody = try encoder.encode(body)
+        }
+
+        return try await executeRequest(urlRequest)
+    }
+
+    /// 执行请求
+    private func executeRequest<T: Codable>(_ request: URLRequest) async throws -> APIResponse<T> {
+        print("🌐 API Request: \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "unknown")")
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("📤 Request Body: \(bodyString)")
+        }
+
+        let (data, response) = try await session.data(for: request)
+
+        // 打印响应数据用于调试
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📥 Response Data: \(responseString)")
+        }
+
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Invalid HTTP response")
             throw APIError.invalidResponse
         }
-        
+
+        print("📊 HTTP Status: \(httpResponse.statusCode)")
+
         guard httpResponse.statusCode == 200 else {
+            // 尝试解析错误响应
+            if let errorData = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+                print("❌ Server Error: \(errorData.message)")
+                throw APIError.serverError(errorData.message)
+            }
+            print("❌ HTTP Error: \(httpResponse.statusCode)")
             throw APIError.httpError(httpResponse.statusCode)
         }
-        
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .millisecondsSince1970
-        
-        return try decoder.decode(APIResponse<IncrementalSyncResponse>.self, from: data)
+
+        do {
+            let result = try decoder.decode(APIResponse<T>.self, from: data)
+            print("✅ Successfully decoded response")
+            return result
+        } catch {
+            print("❌ JSON Decode Error: \(error)")
+            print("❌ Expected type: \(T.self)")
+            throw error
+        }
     }
 }
 
@@ -150,14 +247,13 @@ struct FullSyncData: Codable {
     }
 }
 
-/// 增量同步请求
+/// 增量同步请求（用户认证版本）
 struct IncrementalSyncRequest: Codable {
-    let deviceUUID: String
+    // 移除deviceUUID，改用Authorization header
     let lastSyncTimestamp: Int64
     let changes: SyncChanges
-    
+
     private enum CodingKeys: String, CodingKey {
-        case deviceUUID = "device_uuid"
         case lastSyncTimestamp = "last_sync_timestamp"
         case changes
     }
@@ -229,6 +325,90 @@ struct SyncConflict: Codable {
         case serverUpdatedAt = "server_updated_at"
         case clientUpdatedAt = "client_updated_at"
     }
+}
+
+// MARK: - Authentication Data Models
+
+/// 设备初始化请求
+struct DeviceInitRequest: Codable {
+    let deviceUUID: String
+    let deviceName: String
+    let platform: String
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceUUID = "device_uuid"
+        case deviceName = "device_name"
+        case platform
+    }
+}
+
+/// 设备初始化响应
+struct DeviceInitResponse: Codable {
+    let userUUID: String
+    let sessionToken: String
+    let expiresAt: String
+    let isNewUser: Bool
+    let userInfo: User?
+
+    private enum CodingKeys: String, CodingKey {
+        case userUUID = "user_uuid"
+        case sessionToken = "session_token"
+        case expiresAt = "expires_at"
+        case isNewUser = "is_new_user"
+        case userInfo = "user_info"
+    }
+}
+
+/// 设备绑定请求
+struct DeviceBindRequest: Codable {
+    let userUUID: String
+    let deviceUUID: String
+    let deviceName: String
+    let platform: String
+
+    private enum CodingKeys: String, CodingKey {
+        case userUUID = "user_uuid"
+        case deviceUUID = "device_uuid"
+        case deviceName = "device_name"
+        case platform
+    }
+}
+
+/// 设备绑定响应
+struct DeviceBindResponse: Codable {
+    let sessionToken: String
+    let expiresAt: String
+    let userData: User
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionToken = "session_token"
+        case expiresAt = "expires_at"
+        case userData = "user_data"
+    }
+}
+
+/// Token刷新响应
+struct TokenRefreshResponse: Codable {
+    let sessionToken: String
+    let expiresAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionToken = "session_token"
+        case expiresAt = "expires_at"
+    }
+}
+
+/// 空响应
+struct EmptyResponse: Codable {}
+
+/// 空请求
+struct EmptyRequest: Codable {}
+
+/// API错误响应
+struct APIErrorResponse: Codable {
+    let success: Bool
+    let message: String
+    let timestamp: Int64
 }
 
 /// 服务器端系统事件
@@ -366,3 +546,7 @@ struct ServerTimerSettings: Codable {
         case updatedAt = "updated_at"
     }
 }
+
+
+
+

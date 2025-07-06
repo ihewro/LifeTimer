@@ -13,10 +13,30 @@ struct PomodoroTimerApp: App {
     @StateObject private var audioManager = AudioManager()
     @StateObject private var eventManager = EventManager()
     @StateObject private var activityMonitor = ActivityMonitorManager()
-    @StateObject private var syncManager = SyncManager(serverURL: "http://localhost:8080")
+
+    // 用户认证系统
+    @StateObject private var authManager: AuthManager
+    @StateObject private var syncManager: SyncManager
+    @StateObject private var migrationManager: MigrationManager
+
     #if canImport(Cocoa)
     @StateObject private var menuBarManager = MenuBarManager()
     #endif
+
+    init() {
+        // 创建共享的AuthManager实例
+        let authManager = AuthManager(serverURL: "http://localhost:8080")
+        self._authManager = StateObject(wrappedValue: authManager)
+
+        // 初始化同步管理器（支持认证）
+        let syncManager = SyncManager(serverURL: "http://localhost:8080", authManager: authManager)
+        self._syncManager = StateObject(wrappedValue: syncManager)
+
+        // 初始化迁移管理器
+        let apiClient = APIClient(baseURL: "http://localhost:8080")
+        let migrationManager = MigrationManager(authManager: authManager, apiClient: apiClient)
+        self._migrationManager = StateObject(wrappedValue: migrationManager)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -25,7 +45,9 @@ struct PomodoroTimerApp: App {
                 .environmentObject(audioManager)
                 .environmentObject(eventManager)
                 .environmentObject(activityMonitor)
+                .environmentObject(authManager)
                 .environmentObject(syncManager)
+                .environmentObject(migrationManager)
                 #if canImport(Cocoa)
                 .environmentObject(menuBarManager)
                 #endif

@@ -32,10 +32,33 @@ struct DeletedEventInfo: Codable {
 
 /// 同步状态枚举
 enum SyncStatus {
+    case notAuthenticated
+    case authenticating
     case idle
     case syncing
     case success
     case error(String)
+    case tokenExpired
+}
+
+enum SyncError: LocalizedError {
+    case notAuthenticated
+    case tokenExpired
+    case networkError
+    case serverError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "用户未认证，请先登录"
+        case .tokenExpired:
+            return "认证已过期，请重新登录"
+        case .networkError:
+            return "网络连接错误"
+        case .serverError(let message):
+            return "服务器错误：\(message)"
+        }
+    }
 }
 
 /// 同步模式 - 类似Git的操作模式
@@ -45,6 +68,7 @@ enum SyncMode: String, Codable {
     case pullOnly = "pullOnly"              // 仅拉取 (类似 git pull)
     case pushOnly = "pushOnly"              // 仅推送 (类似 git push)
     case smartMerge = "smartMerge"            // 智能同步 (类似 git pull + git push)
+    case incremental = "incremental"          // 增量同步
 
     var displayName: String {
         switch self {
@@ -58,6 +82,8 @@ enum SyncMode: String, Codable {
             return "推送"
         case .smartMerge:
             return "智能同步"
+        case .incremental:
+            return "增量同步"
         }
     }
 
@@ -73,6 +99,8 @@ enum SyncMode: String, Codable {
             return "将本地未同步数据推送到服务端"
         case .smartMerge:
             return "双向同步：拉取并推送数据"
+        case .incremental:
+            return "增量同步：仅同步变更的数据"
         }
     }
 
@@ -88,6 +116,8 @@ enum SyncMode: String, Codable {
             return "arrow.up"
         case .smartMerge:
             return "arrow.up.arrow.down"
+        case .incremental:
+            return "arrow.triangle.2.circlepath"
         }
     }
 
@@ -134,8 +164,13 @@ class SyncManager: ObservableObject {
     private let deletedEventInfosKey = "DeletedEventInfos"
 
     private let apiClient: APIClient
-    private let deviceUUID: String
+    private var authManager: AuthManager?
     private let userDefaults = UserDefaults.standard
+
+
+
+    // 设备UUID（向后兼容）
+    private let deviceUUID: String
     
     // 依赖的管理器
     private weak var eventManager: EventManager?
@@ -156,15 +191,18 @@ class SyncManager: ObservableObject {
     // 同步设置
     @Published var syncSystemEvents: Bool = true
     
-    init(serverURL: String) {
+    init(serverURL: String, authManager: AuthManager? = nil) {
+        self.serverURL = serverURL
         self.apiClient = APIClient(baseURL: serverURL)
+        self.authManager = authManager
 
-        // 获取或生成设备UUID
-        if let existingUUID = userDefaults.string(forKey: deviceUUIDKey) {
+        // 获取或生成设备UUID（向后兼容）
+        let deviceUUIDKey = "DeviceUUID"
+        if let existingUUID = UserDefaults.standard.string(forKey: deviceUUIDKey) {
             self.deviceUUID = existingUUID
         } else {
             self.deviceUUID = UUID().uuidString
-            userDefaults.set(self.deviceUUID, forKey: deviceUUIDKey)
+            UserDefaults.standard.set(self.deviceUUID, forKey: deviceUUIDKey)
         }
 
         // 加载最后同步时间
@@ -222,6 +260,11 @@ class SyncManager: ObservableObject {
         self.timerModel = timerModel
     }
 
+    /// 设置认证管理器（用于后续升级到用户系统）
+    func setAuthManager(_ authManager: AuthManager) {
+        self.authManager = authManager
+    }
+
     @objc private func settingsDidChange() {
         Task {
             await generateSyncWorkspace()
@@ -262,7 +305,22 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 确保设备已注册
+    /// 确保用户已认证
+    private func ensureAuthenticated() async throws {
+        guard let authManager = authManager,
+              authManager.isAuthenticated,
+              let _ = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+
+        // 检查token是否即将过期
+        if let expiresAt = authManager.tokenExpiresAt,
+           expiresAt.timeIntervalSinceNow < 300 { // 5分钟内过期
+            try await authManager.refreshToken()
+        }
+    }
+
+    /// 确保设备已注册（旧版本兼容）
     private func ensureDeviceRegistered() async throws {
         // 检查是否已经注册过（通过检查是否有设备注册标记）
         let deviceRegisteredKey = "device_registered_\(deviceUUID)"
@@ -286,6 +344,26 @@ class SyncManager: ObservableObject {
         } else {
             print("Device already registered: \(deviceUUID)")
         }
+    }
+
+    /// 获取设备名称
+    private func getDeviceName() -> String {
+        #if canImport(Cocoa)
+        return Host.current().localizedName ?? "Mac"
+        #else
+        return "Unknown Device"
+        #endif
+    }
+
+    /// 获取平台信息
+    private func getPlatform() -> String {
+        #if os(macOS)
+        return "macOS"
+        #elseif os(iOS)
+        return "iOS"
+        #else
+        return "Unknown"
+        #endif
     }
     
     /// 执行全量同步
@@ -437,8 +515,17 @@ class SyncManager: ObservableObject {
 
     /// 内部同步实现
     private func performSyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int, syncDetails: SyncDetails?) {
-        // 确保设备已注册
-        try await ensureDeviceRegistered()
+        // 如果有认证管理器，确保用户已认证
+        if authManager != nil {
+            try await ensureAuthenticated()
+        }
+
+        guard let authManager = authManager,
+              let _ = authManager.sessionToken else {
+            // 回退到旧版本的设备注册方式
+            try await ensureDeviceRegistered()
+            return try await performLegacySyncInternal(mode: mode)
+        }
 
         // 创建同步详情收集器
         var syncDetailsCollector = SyncDetailsCollector()
@@ -468,12 +555,61 @@ class SyncManager: ObservableObject {
             try await performSmartMerge(detailsCollector: &syncDetailsCollector)
             let details = syncDetailsCollector.build()
             return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
+
+        case .incremental:
+            try await performIncrementalSync(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
+        }
+    }
+
+    /// 旧版本同步实现（向后兼容）
+    private func performLegacySyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int, syncDetails: SyncDetails?) {
+        // 确保设备已注册
+        try await ensureDeviceRegistered()
+
+        var syncDetailsCollector = SyncDetailsCollector()
+
+        switch mode {
+        case .forceOverwriteLocal:
+            try await performForceOverwriteLocal(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (0, details.downloadedItems.count, 0, details)
+
+        case .forceOverwriteRemote:
+            try await performForceOverwriteRemote(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, 0, 0, details)
+
+        case .incremental:
+            try await performIncrementalSyncInternal()
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
+
+        case .pullOnly:
+            try await performPullOnly(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (0, details.downloadedItems.count, 0, details)
+
+        case .pushOnly:
+            try await performPushOnly(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, 0, 0, details)
+
+        case .smartMerge:
+            try await performSmartMerge(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
         }
     }
 
     /// 强制覆盖本地
     private func performForceOverwriteLocal(detailsCollector: inout SyncDetailsCollector) async throws {
-        let response = try await apiClient.fullSync(deviceUUID: deviceUUID)
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+        let response = try await apiClient.fullSync(token: token)
 
         // 收集下载的详情
         collectDownloadDetails(from: response.data, to: &detailsCollector)
@@ -494,13 +630,17 @@ class SyncManager: ObservableObject {
         // 1. 使用lastSyncTimestamp = 0，表示从头开始同步
         // 2. 发送所有本地数据作为"新增"数据
         // 3. 服务端应该理解这是一个完全替换操作
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+
         let request = IncrementalSyncRequest(
-            deviceUUID: deviceUUID,
             lastSyncTimestamp: 0, // 使用0表示强制覆盖，服务端应该清空现有数据
             changes: changes
         )
 
-        let response = try await apiClient.incrementalSync(request)
+        let response = try await apiClient.incrementalSync(request, token: token)
 
         // 更新本地的最后同步时间戳
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
@@ -569,7 +709,11 @@ class SyncManager: ObservableObject {
 
     /// 仅拉取
     private func performPullOnly(detailsCollector: inout SyncDetailsCollector) async throws {
-        let response = try await apiClient.fullSync(deviceUUID: deviceUUID)
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+        let response = try await apiClient.fullSync(token: token)
 
         // 收集下载的详情
         collectDownloadDetails(from: response.data, to: &detailsCollector)
@@ -586,13 +730,17 @@ class SyncManager: ObservableObject {
         // 收集上传的详情
         collectUploadDetails(from: changes, to: &detailsCollector)
 
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+
         let request = IncrementalSyncRequest(
-            deviceUUID: deviceUUID,
             lastSyncTimestamp: lastSyncTimestamp,
             changes: changes
         )
 
-        let response = try await apiClient.incrementalSync(request)
+        let response = try await apiClient.incrementalSync(request, token: token)
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
     }
 
@@ -613,13 +761,17 @@ class SyncManager: ObservableObject {
         // 收集本地变更
         let changes = await collectLocalChanges(since: lastSyncTimestamp)
 
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+
         let request = IncrementalSyncRequest(
-            deviceUUID: deviceUUID,
             lastSyncTimestamp: lastSyncTimestamp,
             changes: changes
         )
 
-        let response = try await apiClient.incrementalSync(request)
+        let response = try await apiClient.incrementalSync(request, token: token)
         
         // 处理冲突
         if !response.data.conflicts.isEmpty {
@@ -638,7 +790,13 @@ class SyncManager: ObservableObject {
         await generateSyncWorkspace()
         updatePendingSyncCount()
     }
-    
+
+    /// 增量同步
+    private func performIncrementalSync(detailsCollector: inout SyncDetailsCollector) async throws {
+        // 增量同步就是智能合并的简化版本
+        try await performSmartMerge(detailsCollector: &detailsCollector)
+    }
+
     private func collectLocalChanges(since timestamp: Int64) async -> SyncChanges {
         let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
         var createdEvents: [ServerPomodoroEvent] = []
@@ -787,7 +945,7 @@ class SyncManager: ObservableObject {
                     // 强制覆盖远程：保持本地数据不变（这个模式在这里不适用）
                     break
 
-                case .pullOnly, .smartMerge:
+                case .pullOnly, .smartMerge, .incremental:
                     // 拉取模式或智能合并：智能合并数据
                     self.smartMergeServerData(data, into: eventManager)
 
@@ -834,7 +992,7 @@ class SyncManager: ObservableObject {
                 // 强制覆盖远程：保持本地数据不变
                 break
 
-            case .pullOnly, .smartMerge:
+            case .pullOnly, .smartMerge, .incremental:
                 // 智能合并系统事件
                 self.smartMergeSystemEvents(serverSystemEvents, into: systemEventStore)
 
@@ -1060,7 +1218,11 @@ class SyncManager: ObservableObject {
 
             // 获取服务端数据
             print("📡 请求服务端数据...")
-            let response = try await apiClient.fullSync(deviceUUID: deviceUUID)
+            guard let authManager = authManager,
+                  let token = authManager.sessionToken else {
+                throw SyncError.notAuthenticated
+            }
+            let response = try await apiClient.fullSync(token: token)
 
             print("✅ 服务端响应成功")
             print("📊 番茄事件数量: \(response.data.pomodoroEvents.count)")
@@ -1382,21 +1544,7 @@ class SyncManager: ObservableObject {
         }
     }
     
-    private func getDeviceName() -> String {
-        #if os(macOS)
-        return Host.current().localizedName ?? "Mac"
-        #else
-        return UIDevice.current.name
-        #endif
-    }
-    
-    private func getPlatform() -> String {
-        #if os(macOS)
-        return "macOS"
-        #else
-        return "iOS"
-        #endif
-    }
+
 
     // MARK: - 同步界面支持方法
 
