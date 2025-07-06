@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+/// 全局时间格式化函数
+private func formatSyncTime(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MM-dd HH:mm"
+    return formatter.string(from: date)
+}
+
 // 弹窗数据管理器
 class FullChangesManager: ObservableObject {
     @Published var isPresented = false
@@ -85,6 +92,13 @@ struct SyncView: View {
                     await syncManager.loadServerDataPreview()
                     await syncManager.generateSyncWorkspace()
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncCompleted"))) { _ in
+            // 同步完成后自动刷新数据对比区域
+            Task {
+                await syncManager.loadServerDataPreview()
+                await syncManager.generateSyncWorkspace()
             }
         }
         // 数据详情弹窗
@@ -343,41 +357,78 @@ struct SyncView: View {
                     .foregroundColor(localCount > 0 ? .primary : .secondary)
             }
 
-            // 服务端数据 - 可点击
-            if debugMode && serverCount > 0 {
-                Button("\(serverCount)") {
-                    let dataType = getDataType(from: title)
-                    showServerDataDetail(dataType)
+            // 服务端数据 - 根据连接状态显示
+            if isServerDataAvailable() {
+                // 服务器连接正常，显示实际数据
+                if debugMode && serverCount > 0 {
+                    Button("\(serverCount)") {
+                        let dataType = getDataType(from: title)
+                        showServerDataDetail(dataType)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .foregroundColor(.accentColor)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .frame(width: 60, alignment: .center)
+                } else {
+                    Text("\(serverCount)")
+                        .font(.subheadline)
+                        .frame(width: 60, alignment: .center)
+                        .foregroundColor(serverCount > 0 ? .primary : .secondary)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .foregroundColor(.accentColor)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .frame(width: 60, alignment: .center)
             } else {
-                Text("\(serverCount)")
+                // 服务器连接失败，显示不可用状态
+                Text("--")
                     .font(.subheadline)
                     .frame(width: 60, alignment: .center)
-                    .foregroundColor(serverCount > 0 ? .primary : .secondary)
+                    .foregroundColor(.red)
             }
 
-            // 状态指示器
+            // 状态指示器 - 基于实际数据变更状态
             Group {
-                if localCount == serverCount {
+                let dataType = getDataType(from: title)
+                let status = getDataTypeStatus(dataType)
+
+                switch status {
+                case .synced:
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                } else if localCount > serverCount {
+                case .localChanges:
                     Image(systemName: "arrow.up.circle.fill")
                         .foregroundColor(.blue)
-                } else {
+                case .remoteChanges:
                     Image(systemName: "arrow.down.circle.fill")
                         .foregroundColor(.orange)
+                case .conflicts:
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                case .bothChanges:
+                    Image(systemName: "arrow.left.arrow.right.circle.fill")
+                        .foregroundColor(.purple)
+                case .serverUnavailable:
+                    Image(systemName: "wifi.slash")
+                        .foregroundColor(.red)
                 }
             }
             .font(.subheadline)
             .frame(width: 60, alignment: .center)
         }
         .padding(.vertical, 4)
+    }
+
+    /// 数据类型同步状态
+    private enum DataTypeStatus {
+        case synced          // 已同步
+        case localChanges    // 本地有变更
+        case remoteChanges   // 远程有变更
+        case bothChanges     // 双向变更
+        case conflicts       // 有冲突
+        case serverUnavailable // 服务器不可用
+    }
+
+    /// 检查服务器数据是否可用
+    private func isServerDataAvailable() -> Bool {
+        return syncManager.serverData != nil && syncManager.serverConnectionStatus == "已连接"
     }
 
     /// 根据标题获取数据类型
@@ -394,6 +445,86 @@ struct SyncView: View {
         }
     }
 
+    /// 获取特定数据类型的同步状态
+    private func getDataTypeStatus(_ dataType: DataType) -> DataTypeStatus {
+        // 首先检查服务器是否可用
+        if !isServerDataAvailable() {
+            return .serverUnavailable
+        }
+
+        guard let workspace = syncManager.syncWorkspace else {
+            // 如果没有工作区信息，回退到数量比较
+            let localCount: Int
+            let serverCount: Int
+
+            switch dataType {
+            case .pomodoroEvents:
+                localCount = syncManager.localData?.eventCount ?? 0
+                serverCount = syncManager.serverData?.eventCount ?? 0
+            case .systemEvents:
+                localCount = syncManager.localData?.systemEventCount ?? 0
+                serverCount = syncManager.serverData?.systemEventCount ?? 0
+            case .timerSettings:
+                localCount = syncManager.localData?.timerSettings != nil ? 1 : 0
+                serverCount = syncManager.serverData?.timerSettings != nil ? 1 : 0
+            }
+
+            if localCount == serverCount {
+                return .synced
+            } else if localCount > serverCount {
+                return .localChanges
+            } else {
+                return .remoteChanges
+            }
+        }
+
+        // 基于工作区分析具体的数据类型状态
+        let hasLocalChanges = workspace.staged.contains { item in
+            switch dataType {
+            case .pomodoroEvents:
+                return item.type == .pomodoroEvent
+            case .systemEvents:
+                return item.type == .systemEvent
+            case .timerSettings:
+                return item.type == .timerSettings
+            }
+        }
+
+        let hasRemoteChanges = workspace.remoteChanges.contains { item in
+            switch dataType {
+            case .pomodoroEvents:
+                return item.type == .pomodoroEvent
+            case .systemEvents:
+                return item.type == .systemEvent
+            case .timerSettings:
+                return item.type == .timerSettings
+            }
+        }
+
+        let hasConflicts = workspace.conflicts.contains { item in
+            switch dataType {
+            case .pomodoroEvents:
+                return item.type == .pomodoroEvent
+            case .systemEvents:
+                return item.type == .systemEvent
+            case .timerSettings:
+                return item.type == .timerSettings
+            }
+        }
+
+        if hasConflicts {
+            return .conflicts
+        } else if hasLocalChanges && hasRemoteChanges {
+            return .bothChanges
+        } else if hasLocalChanges {
+            return .localChanges
+        } else if hasRemoteChanges {
+            return .remoteChanges
+        } else {
+            return .synced
+        }
+    }
+
     /// 同步状态图例
     private var syncStatusLegend: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -404,32 +535,42 @@ struct SyncView: View {
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
 
-            HStack(spacing: 20) {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                    Text("一致")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+            VStack(spacing: 8) {
+                HStack(spacing: 20) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                        Text("一致")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundColor(.blue)
-                        .font(.caption)
-                    Text("本地更多")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.caption)
+                        Text("本地更多")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
 
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text("服务端更多")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                        Text("服务端更多")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "wifi.slash")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                        Text("服务器不可用")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
@@ -753,6 +894,13 @@ struct SyncView: View {
                 debugInfoRow("设备UUID", "已配置")
                 debugInfoRow("服务器地址", syncManager.serverURL.isEmpty ? "未配置" : syncManager.serverURL)
 
+                // 服务器响应状态信息
+                debugInfoRow("连接状态", syncManager.serverConnectionStatus)
+                debugInfoRow("最后响应状态", syncManager.lastServerResponseStatus)
+                if let responseTime = syncManager.lastServerResponseTime {
+                    debugInfoRow("最后响应时间", formatTime(responseTime))
+                }
+
                 if let workspace = syncManager.syncWorkspace {
                     debugInfoRow("本地变更数", "\(workspace.totalLocalChanges)")
                     debugInfoRow("远程变更数", "\(workspace.totalRemoteChanges)")
@@ -852,10 +1000,22 @@ struct SyncView: View {
             let sortedItems = items.sorted { $0.timestamp > $1.timestamp }
 
             ForEach(sortedItems.prefix(3)) { item in
-                HStack {
-                    Image(systemName: item.status.icon)
-                        .foregroundColor(Color(item.status.color))
-                        .font(.caption2)
+                HStack(spacing: 8) {
+                    // 操作类型标识
+                    HStack(spacing: 4) {
+                        Image(systemName: item.status.icon)
+                            .foregroundColor(item.status.color)
+                            .font(.caption)
+
+                        Text(item.status.displayName)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(item.status.color)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(item.status.color.opacity(0.1))
+                            .cornerRadius(4)
+                    }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
@@ -958,6 +1118,16 @@ struct SyncView: View {
             return "questionmark.circle"
         }
 
+        // 基于同步工作区判断是否有变更
+        if let workspace = syncManager.syncWorkspace {
+            if workspace.hasChanges || workspace.hasRemoteChanges || workspace.hasConflicts {
+                return "arrow.left.arrow.right"
+            } else {
+                return "checkmark.circle"
+            }
+        }
+
+        // 如果没有工作区信息，回退到数量比较
         if localData.eventCount == serverData.eventCount &&
            localData.systemEventCount == serverData.systemEventCount {
             return "checkmark.circle"
@@ -973,6 +1143,18 @@ struct SyncView: View {
             return .secondary
         }
 
+        // 基于同步工作区判断是否有变更
+        if let workspace = syncManager.syncWorkspace {
+            if workspace.hasConflicts {
+                return .red
+            } else if workspace.hasChanges || workspace.hasRemoteChanges {
+                return .orange
+            } else {
+                return .green
+            }
+        }
+
+        // 如果没有工作区信息，回退到数量比较
         if localData.eventCount == serverData.eventCount &&
            localData.systemEventCount == serverData.systemEventCount {
             return .green
@@ -988,6 +1170,22 @@ struct SyncView: View {
             return "数据加载中"
         }
 
+        // 基于同步工作区判断是否有变更
+        if let workspace = syncManager.syncWorkspace {
+            if workspace.hasConflicts {
+                return "存在冲突"
+            } else if workspace.hasChanges && workspace.hasRemoteChanges {
+                return "双向变更"
+            } else if workspace.hasChanges {
+                return "本地有变更"
+            } else if workspace.hasRemoteChanges {
+                return "远程有变更"
+            } else {
+                return "数据一致"
+            }
+        }
+
+        // 如果没有工作区信息，回退到数量比较
         if localData.eventCount == serverData.eventCount &&
            localData.systemEventCount == serverData.systemEventCount {
             return "数据一致"
@@ -1146,11 +1344,23 @@ struct SyncView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(changes.items.sorted { $0.timestamp > $1.timestamp }) { item in
-                        HStack {
-                            Image(systemName: item.status.icon)
-                                .foregroundColor(Color(item.status.color))
-                                .font(.caption)
-                                .frame(width: 16)
+                        HStack(spacing: 12) {
+                            // 操作类型标识（左侧）
+                            HStack(spacing: 4) {
+                                Image(systemName: item.status.icon)
+                                    .foregroundColor(item.status.color)
+                                    .font(.caption)
+
+                                Text(item.status.displayName)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(item.status.color)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(item.status.color.opacity(0.15))
+                            .cornerRadius(6)
+                            .frame(width: 60)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
@@ -1164,16 +1374,11 @@ struct SyncView: View {
 
                             Spacer()
 
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(item.status.displayName)
-                                    .font(.caption2)
-                                    .foregroundColor(Color(item.status.color))
-                                Text(formatWorkspaceTime(item.timestamp))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
+                            Text(formatWorkspaceTime(item.timestamp))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 6)
                         .padding(.horizontal, 8)
                         .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
                         .cornerRadius(6)
@@ -1223,9 +1428,17 @@ struct SyncView: View {
         }
         .padding()
         .frame(width: 500)
+        .popover(item: $selectedSyncRecord) { record in
+            syncRecordDetailView(record: record)
+                .onAppear {
+                    print("🔍 Popover显示: 记录ID: \(record.id)")
+                }
+        }
     }
 
     /// 同步历史记录行
+    @State private var selectedSyncRecord: SyncRecord? = nil
+
     private func syncHistoryRow(_ record: SyncRecord) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -1245,15 +1458,25 @@ struct SyncView: View {
             }
 
             if record.success {
-                HStack(spacing: 12) {
-                    Text("✓ 同步成功")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Spacer()
-                    syncStatItem("上传", count: record.uploadedCount, color: .blue)
-                    syncStatItem("下载", count: record.downloadedCount, color: .green)
-                    if record.conflictCount > 0 {
-                        syncStatItem("冲突", count: record.conflictCount, color: .orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 12) {
+                        Text("✓ 同步成功")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Spacer()
+                        syncStatItem("上传", count: record.uploadedCount, color: .blue)
+                        syncStatItem("下载", count: record.downloadedCount, color: .green)
+                        if record.conflictCount > 0 {
+                            syncStatItem("冲突", count: record.conflictCount, color: .orange)
+                        }
+                    }
+
+                    // 显示同步内容摘要
+                    if let details = record.syncDetails, details.totalItems > 0 {
+                        Text(details.summary)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 2)
                     }
                 }
             } else {
@@ -1265,6 +1488,22 @@ struct SyncView: View {
         .padding()
         .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
         .cornerRadius(6)
+        .onTapGesture {
+            print("🖱️ 点击同步记录: ID=\(record.id), success=\(record.success)")
+            if let details = record.syncDetails {
+                print("📊 同步详情存在: totalItems=\(details.totalItems)")
+            } else {
+                print("❌ 同步详情为nil")
+            }
+
+            if record.success, let details = record.syncDetails, details.totalItems > 0 {
+                print("✅ 设置selectedSyncRecord")
+                selectedSyncRecord = record
+            } else {
+                print("❌ 条件不满足，不显示弹窗")
+                selectedSyncRecord = nil
+            }
+        }
     }
 
     // MARK: - 按钮状态管理
@@ -1525,6 +1764,148 @@ struct SelectedChanges {
     let items: [WorkspaceItem]
     let color: Color
     let icon: String
+}
+
+// MARK: - 同步记录详细视图扩展
+extension SyncView {
+
+    /// 同步记录详细视图
+    private func syncRecordDetailView(record: SyncRecord) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 标题
+            HStack {
+                Image(systemName: record.success ? "checkmark.circle" : "xmark.circle")
+                    .foregroundColor(record.success ? .green : .red)
+                Text("同步详情")
+                    .font(.headline)
+                Spacer()
+                Button("关闭") {
+                    selectedSyncRecord = nil
+                }
+                .buttonStyle(BorderlessButtonStyle())
+            }
+
+            Divider()
+
+            // 基本信息
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("同步时间:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(formatTime(record.timestamp))
+                        .font(.caption)
+                }
+
+                HStack {
+                    Text("同步模式:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(record.syncMode.displayName)
+                        .font(.caption)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.accentColor.opacity(0.2))
+                        .cornerRadius(3)
+                }
+
+                HStack {
+                    Text("耗时:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(String(format: "%.1f秒", record.duration))
+                        .font(.caption)
+                }
+            }
+
+            if let details = record.syncDetails, details.totalItems > 0 {
+                Divider()
+
+                // 同步内容详情
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        // 上传的项目
+                        if !details.uploadedItems.isEmpty {
+                            syncItemSection(title: "上传项目", items: details.uploadedItems, color: .blue)
+                        }
+
+                        // 下载的项目
+                        if !details.downloadedItems.isEmpty {
+                            syncItemSection(title: "下载项目", items: details.downloadedItems, color: .green)
+                        }
+
+                        // 冲突的项目
+                        if !details.conflictItems.isEmpty {
+                            syncItemSection(title: "冲突项目", items: details.conflictItems, color: .orange)
+                        }
+
+                        // 删除的项目
+                        if !details.deletedItems.isEmpty {
+                            syncItemSection(title: "删除项目", items: details.deletedItems, color: .red)
+                        }
+                    }
+                    .padding()
+                }
+                .frame(maxHeight: 300)
+            }
+        }
+        .padding()
+        .frame(width: 500)
+    }
+
+    /// 同步项目分组显示
+    private func syncItemSection(title: String, items: [SyncItemDetail], color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text("(\(items.count))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(items) { item in
+                syncItemRow(item: item, color: color)
+            }
+        }
+    }
+
+    /// 同步项目行
+    private func syncItemRow(item: SyncItemDetail, color: Color) -> some View {
+        HStack(spacing: 8) {
+            // 类型图标
+            Image(systemName: item.type.icon)
+                .foregroundColor(color)
+                .font(.caption)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                Text(item.description)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(item.type.displayName)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(formatTime(item.timestamp))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 8)
+        .background(color.opacity(0.1))
+        .cornerRadius(4)
+    }
 }
 
 #Preview {

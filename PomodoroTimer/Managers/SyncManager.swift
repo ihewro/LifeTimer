@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import SwiftUI
 
 /// 同步状态枚举
 enum SyncStatus {
@@ -93,6 +94,11 @@ class SyncManager: ObservableObject {
     @Published var lastSyncRecord: SyncRecord? = nil
     @Published var syncHistory: [SyncRecord] = []
 
+    // 服务器响应状态
+    @Published var lastServerResponseStatus: String = "未知"
+    @Published var lastServerResponseTime: Date? = nil
+    @Published var serverConnectionStatus: String = "未连接"
+
     // 跟踪删除的事件
     private var deletedEventUUIDs: Set<String> = []
     private let deletedEventsKey = "DeletedEventUUIDs"
@@ -161,6 +167,14 @@ class SyncManager: ObservableObject {
             name: Notification.Name("EventDeleted"),
             object: nil
         )
+
+        // 监听事件变更（新增、修改）
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(eventDataChanged),
+            name: Notification.Name("EventDataChanged"),
+            object: nil
+        )
     }
     
     /// 设置依赖的管理器
@@ -181,6 +195,15 @@ class SyncManager: ObservableObject {
     @objc private func eventDeleted(_ notification: Notification) {
         if let eventUUID = notification.userInfo?["eventUUID"] as? String {
             trackDeletedEvent(eventUUID)
+        }
+    }
+
+    @objc private func eventDataChanged() {
+        // 当事件数据发生变更时，立即刷新本地数据预览和同步工作区
+        Task {
+            loadLocalDataPreview()
+            await generateSyncWorkspace()
+            updatePendingSyncCount()
         }
     }
 
@@ -302,7 +325,7 @@ class SyncManager: ObservableObject {
         }
 
         do {
-            let (uploadedCount, downloadedCount, conflictCount) = try await performSyncInternal(mode: mode)
+            let (uploadedCount, downloadedCount, conflictCount, syncDetails) = try await performSyncInternal(mode: mode)
 
             let duration = Date().timeIntervalSince(startTime)
             let record = SyncRecord(
@@ -311,7 +334,8 @@ class SyncManager: ObservableObject {
                 uploadedCount: uploadedCount,
                 downloadedCount: downloadedCount,
                 conflictCount: conflictCount,
-                duration: duration
+                duration: duration,
+                syncDetails: syncDetails
             )
 
             // 同步成功后刷新所有数据预览和工作区状态
@@ -326,11 +350,22 @@ class SyncManager: ObservableObject {
                 self.userDefaults.set(self.lastSyncTime, forKey: self.lastSyncTimeKey)
                 self.isSyncing = false
 
+                // 更新服务器响应状态
+                self.lastServerResponseStatus = "同步成功 (HTTP 200)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "已连接"
+
                 // 清除已同步的删除记录
                 self.clearSyncedDeletions()
 
                 // 记录同步历史
                 self.addSyncRecord(record)
+
+                // 发送同步完成通知，用于UI刷新
+                NotificationCenter.default.post(
+                    name: Notification.Name("SyncCompleted"),
+                    object: self
+                )
             }
         } catch {
             let duration = Date().timeIntervalSince(startTime)
@@ -345,6 +380,11 @@ class SyncManager: ObservableObject {
                 self.syncStatus = .error(error.localizedDescription)
                 self.isSyncing = false
 
+                // 更新服务器响应状态
+                self.lastServerResponseStatus = "同步失败: \(error.localizedDescription)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "连接失败"
+
                 // 记录同步历史
                 self.addSyncRecord(record)
             }
@@ -352,44 +392,59 @@ class SyncManager: ObservableObject {
     }
 
     /// 内部同步实现
-    private func performSyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int) {
+    private func performSyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int, syncDetails: SyncDetails?) {
         // 确保设备已注册
         try await ensureDeviceRegistered()
 
+        // 创建同步详情收集器
+        var syncDetailsCollector = SyncDetailsCollector()
+
         switch mode {
         case .forceOverwriteLocal:
-            try await performForceOverwriteLocal()
-            return (0, 1, 0) // 简化返回值
+            try await performForceOverwriteLocal(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (0, details.downloadedItems.count, 0, details)
 
         case .forceOverwriteRemote:
-            try await performForceOverwriteRemote()
-            return (1, 0, 0) // 简化返回值
+            try await performForceOverwriteRemote(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, 0, 0, details)
 
         case .pullOnly:
-            try await performPullOnly()
-            return (0, 1, 0) // 简化返回值
+            try await performPullOnly(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (0, details.downloadedItems.count, 0, details)
 
         case .pushOnly:
-            try await performPushOnly()
-            return (1, 0, 0) // 简化返回值
+            try await performPushOnly(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, 0, 0, details)
 
         case .smartMerge:
-            try await performSmartMerge()
-            return (1, 1, 0) // 简化返回值
+            try await performSmartMerge(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
         }
     }
 
     /// 强制覆盖本地
-    private func performForceOverwriteLocal() async throws {
+    private func performForceOverwriteLocal(detailsCollector: inout SyncDetailsCollector) async throws {
         let response = try await apiClient.fullSync(deviceUUID: deviceUUID)
+
+        // 收集下载的详情
+        collectDownloadDetails(from: response.data, to: &detailsCollector)
+
         await applyServerData(response.data, mode: .forceOverwriteLocal)
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
     }
 
     /// 强制覆盖远程
-    private func performForceOverwriteRemote() async throws {
+    private func performForceOverwriteRemote(detailsCollector: inout SyncDetailsCollector) async throws {
         // 收集所有本地数据
         let changes = await collectAllLocalData()
+
+        // 收集上传的详情
+        collectUploadDetails(from: changes, to: &detailsCollector)
 
         // 强制覆盖远程的策略：
         // 1. 使用lastSyncTimestamp = 0，表示从头开始同步
@@ -469,16 +524,23 @@ class SyncManager: ObservableObject {
     }
 
     /// 仅拉取
-    private func performPullOnly() async throws {
+    private func performPullOnly(detailsCollector: inout SyncDetailsCollector) async throws {
         let response = try await apiClient.fullSync(deviceUUID: deviceUUID)
+
+        // 收集下载的详情
+        collectDownloadDetails(from: response.data, to: &detailsCollector)
+
         await applyServerData(response.data, mode: .pullOnly)
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
     }
 
     /// 仅推送
-    private func performPushOnly() async throws {
+    private func performPushOnly(detailsCollector: inout SyncDetailsCollector) async throws {
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
         let changes = await collectLocalChanges(since: lastSyncTimestamp)
+
+        // 收集上传的详情
+        collectUploadDetails(from: changes, to: &detailsCollector)
 
         let request = IncrementalSyncRequest(
             deviceUUID: deviceUUID,
@@ -491,11 +553,11 @@ class SyncManager: ObservableObject {
     }
 
     /// 智能合并
-    private func performSmartMerge() async throws {
+    private func performSmartMerge(detailsCollector: inout SyncDetailsCollector) async throws {
         // 先拉取
-        try await performPullOnly()
+        try await performPullOnly(detailsCollector: &detailsCollector)
         // 再推送
-        try await performPushOnly()
+        try await performPushOnly(detailsCollector: &detailsCollector)
     }
     
     private func performIncrementalSyncInternal() async throws {
@@ -950,6 +1012,9 @@ class SyncManager: ObservableObject {
             DispatchQueue.main.async {
                 self.serverData = preview
                 self.isLoadingServerData = false
+                self.lastServerResponseStatus = "成功 (HTTP 200)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "已连接"
                 print("🎯 服务端数据预览已更新: \(preview.eventCount)个番茄钟, \(preview.systemEventCount)个系统事件")
             }
         } catch {
@@ -957,6 +1022,9 @@ class SyncManager: ObservableObject {
             DispatchQueue.main.async {
                 self.serverData = nil
                 self.isLoadingServerData = false
+                self.lastServerResponseStatus = "失败: \(error.localizedDescription)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "连接失败"
             }
         }
     }
@@ -1613,16 +1681,16 @@ struct WorkspaceItem: Identifiable {
         case deleted    // 删除
         case conflict   // 冲突
 
-        var color: String {
+        var color: Color {
             switch self {
             case .added:
-                return "green"
+                return .green
             case .modified:
-                return "blue"
+                return .blue
             case .deleted:
-                return "red"
+                return .red
             case .conflict:
-                return "orange"
+                return .orange
             }
         }
 
@@ -1666,7 +1734,10 @@ struct SyncRecord: Identifiable, Codable {
     let conflictCount: Int
     let duration: TimeInterval
 
-    init(syncMode: SyncMode, success: Bool, errorMessage: String? = nil, uploadedCount: Int = 0, downloadedCount: Int = 0, conflictCount: Int = 0, duration: TimeInterval = 0) {
+    // 详细同步内容信息
+    let syncDetails: SyncDetails?
+
+    init(syncMode: SyncMode, success: Bool, errorMessage: String? = nil, uploadedCount: Int = 0, downloadedCount: Int = 0, conflictCount: Int = 0, duration: TimeInterval = 0, syncDetails: SyncDetails? = nil) {
         self.id = UUID().uuidString
         self.timestamp = Date()
         self.syncMode = syncMode
@@ -1676,5 +1747,314 @@ struct SyncRecord: Identifiable, Codable {
         self.downloadedCount = downloadedCount
         self.conflictCount = conflictCount
         self.duration = duration
+        self.syncDetails = syncDetails
+    }
+}
+
+// MARK: - 同步详情
+struct SyncDetails: Codable {
+    let uploadedItems: [SyncItemDetail]
+    let downloadedItems: [SyncItemDetail]
+    let conflictItems: [SyncItemDetail]
+    let deletedItems: [SyncItemDetail]
+
+    var totalItems: Int {
+        return uploadedItems.count + downloadedItems.count + conflictItems.count + deletedItems.count
+    }
+
+    var summary: String {
+        var parts: [String] = []
+        if !uploadedItems.isEmpty {
+            parts.append("上传\(uploadedItems.count)项")
+        }
+        if !downloadedItems.isEmpty {
+            parts.append("下载\(downloadedItems.count)项")
+        }
+        if !conflictItems.isEmpty {
+            parts.append("冲突\(conflictItems.count)项")
+        }
+        if !deletedItems.isEmpty {
+            parts.append("删除\(deletedItems.count)项")
+        }
+        return parts.joined(separator: "，")
+    }
+}
+
+// MARK: - 同步项目详情
+struct SyncItemDetail: Identifiable, Codable {
+    let id: String
+    let type: SyncItemType
+    let operation: SyncOperation
+    let title: String
+    let description: String
+    let timestamp: Date
+    let details: SyncItemSpecificDetails?
+
+    enum SyncItemType: String, Codable {
+        case pomodoroEvent = "pomodoroEvent"
+        case timerSettings = "timerSettings"
+        case systemEvent = "systemEvent"
+
+        var displayName: String {
+            switch self {
+            case .pomodoroEvent:
+                return "番茄钟事件"
+            case .timerSettings:
+                return "计时器设置"
+            case .systemEvent:
+                return "系统事件"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .pomodoroEvent:
+                return "clock"
+            case .timerSettings:
+                return "gear"
+            case .systemEvent:
+                return "desktopcomputer"
+            }
+        }
+    }
+
+    enum SyncOperation: String, Codable {
+        case upload = "upload"
+        case download = "download"
+        case conflict = "conflict"
+        case delete = "delete"
+
+        var displayName: String {
+            switch self {
+            case .upload:
+                return "上传"
+            case .download:
+                return "下载"
+            case .conflict:
+                return "冲突"
+            case .delete:
+                return "删除"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .upload:
+                return .blue
+            case .download:
+                return .green
+            case .conflict:
+                return .orange
+            case .delete:
+                return .red
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .upload:
+                return "arrow.up.circle"
+            case .download:
+                return "arrow.down.circle"
+            case .conflict:
+                return "exclamationmark.triangle"
+            case .delete:
+                return "trash"
+            }
+        }
+    }
+}
+
+// MARK: - 同步项目具体详情
+struct SyncItemSpecificDetails: Codable {
+    // 番茄钟事件详情
+    let eventStartTime: Date?
+    let eventEndTime: Date?
+    let eventType: String?
+    let taskName: String?
+
+    // 计时器设置详情
+    let pomodoroTime: TimeInterval?
+    let shortBreakTime: TimeInterval?
+    let longBreakTime: TimeInterval?
+    let autoStartBreak: Bool?
+
+    // 系统事件详情
+    let systemEventType: String?
+    let systemEventData: String?
+
+    init(eventStartTime: Date? = nil, eventEndTime: Date? = nil, eventType: String? = nil, taskName: String? = nil,
+         pomodoroTime: TimeInterval? = nil, shortBreakTime: TimeInterval? = nil, longBreakTime: TimeInterval? = nil, autoStartBreak: Bool? = nil,
+         systemEventType: String? = nil, systemEventData: String? = nil) {
+        self.eventStartTime = eventStartTime
+        self.eventEndTime = eventEndTime
+        self.eventType = eventType
+        self.taskName = taskName
+        self.pomodoroTime = pomodoroTime
+        self.shortBreakTime = shortBreakTime
+        self.longBreakTime = longBreakTime
+        self.autoStartBreak = autoStartBreak
+        self.systemEventType = systemEventType
+        self.systemEventData = systemEventData
+    }
+}
+
+// MARK: - 同步详情收集器
+class SyncDetailsCollector {
+    private var uploadedItems: [SyncItemDetail] = []
+    private var downloadedItems: [SyncItemDetail] = []
+    private var conflictItems: [SyncItemDetail] = []
+    private var deletedItems: [SyncItemDetail] = []
+
+    func addUploadedItem(_ item: SyncItemDetail) {
+        uploadedItems.append(item)
+    }
+
+    func addDownloadedItem(_ item: SyncItemDetail) {
+        downloadedItems.append(item)
+    }
+
+    func addConflictItem(_ item: SyncItemDetail) {
+        conflictItems.append(item)
+    }
+
+    func addDeletedItem(_ item: SyncItemDetail) {
+        deletedItems.append(item)
+    }
+
+    func build() -> SyncDetails {
+        return SyncDetails(
+            uploadedItems: uploadedItems,
+            downloadedItems: downloadedItems,
+            conflictItems: conflictItems,
+            deletedItems: deletedItems
+        )
+    }
+}
+
+// MARK: - 同步详情收集辅助方法
+extension SyncManager {
+
+    /// 收集上传详情
+    private func collectUploadDetails(from changes: SyncChanges, to collector: inout SyncDetailsCollector) {
+        // 收集番茄钟事件上传详情
+        for event in changes.pomodoroEvents.created + changes.pomodoroEvents.updated {
+            let detail = SyncItemDetail(
+                id: event.uuid,
+                type: .pomodoroEvent,
+                operation: .upload,
+                title: event.title,
+                description: formatEventTimeRange(start: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                                                end: Date(timeIntervalSince1970: TimeInterval(event.endTime) / 1000)),
+                timestamp: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                details: SyncItemSpecificDetails(
+                    eventStartTime: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                    eventEndTime: Date(timeIntervalSince1970: TimeInterval(event.endTime) / 1000),
+                    eventType: event.eventType,
+                    taskName: event.title
+                )
+            )
+            collector.addUploadedItem(detail)
+        }
+
+        // 收集设置上传详情
+        if let settings = changes.timerSettings {
+            let detail = SyncItemDetail(
+                id: "timer_settings",
+                type: .timerSettings,
+                operation: .upload,
+                title: "计时器设置",
+                description: "番茄钟: \(settings.pomodoroTime/60)分钟, 短休息: \(settings.shortBreakTime/60)分钟",
+                timestamp: Date(),
+                details: SyncItemSpecificDetails(
+                    pomodoroTime: TimeInterval(settings.pomodoroTime),
+                    shortBreakTime: TimeInterval(settings.shortBreakTime),
+                    longBreakTime: TimeInterval(settings.longBreakTime)
+                )
+            )
+            collector.addUploadedItem(detail)
+        }
+
+        // 收集系统事件上传详情
+        for systemEvent in changes.systemEvents.created {
+            let detail = SyncItemDetail(
+                id: systemEvent.uuid,
+                type: .systemEvent,
+                operation: .upload,
+                title: "系统事件",
+                description: systemEvent.eventType,
+                timestamp: Date(timeIntervalSince1970: TimeInterval(systemEvent.timestamp) / 1000),
+                details: SyncItemSpecificDetails(
+                    systemEventType: systemEvent.eventType,
+                    systemEventData: systemEvent.data.description
+                )
+            )
+            collector.addUploadedItem(detail)
+        }
+    }
+
+    /// 收集下载详情
+    private func collectDownloadDetails(from data: FullSyncData, to collector: inout SyncDetailsCollector) {
+        // 收集番茄钟事件下载详情
+        for event in data.pomodoroEvents {
+            let detail = SyncItemDetail(
+                id: event.uuid,
+                type: .pomodoroEvent,
+                operation: .download,
+                title: event.title,
+                description: formatEventTimeRange(start: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                                                end: Date(timeIntervalSince1970: TimeInterval(event.endTime) / 1000)),
+                timestamp: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                details: SyncItemSpecificDetails(
+                    eventStartTime: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                    eventEndTime: Date(timeIntervalSince1970: TimeInterval(event.endTime) / 1000),
+                    eventType: event.eventType,
+                    taskName: event.title
+                )
+            )
+            collector.addDownloadedItem(detail)
+        }
+
+        // 收集设置下载详情
+        if let settings = data.timerSettings {
+            let detail = SyncItemDetail(
+                id: "timer_settings",
+                type: .timerSettings,
+                operation: .download,
+                title: "计时器设置",
+                description: "番茄钟: \(settings.pomodoroTime/60)分钟, 短休息: \(settings.shortBreakTime/60)分钟",
+                timestamp: Date(),
+                details: SyncItemSpecificDetails(
+                    pomodoroTime: TimeInterval(settings.pomodoroTime),
+                    shortBreakTime: TimeInterval(settings.shortBreakTime),
+                    longBreakTime: TimeInterval(settings.longBreakTime)
+                )
+            )
+            collector.addDownloadedItem(detail)
+        }
+
+        // 收集系统事件下载详情
+        for systemEvent in data.systemEvents {
+            let detail = SyncItemDetail(
+                id: systemEvent.uuid,
+                type: .systemEvent,
+                operation: .download,
+                title: "系统事件",
+                description: systemEvent.eventType,
+                timestamp: Date(timeIntervalSince1970: TimeInterval(systemEvent.timestamp) / 1000),
+                details: SyncItemSpecificDetails(
+                    systemEventType: systemEvent.eventType,
+                    systemEventData: systemEvent.data.description
+                )
+            )
+            collector.addDownloadedItem(detail)
+        }
+    }
+
+    /// 格式化事件时间范围
+    private func formatEventTimeRange(start: Date, end: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "\(formatter.string(from: start)) - \(formatter.string(from: end))"
     }
 }

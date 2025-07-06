@@ -145,6 +145,7 @@ class EventManager: ObservableObject {
     func addEvent(_ event: PomodoroEvent) {
         events.append(event)
         saveEvents()
+        notifyEventDataChanged()
     }
     
     func removeEvent(_ event: PomodoroEvent) {
@@ -163,6 +164,7 @@ class EventManager: ObservableObject {
         if let index = events.firstIndex(where: { $0.id == event.id }) {
             events[index] = event
             saveEvents()
+            notifyEventDataChanged()
         }
     }
     
@@ -258,5 +260,13 @@ class EventManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([PomodoroEvent].self, from: data) {
             events = decoded
         }
+    }
+
+    /// 发送事件数据变更通知
+    private func notifyEventDataChanged() {
+        NotificationCenter.default.post(
+            name: Notification.Name("EventDataChanged"),
+            object: self
+        )
     }
 }

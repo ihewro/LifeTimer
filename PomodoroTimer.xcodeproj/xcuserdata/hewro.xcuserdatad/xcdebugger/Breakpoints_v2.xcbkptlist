@@ -7,15 +7,15 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "94F5A5A3-4D73-4E07-9BB0-5E4BD7950981"
-            shouldBeEnabled = "No"
+            uuid = "D6DD6D06-BB7A-486A-8AD3-E1A041F1E18F"
+            shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/CalendarView.swift"
+            filePath = "PomodoroTimer/Views/SyncView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "750"
-            endingLineNumber = "750"
+            startingLineNumber = "110"
+            endingLineNumber = "110"
             landmarkName = "body"
             landmarkType = "24">
          </BreakpointContent>
@@ -23,152 +23,32 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Managers/SyncManager.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "265"
-            endingLineNumber = "265"
-            landmarkName = "performSync(isFullSync:)"
-            landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - 8172dcbdc207dd4"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "(2) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "268"
-                  endingLineNumber = "268">
-               </Location>
-               <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - bb60596cb8345fd3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "(3) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "268"
-                  endingLineNumber = "268">
-               </Location>
-               <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - e6b28291645bb9d2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "(4) await resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "268"
-                  endingLineNumber = "268">
-               </Location>
-               <Location
-                  uuid = "DE9E43B0-9FC2-456C-ABA8-46A66885B700 - aaecda1a0e0d2fd8"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "(5) suspend resume partial function for PomodoroTimer.SyncManager.performSync(isFullSync: Swift.Bool) async -&gt; ()"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "268"
-                  endingLineNumber = "268">
-               </Location>
-            </Locations>
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "E4A1FAC7-6545-4F54-90A1-AAB9392AF53D"
+            uuid = "68F01331-CC58-4C61-B57F-471418AF08E5"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "PomodoroTimer/Views/SyncView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "854"
-            endingLineNumber = "854"
-            landmarkName = "differenceSection(title:items:color:icon:)"
-            landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "E4A1FAC7-6545-4F54-90A1-AAB9392AF53D - 9204cc96bf9013f3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 () -&gt; SwiftUI.TupleView&lt;(SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of SwiftUI.View.foregroundColor(Swift.Optional&lt;SwiftUI.Color&gt;) -&gt; some&gt;&gt;.0, SwiftUI.Text, SwiftUI.Text, SwiftUI.Spacer)&gt;&gt;, SwiftUI.ForEach&lt;Swift.ArraySlice&lt;PomodoroTimer.WorkspaceItem&gt;, Swift.String, &lt;&lt;opaque return type of SwiftUI.View.padding(SwiftUI.Edge.Set, Swift.Optional&lt;CoreGraphics.CGFloat&gt;) -&gt; some&gt;&gt;.0&gt;, Swift.Optional&lt;&lt;&lt;opaque return type of SwiftUI.View.padding(SwiftUI.Edge.Set, Swift.Optional&lt;CoreGraphics.CGFloat&gt;) -&gt; some&gt;&gt;.0&gt;)&gt; in PomodoroTimer.SyncView.differenceSection(title: Swift.String, items: Swift.Array&lt;PomodoroTimer.WorkspaceItem&gt;, color: SwiftUI.Color, icon: Swift.String) -&gt; some"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Views/SyncView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "854"
-                  endingLineNumber = "854">
-               </Location>
-               <Location
-                  uuid = "E4A1FAC7-6545-4F54-90A1-AAB9392AF53D - e11b3b39a7bb4de0"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #3 () -&gt; () in closure #1 () -&gt; SwiftUI.TupleView&lt;(SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of SwiftUI.View.foregroundColor(Swift.Optional&lt;SwiftUI.Color&gt;) -&gt; some&gt;&gt;.0, SwiftUI.Text, SwiftUI.Text, SwiftUI.Spacer)&gt;&gt;, SwiftUI.ForEach&lt;Swift.ArraySlice&lt;PomodoroTimer.WorkspaceItem&gt;, Swift.String, &lt;&lt;opaque return type of SwiftUI.View.padding(SwiftUI.Edge.Set, Swift.Optional&lt;CoreGraphics.CGFloat&gt;) -&gt; some&gt;&gt;.0&gt;, Swift.Optional&lt;&lt;&lt;opaque return type of SwiftUI.View.padding(SwiftUI.Edge.Set, Swift.Optional&lt;CoreGraphics.CGFloat&gt;) -&gt; some&gt;&gt;.0&gt;)&gt; in PomodoroTimer.SyncView.differenceSection(title: Swift.String, items: Swift.Array&lt;PomodoroTimer.WorkspaceItem&gt;, color: SwiftUI.Color, icon: Swift.String) -&gt; some"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Views/SyncView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "855"
-                  endingLineNumber = "855">
-               </Location>
-            </Locations>
+            startingLineNumber = "619"
+            endingLineNumber = "619"
+            landmarkName = "syncHistorySection"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "684F3FE4-35A2-424E-BD96-E1F0A2A79017"
+            uuid = "ED62CE7E-8DF9-4E58-BAC6-C6C672BEADEE"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "PomodoroTimer/Views/SyncView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "855"
-            endingLineNumber = "855"
-            landmarkName = "differenceSection(title:items:color:icon:)"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "F3157636-CE6E-4709-82CD-F2B3510186E3"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/SyncView.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1046"
-            endingLineNumber = "1046"
-            landmarkName = "formatWorkspaceTime(_:)"
+            startingLineNumber = "1133"
+            endingLineNumber = "1133"
+            landmarkName = "getComparisonIcon()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
