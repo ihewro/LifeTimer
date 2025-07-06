@@ -9,6 +9,27 @@ import Foundation
 import Combine
 import SwiftUI
 
+/// 删除事件的详细信息
+struct DeletedEventInfo: Codable {
+    let uuid: String
+    let title: String
+    let eventType: String
+    let startTime: Date
+    let endTime: Date
+    let deletedAt: Date
+    let reason: String? // 删除原因（可选）
+
+    init(from event: PomodoroEvent, reason: String? = nil) {
+        self.uuid = event.id.uuidString
+        self.title = event.title
+        self.eventType = event.type.rawValue
+        self.startTime = event.startTime
+        self.endTime = event.endTime
+        self.deletedAt = Date()
+        self.reason = reason
+    }
+}
+
 /// 同步状态枚举
 enum SyncStatus {
     case idle
@@ -87,6 +108,13 @@ class SyncManager: ObservableObject {
     @Published var isSyncing = false
     @Published var serverURL: String = ""
     @Published var pendingSyncCount: Int = 0
+
+    // 标记是否正在进行同步更新操作（用于避免误跟踪删除）
+    private var isPerformingSyncUpdate = false
+
+    // 调试模式
+    @Published var isDebugMode = false
+    private var deletionTrackingLog: [String] = []
     @Published var serverData: ServerDataPreview? = nil
     @Published var isLoadingServerData = false
     @Published var localData: LocalDataPreview? = nil
@@ -100,8 +128,10 @@ class SyncManager: ObservableObject {
     @Published var serverConnectionStatus: String = "未连接"
 
     // 跟踪删除的事件
-    private var deletedEventUUIDs: Set<String> = []
+    private var deletedEventUUIDs: Set<String> = [] // 保持向后兼容
+    private var deletedEventInfos: [String: DeletedEventInfo] = [:] // 新的详细信息存储
     private let deletedEventsKey = "DeletedEventUUIDs"
+    private let deletedEventInfosKey = "DeletedEventInfos"
 
     private let apiClient: APIClient
     private let deviceUUID: String
@@ -158,6 +188,7 @@ class SyncManager: ObservableObject {
 
         // 加载删除的事件列表
         loadDeletedEvents()
+        loadDeletedEventInfos()
 
         // 监听设置变更
         NotificationCenter.default.addObserver(
@@ -201,7 +232,13 @@ class SyncManager: ObservableObject {
 
     @objc private func eventDeleted(_ notification: Notification) {
         if let eventUUID = notification.userInfo?["eventUUID"] as? String {
-            trackDeletedEvent(eventUUID)
+            // 尝试获取事件详细信息
+            if let eventInfo = notification.userInfo?["eventInfo"] as? DeletedEventInfo {
+                trackDeletedEvent(eventInfo)
+            } else {
+                // 向后兼容：只有UUID的情况
+                trackDeletedEvent(eventUUID)
+            }
         }
     }
 
@@ -738,6 +775,9 @@ class SyncManager: ObservableObject {
         // 1. 应用番茄钟事件
         if let eventManager = eventManager {
             DispatchQueue.main.async {
+                // 设置同步更新标志，防止误跟踪删除
+                self.isPerformingSyncUpdate = true
+
                 switch mode {
                 case .forceOverwriteLocal:
                     // 强制覆盖本地：完全使用服务端数据
@@ -755,6 +795,9 @@ class SyncManager: ObservableObject {
                     // 推送模式：不应用服务端数据
                     break
                 }
+
+                // 重置同步更新标志
+                self.isPerformingSyncUpdate = false
             }
         }
 
@@ -808,13 +851,13 @@ class SyncManager: ObservableObject {
         return SystemEvent(
             type: eventType,
             timestamp: Date(timeIntervalSince1970: TimeInterval(serverEvent.timestamp) / 1000),
-            data: serverEvent.data ?? [:]
+            data: serverEvent.data
         )
     }
 
     /// 智能合并系统事件
     private func smartMergeSystemEvents(_ serverEvents: [ServerSystemEvent], into systemEventStore: SystemEventStore) {
-        var existingEvents = systemEventStore.events
+        let existingEvents = systemEventStore.events
         var mergedEvents: [SystemEvent] = []
         var processedServerUUIDs = Set<String>()
 
@@ -854,7 +897,11 @@ class SyncManager: ObservableObject {
 
     /// 智能合并服务端数据到本地
     private func smartMergeServerData(_ data: FullSyncData, into eventManager: EventManager) {
-        var existingEvents = eventManager.events
+        // 设置同步更新标志，防止误跟踪删除
+        isPerformingSyncUpdate = true
+        defer { isPerformingSyncUpdate = false }
+
+        let existingEvents = eventManager.events
         var mergedEvents: [PomodoroEvent] = []
         var processedServerUUIDs = Set<String>()
 
@@ -907,6 +954,9 @@ class SyncManager: ObservableObject {
         // 应用服务器端的番茄事件变更
         if let eventManager = eventManager {
             DispatchQueue.main.async {
+                // 设置同步更新标志，防止误跟踪删除
+                self.isPerformingSyncUpdate = true
+
                 // 处理服务器端的番茄事件变更
                 for serverEvent in changes.pomodoroEvents {
                     // 检查本地是否已存在该事件
@@ -935,6 +985,9 @@ class SyncManager: ObservableObject {
                         eventManager.addEvent(newEvent)
                     }
                 }
+
+                // 重置同步更新标志
+                self.isPerformingSyncUpdate = false
             }
         }
 
@@ -1082,7 +1135,7 @@ class SyncManager: ObservableObject {
         let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(lastSyncTimestamp) / 1000)
 
         var staged: [WorkspaceItem] = []
-        var unstaged: [WorkspaceItem] = []
+        let unstaged: [WorkspaceItem] = []
         var remoteChanges: [WorkspaceItem] = []
 
         // 分析本地变更
@@ -1125,14 +1178,34 @@ class SyncManager: ObservableObject {
 
         // 3. 分析删除的事件
         for deletedUUID in deletedEventUUIDs {
-            let item = WorkspaceItem(
-                id: deletedUUID,
-                type: .pomodoroEvent,
-                status: .deleted,
-                title: "已删除的事件",
-                description: "事件已从本地删除",
-                timestamp: Date()
-            )
+            let item: WorkspaceItem
+
+            if let deletedInfo = deletedEventInfos[deletedUUID] {
+                // 使用详细信息创建工作区项目
+                let eventTypeDisplay = PomodoroEvent.EventType(rawValue: deletedInfo.eventType)?.displayName ?? deletedInfo.eventType
+                let duration = deletedInfo.endTime.timeIntervalSince(deletedInfo.startTime)
+                let durationText = formatDuration(duration)
+
+                item = WorkspaceItem(
+                    id: deletedUUID,
+                    type: .pomodoroEvent,
+                    status: .deleted,
+                    title: deletedInfo.title.isEmpty ? "已删除的\(eventTypeDisplay)" : deletedInfo.title,
+                    description: "\(eventTypeDisplay) - \(durationText) (删除于 \(formatTime(deletedInfo.deletedAt)))",
+                    timestamp: deletedInfo.deletedAt
+                )
+            } else {
+                // 向后兼容：使用通用信息
+                item = WorkspaceItem(
+                    id: deletedUUID,
+                    type: .pomodoroEvent,
+                    status: .deleted,
+                    title: "已删除的事件",
+                    description: "事件已从本地删除",
+                    timestamp: Date()
+                )
+            }
+
             staged.append(item)
         }
 
@@ -1372,7 +1445,7 @@ class SyncManager: ObservableObject {
         }
 
         // 计算待同步的设置变更
-        if let timerModel = timerModel {
+        if timerModel != nil {
             // 检查设置是否有变更（简化处理：如果有任何本地数据变更，就认为设置可能有变更）
             if count > 0 {
                 count += 1 // 设置变更算作1个待同步项
@@ -1419,8 +1492,58 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 跟踪删除的事件
+    /// 跟踪删除的事件（使用详细信息）
+    private func trackDeletedEvent(_ eventInfo: DeletedEventInfo) {
+        let timestamp = Date()
+        let logEntry = "[\(formatTimestamp(timestamp))] 尝试跟踪删除事件: UUID=\(eventInfo.uuid), 标题=\(eventInfo.title), 类型=\(eventInfo.eventType), 原因=\(eventInfo.reason ?? "未知")"
+
+        // 检查是否正在进行同步更新操作，如果是则不跟踪删除
+        // 这避免了在同步过程中更新事件时被误标记为删除
+        guard !isPerformingSyncUpdate else {
+            let skipLogEntry = "[\(formatTimestamp(timestamp))] ⚠️ 跳过删除跟踪 - 正在进行同步更新 (UUID: \(eventInfo.uuid))"
+            print(skipLogEntry)
+            addDeletionLog(skipLogEntry)
+            return
+        }
+
+        let trackLogEntry = "[\(formatTimestamp(timestamp))] 🗑️ 成功跟踪删除事件 (UUID: \(eventInfo.uuid), 标题: \(eventInfo.title))"
+        print(trackLogEntry)
+        addDeletionLog(logEntry)
+        addDeletionLog(trackLogEntry)
+
+        deletedEventUUIDs.insert(eventInfo.uuid)
+        deletedEventInfos[eventInfo.uuid] = eventInfo
+        saveDeletedEvents()
+        saveDeletedEventInfos()
+
+        // 更新待同步数据计数
+        updatePendingSyncCount()
+
+        // 重新生成同步工作区
+        Task {
+            await generateSyncWorkspace()
+        }
+    }
+
+    /// 跟踪删除的事件（仅UUID，向后兼容）
     private func trackDeletedEvent(_ eventUUID: String) {
+        let timestamp = Date()
+        let logEntry = "[\(formatTimestamp(timestamp))] 尝试跟踪删除事件 (仅UUID模式): UUID=\(eventUUID)"
+
+        // 检查是否正在进行同步更新操作，如果是则不跟踪删除
+        // 这避免了在同步过程中更新事件时被误标记为删除
+        guard !isPerformingSyncUpdate else {
+            let skipLogEntry = "[\(formatTimestamp(timestamp))] ⚠️ 跳过删除跟踪 - 正在进行同步更新 (UUID: \(eventUUID))"
+            print(skipLogEntry)
+            addDeletionLog(skipLogEntry)
+            return
+        }
+
+        let trackLogEntry = "[\(formatTimestamp(timestamp))] 🗑️ 成功跟踪删除事件 (UUID: \(eventUUID)) - 仅UUID模式"
+        print(trackLogEntry)
+        addDeletionLog(logEntry)
+        addDeletionLog(trackLogEntry)
+
         deletedEventUUIDs.insert(eventUUID)
         saveDeletedEvents()
 
@@ -1446,10 +1569,27 @@ class SyncManager: ObservableObject {
         }
     }
 
+    /// 保存删除的事件详细信息到UserDefaults
+    private func saveDeletedEventInfos() {
+        if let encoded = try? JSONEncoder().encode(deletedEventInfos) {
+            userDefaults.set(encoded, forKey: deletedEventInfosKey)
+        }
+    }
+
+    /// 从UserDefaults加载删除的事件详细信息
+    private func loadDeletedEventInfos() {
+        if let data = userDefaults.data(forKey: deletedEventInfosKey),
+           let decoded = try? JSONDecoder().decode([String: DeletedEventInfo].self, from: data) {
+            deletedEventInfos = decoded
+        }
+    }
+
     /// 清除已同步的删除记录
     private func clearSyncedDeletions() {
         deletedEventUUIDs.removeAll()
+        deletedEventInfos.removeAll()
         saveDeletedEvents()
+        saveDeletedEventInfos()
     }
 
     /// 检查计时器设置是否有变更
@@ -1504,6 +1644,145 @@ class SyncManager: ObservableObject {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    /// 格式化时间戳
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    /// 格式化详细时间戳（用于调试日志）
+    private func formatTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter.string(from: date)
+    }
+
+    /// 添加删除跟踪日志
+    private func addDeletionLog(_ message: String) {
+        deletionTrackingLog.append(message)
+        // 限制日志数量，保留最近的100条
+        if deletionTrackingLog.count > 100 {
+            deletionTrackingLog.removeFirst(deletionTrackingLog.count - 100)
+        }
+    }
+
+    /// 获取删除跟踪日志（用于调试）
+    func getDeletionTrackingLog() -> [String] {
+        return deletionTrackingLog
+    }
+
+    /// 清除删除跟踪日志
+    func clearDeletionTrackingLog() {
+        deletionTrackingLog.removeAll()
+    }
+
+    /// 获取所有删除记录的详细信息（用于调试和管理）
+    func getAllDeletedEventInfos() -> [DeletedEventInfo] {
+        return Array(deletedEventInfos.values).sorted { $0.deletedAt > $1.deletedAt }
+    }
+
+    /// 获取删除记录统计信息
+    func getDeletionStatistics() -> (totalCount: Int, withDetails: Int, uuidOnly: Int) {
+        let totalCount = deletedEventUUIDs.count
+        let withDetails = deletedEventInfos.count
+        let uuidOnly = totalCount - withDetails
+        return (totalCount: totalCount, withDetails: withDetails, uuidOnly: uuidOnly)
+    }
+
+    /// 清除特定的删除记录
+    func clearDeletedEvent(uuid: String) {
+        deletedEventUUIDs.remove(uuid)
+        deletedEventInfos.removeValue(forKey: uuid)
+        saveDeletedEvents()
+        saveDeletedEventInfos()
+
+        // 更新待同步数据计数
+        updatePendingSyncCount()
+
+        // 重新生成同步工作区
+        Task {
+            await generateSyncWorkspace()
+        }
+
+        let logEntry = "[\(formatTimestamp(Date()))] 🧹 手动清除删除记录: UUID=\(uuid)"
+        print(logEntry)
+        addDeletionLog(logEntry)
+    }
+
+    /// 清除所有删除记录（不仅仅是已同步的）
+    func clearAllDeletionRecords() {
+        let count = deletedEventUUIDs.count
+        deletedEventUUIDs.removeAll()
+        deletedEventInfos.removeAll()
+        saveDeletedEvents()
+        saveDeletedEventInfos()
+
+        // 更新待同步数据计数
+        updatePendingSyncCount()
+
+        // 重新生成同步工作区
+        Task {
+            await generateSyncWorkspace()
+        }
+
+        let logEntry = "[\(formatTimestamp(Date()))] 🧹 手动清除所有删除记录: 共清除\(count)条记录"
+        print(logEntry)
+        addDeletionLog(logEntry)
+    }
+
+    /// 清除可能的虚假删除记录（基于启发式规则）
+    func clearSpuriousDeletionRecords() {
+        let now = Date()
+        var clearedCount = 0
+        var uuidsToRemove: [String] = []
+
+        // 规则1: 清除没有详细信息的删除记录（可能是同步过程中误创建的）
+        for uuid in deletedEventUUIDs {
+            if deletedEventInfos[uuid] == nil {
+                uuidsToRemove.append(uuid)
+                clearedCount += 1
+            }
+        }
+
+        // 规则2: 清除删除时间过于接近的记录（可能是批量误删）
+        let sortedInfos = deletedEventInfos.values.sorted { $0.deletedAt < $1.deletedAt }
+        for i in 1..<sortedInfos.count {
+            let current = sortedInfos[i]
+            let previous = sortedInfos[i-1]
+
+            // 如果两个删除事件间隔小于1秒，且都没有明确的删除原因，可能是误删
+            if current.deletedAt.timeIntervalSince(previous.deletedAt) < 1.0 &&
+               current.reason == nil && previous.reason == nil {
+                uuidsToRemove.append(current.uuid)
+                clearedCount += 1
+            }
+        }
+
+        // 执行清除
+        for uuid in uuidsToRemove {
+            deletedEventUUIDs.remove(uuid)
+            deletedEventInfos.removeValue(forKey: uuid)
+        }
+
+        if clearedCount > 0 {
+            saveDeletedEvents()
+            saveDeletedEventInfos()
+
+            // 更新待同步数据计数
+            updatePendingSyncCount()
+
+            // 重新生成同步工作区
+            Task {
+                await generateSyncWorkspace()
+            }
+        }
+
+        let logEntry = "[\(formatTimestamp(now))] 🧹 智能清除虚假删除记录: 共清除\(clearedCount)条记录"
+        print(logEntry)
+        addDeletionLog(logEntry)
     }
 
 

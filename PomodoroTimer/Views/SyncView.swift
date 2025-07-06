@@ -42,6 +42,8 @@ struct SyncView: View {
     @State private var showingServerDataDetail = false
     @State private var showingSyncHistory = false
     @State private var selectedDataType: DataType = .pomodoroEvents
+    @State private var showingDeletionDebug = false
+    @State private var showingDeletionLog = false
 
     enum DataType: String, CaseIterable {
         case pomodoroEvents = "番茄钟事件"
@@ -135,6 +137,12 @@ struct SyncView: View {
                 Text("数据加载中...")
                     .padding()
             }
+        }
+        .popover(isPresented: $showingDeletionDebug) {
+            deletionDebugView
+        }
+        .popover(isPresented: $showingDeletionLog) {
+            deletionLogView
         }
     }
 
@@ -607,9 +615,6 @@ struct SyncView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                }
-
-                HStack(spacing: 20) {
                     HStack(spacing: 4) {
                         Image(systemName: "minus.circle")
                             .foregroundColor(.secondary)
@@ -618,8 +623,6 @@ struct SyncView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-
-                    Spacer()
                 }
             }
         }
@@ -961,6 +964,46 @@ struct SyncView: View {
 
                 if let lastSync = syncManager.lastSyncTime {
                     debugInfoRow("最后同步时间戳", "\(Int64(lastSync.timeIntervalSince1970 * 1000))")
+                }
+
+                // 删除记录统计
+                let deletionStats = syncManager.getDeletionStatistics()
+                debugInfoRow("删除记录总数", "\(deletionStats.totalCount)")
+                if deletionStats.totalCount > 0 {
+                    debugInfoRow("  - 有详细信息", "\(deletionStats.withDetails)")
+                    debugInfoRow("  - 仅UUID", "\(deletionStats.uuidOnly)")
+                }
+            }
+
+            // 删除记录管理按钮
+            let deletionStats = syncManager.getDeletionStatistics()
+            if deletionStats.totalCount > 0 {
+                HStack(spacing: 8) {
+                    Button("查看删除记录") {
+                        showingDeletionDebug = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button("查看删除日志") {
+                        showingDeletionLog = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button("智能清理") {
+                        syncManager.clearSpuriousDeletionRecords()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .foregroundColor(.orange)
+
+                    Button("全部清除") {
+                        syncManager.clearAllDeletionRecords()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .foregroundColor(.red)
                 }
             }
         }
@@ -1966,6 +2009,198 @@ extension SyncView {
         .padding(.horizontal, 8)
         .background(color.opacity(0.1))
         .cornerRadius(4)
+    }
+
+    /// 删除记录调试视图
+    private var deletionDebugView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 标题
+            HStack {
+                Image(systemName: "trash.circle")
+                    .foregroundColor(.red)
+                Text("删除记录调试")
+                    .font(.headline)
+                Spacer()
+                Button("关闭") {
+                    showingDeletionDebug = false
+                }
+                .buttonStyle(.plain)
+            }
+
+            let deletedEvents = syncManager.getAllDeletedEventInfos()
+            let stats = syncManager.getDeletionStatistics()
+
+            // 统计信息
+            VStack(alignment: .leading, spacing: 8) {
+                Text("统计信息")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                HStack {
+                    Text("总删除记录:")
+                    Spacer()
+                    Text("\(stats.totalCount)")
+                        .fontWeight(.medium)
+                }
+
+                HStack {
+                    Text("有详细信息:")
+                    Spacer()
+                    Text("\(stats.withDetails)")
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
+                }
+
+                HStack {
+                    Text("仅UUID:")
+                    Spacer()
+                    Text("\(stats.uuidOnly)")
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(8)
+
+            // 删除记录列表
+            if !deletedEvents.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("删除记录详情")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(deletedEvents, id: \.uuid) { deletedEvent in
+                                deletionRecordRow(deletedEvent)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 300)
+                }
+            } else {
+                Text("暂无删除记录")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            }
+
+            // 操作按钮
+            HStack {
+                Button("智能清理虚假记录") {
+                    syncManager.clearSpuriousDeletionRecords()
+                }
+                .buttonStyle(.bordered)
+                .foregroundColor(.orange)
+
+                Spacer()
+
+                Button("清除所有删除记录") {
+                    syncManager.clearAllDeletionRecords()
+                    showingDeletionDebug = false
+                }
+                .buttonStyle(.bordered)
+                .foregroundColor(.red)
+            }
+        }
+        .padding()
+        .frame(width: 500, height: 600)
+    }
+
+    /// 删除记录行
+    private func deletionRecordRow(_ deletedEvent: DeletedEventInfo) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(deletedEvent.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                Button("清除") {
+                    syncManager.clearDeletedEvent(uuid: deletedEvent.uuid)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.red)
+                .font(.caption)
+            }
+
+            HStack {
+                Text("类型: \(deletedEvent.eventType)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("删除时间: \(formatSyncTime(deletedEvent.deletedAt))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            if let reason = deletedEvent.reason {
+                Text("原因: \(reason)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
+
+            Text("UUID: \(deletedEvent.uuid)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .textSelection(.enabled)
+        }
+        .padding(8)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(6)
+    }
+
+    /// 删除日志视图
+    private var deletionLogView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 标题
+            HStack {
+                Image(systemName: "doc.text")
+                    .foregroundColor(.blue)
+                Text("删除跟踪日志")
+                    .font(.headline)
+                Spacer()
+                Button("清除日志") {
+                    syncManager.clearDeletionTrackingLog()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button("关闭") {
+                    showingDeletionLog = false
+                }
+                .buttonStyle(.plain)
+            }
+
+            let logs = syncManager.getDeletionTrackingLog()
+
+            if !logs.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(logs.enumerated().reversed()), id: \.offset) { index, log in
+                            Text(log)
+                                .font(.caption)
+                                .foregroundColor(log.contains("⚠️") ? .orange : log.contains("🗑️") ? .red : log.contains("🧹") ? .green : .primary)
+                                .textSelection(.enabled)
+                                .padding(.vertical, 2)
+                        }
+                    }
+                }
+                .frame(maxHeight: 400)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(8)
+            } else {
+                Text("暂无日志记录")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            }
+        }
+        .padding()
+        .frame(width: 600, height: 500)
     }
 }
 

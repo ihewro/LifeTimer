@@ -35,19 +35,28 @@ check_xcode() {
 # 函数：清理构建缓存
 clean_build() {
     print_message "清理构建缓存..." $BLUE
-    xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME_NAME" clean
-    print_message "✓ 构建缓存已清理" $GREEN
+    if xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME_NAME" clean; then
+        print_message "✓ 构建缓存已清理" $GREEN
+    else
+        print_message "✗ 清理构建缓存失败" $RED
+        exit 1
+    fi
 }
 
 # 函数：构建 macOS 版本
 build_macos() {
     print_message "开始构建 macOS 版本..." $BLUE
-    xcodebuild -project "$PROJECT_PATH" \
-               -scheme "$SCHEME_NAME" \
-               -destination 'platform=macOS' \
-               -configuration Release \
-               build
-    print_message "✓ macOS 版本构建完成" $GREEN
+    if xcodebuild -project "$PROJECT_PATH" \
+                  -scheme "$SCHEME_NAME" \
+                  -destination 'platform=macOS' \
+                  -configuration Release \
+                  build; then
+        print_message "✓ macOS 版本构建完成" $GREEN
+        print_message "应用位置: $(find ~/Library/Developer/Xcode/DerivedData -name "PomodoroTimer.app" -path "*/Release/*" 2>/dev/null | head -1)" $BLUE
+    else
+        print_message "✗ macOS 版本构建失败" $RED
+        exit 1
+    fi
 }
 
 # 函数：构建 iOS 版本
@@ -116,6 +125,7 @@ show_help() {
     echo "  run-macos      运行 macOS 版本"
     echo "  run-ios        运行 iOS 模拟器版本"
     echo "  run-ipados     运行 iPadOS 模拟器版本"
+    echo "  test-macos     测试 macOS 版本（构建并运行）"
     echo "  clean          清理构建缓存"
     echo "  open           在 Xcode 中打开项目"
     echo "  help           显示此帮助信息"
@@ -131,6 +141,24 @@ open_xcode() {
     print_message "在 Xcode 中打开项目..." $BLUE
     open "$PROJECT_PATH"
     print_message "✓ 项目已在 Xcode 中打开" $GREEN
+}
+
+# 函数：测试 macOS 版本（构建并运行）
+test_macos() {
+    print_message "测试 macOS 版本（构建并运行）..." $BLUE
+    build_macos
+
+    # 查找构建的应用
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "PomodoroTimer.app" -path "*/Release/*" 2>/dev/null | head -1)
+
+    if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
+        print_message "启动应用: $APP_PATH" $BLUE
+        open "$APP_PATH"
+        print_message "✓ 应用已启动" $GREEN
+    else
+        print_message "✗ 未找到构建的应用" $RED
+        exit 1
+    fi
 }
 
 # 主函数
@@ -172,6 +200,9 @@ main() {
             ;;
         "run-ipados")
             run_ipados
+            ;;
+        "test-macos")
+            test_macos
             ;;
         "clean")
             clean_build

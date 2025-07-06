@@ -204,7 +204,7 @@ class SystemEventMonitor: ObservableObject {
     
     private func handleSystemWake() {
         // 重新开始计时
-        if let app = lastActiveApp {
+        if lastActiveApp != nil {
             appStartTime = Date()
         }
         eventStore.recordEvent(type: .systemWake)
@@ -219,7 +219,7 @@ class SystemEventMonitor: ObservableObject {
     
     private func handleScreenUnlocked() {
         // 重新开始计时
-        if let app = lastActiveApp {
+        if lastActiveApp != nil {
             appStartTime = Date()
         }
         eventStore.recordEvent(type: .screenUnlocked)

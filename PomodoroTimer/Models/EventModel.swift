@@ -152,11 +152,17 @@ class EventManager: ObservableObject {
         events.removeAll { $0.id == event.id }
         saveEvents()
 
+        // 创建删除事件的详细信息
+        let deletedEventInfo = DeletedEventInfo(from: event, reason: "用户手动删除")
+
         // 发送删除通知给同步管理器
         NotificationCenter.default.post(
             name: Notification.Name("EventDeleted"),
             object: nil,
-            userInfo: ["eventUUID": event.id.uuidString]
+            userInfo: [
+                "eventUUID": event.id.uuidString,
+                "eventInfo": deletedEventInfo
+            ]
         )
     }
     
