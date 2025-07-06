@@ -50,38 +50,58 @@ struct SyncView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 标题栏
-            titleBar
+        ScrollView {
+            VStack(spacing: 20) {
+                // 服务器配置
+                serverConfigurationSection
 
-            ScrollView {
-                VStack(spacing: 20) {
-                    // 服务器配置
-                    serverConfigurationSection
+                // 同步状态总览
+                syncStatusOverviewSection
 
-                    // 同步状态总览
-                    syncStatusOverviewSection
+                // 数据对比区域
+                dataComparisonSection
 
-                    // 数据对比区域
-                    dataComparisonSection
-
-                    // 数据差异分析
-                    if shouldShowDataDifferences() {
-                        dataDifferenceAnalysisSection
-                    }
-
-                    // 同步操作区域
-                    syncActionsSection
-
-                    // 同步历史记录
-                    syncHistorySection
-
-                    // Debug信息区域
-                    if debugMode {
-                        debugInfoSection
-                    }
+                // 数据差异分析
+                if shouldShowDataDifferences() {
+                    dataDifferenceAnalysisSection
                 }
-                .padding()
+
+                // 同步操作区域
+                syncActionsSection
+
+                // 同步历史记录
+                syncHistorySection
+
+                // Debug信息区域
+                if debugMode {
+                    debugInfoSection
+                }
+            }
+            .padding()
+        }
+        .toolbar {
+            // 左侧：同步图标和标题
+            ToolbarItem(placement: .navigation) {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                    Text("数据同步")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                }
+            }
+
+            // 中间：占位符确保 toolbar 铺满宽度
+            ToolbarItem(placement: .principal) {
+                Spacer()
+            }
+
+            // 右侧：Debug模式切换
+            ToolbarItem(placement: .primaryAction) {
+                Toggle("Debug", isOn: $debugMode)
+                    .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                    .controlSize(.small)
             }
         }
         .onAppear {
@@ -120,27 +140,6 @@ struct SyncView: View {
 
     // MARK: - UI组件
 
-    /// 标题栏
-    private var titleBar: some View {
-        HStack {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.title2)
-                .foregroundColor(.accentColor)
-            Text("数据同步")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Spacer()
-
-            // Debug模式切换
-            Toggle("Debug", isOn: $debugMode)
-                .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                .controlSize(.small)
-        }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-    }
-
     /// 服务器配置区域
     private var serverConfigurationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -178,6 +177,34 @@ struct SyncView: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     Text("服务器地址已配置")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Divider()
+
+            // 同步设置
+            VStack(alignment: .leading, spacing: 8) {
+                Text("同步设置")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    Toggle("同步系统事件", isOn: $syncManager.syncSystemEvents)
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        .controlSize(.small)
+                        .onChange(of: syncManager.syncSystemEvents) { newValue in
+                            syncManager.updateSyncSystemEvents(newValue)
+                            // 重新生成同步工作区以反映设置变更
+                            Task {
+                                await syncManager.generateSyncWorkspace()
+                            }
+                        }
+
+                    Spacer()
+
+                    Text("包含活动监控数据")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -408,6 +435,9 @@ struct SyncView: View {
                 case .serverUnavailable:
                     Image(systemName: "wifi.slash")
                         .foregroundColor(.red)
+                case .ignored:
+                    Image(systemName: "minus.circle")
+                        .foregroundColor(.secondary)
                 }
             }
             .font(.subheadline)
@@ -424,6 +454,7 @@ struct SyncView: View {
         case bothChanges     // 双向变更
         case conflicts       // 有冲突
         case serverUnavailable // 服务器不可用
+        case ignored         // 忽略变更
     }
 
     /// 检查服务器数据是否可用
@@ -447,6 +478,11 @@ struct SyncView: View {
 
     /// 获取特定数据类型的同步状态
     private func getDataTypeStatus(_ dataType: DataType) -> DataTypeStatus {
+        // 检查系统事件是否被忽略
+        if dataType == .systemEvents && !syncManager.syncSystemEvents {
+            return .ignored
+        }
+
         // 首先检查服务器是否可用
         if !isServerDataAvailable() {
             return .serverUnavailable
@@ -571,6 +607,19 @@ struct SyncView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                }
+
+                HStack(spacing: 20) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "minus.circle")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        Text("忽略变更")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
                 }
             }
         }
@@ -768,30 +817,33 @@ struct SyncView: View {
             if let workspace = syncManager.syncWorkspace {
                 VStack(alignment: .leading, spacing: 12) {
                     // 本地变更
-                    if workspace.hasChanges {
+                    let localChanges = filterSystemEventsIfNeeded(workspace.staged + workspace.unstaged)
+                    if !localChanges.isEmpty {
                         differenceSection(
                             title: "本地变更",
-                            items: workspace.staged + workspace.unstaged,
+                            items: localChanges,
                             color: .orange,
                             icon: "arrow.up.circle"
                         )
                     }
 
                     // 远程变更
-                    if workspace.hasRemoteChanges {
+                    let remoteChanges = filterSystemEventsIfNeeded(workspace.remoteChanges)
+                    if !remoteChanges.isEmpty {
                         differenceSection(
                             title: "远程变更",
-                            items: workspace.remoteChanges,
+                            items: remoteChanges,
                             color: .blue,
                             icon: "arrow.down.circle"
                         )
                     }
 
                     // 冲突
-                    if workspace.hasConflicts {
+                    let conflicts = filterSystemEventsIfNeeded(workspace.conflicts)
+                    if !conflicts.isEmpty {
                         differenceSection(
                             title: "冲突项目",
-                            items: workspace.conflicts,
+                            items: conflicts,
                             color: .red,
                             icon: "exclamationmark.triangle"
                         )
@@ -1081,6 +1133,15 @@ struct SyncView: View {
     }
 
     // MARK: - 辅助方法
+
+    /// 根据设置过滤系统事件
+    private func filterSystemEventsIfNeeded(_ items: [WorkspaceItem]) -> [WorkspaceItem] {
+        if syncManager.syncSystemEvents {
+            return items
+        } else {
+            return items.filter { $0.type != .systemEvent }
+        }
+    }
 
     /// 刷新所有数据
     private func refreshAllData() {

@@ -121,6 +121,10 @@ class SyncManager: ObservableObject {
     private let deviceUUIDKey = "DeviceUUID"
     private let lastSyncTimestampKey = "LastSyncTimestamp"
     private let serverURLKey = "ServerURL"
+    private let syncSystemEventsKey = "SyncSystemEvents"
+
+    // 同步设置
+    @Published var syncSystemEvents: Bool = true
     
     init(serverURL: String) {
         self.apiClient = APIClient(baseURL: serverURL)
@@ -140,6 +144,9 @@ class SyncManager: ObservableObject {
 
         // 加载服务器URL
         self.serverURL = userDefaults.string(forKey: serverURLKey) ?? serverURL
+
+        // 加载同步系统事件设置（默认为true）
+        self.syncSystemEvents = userDefaults.object(forKey: syncSystemEventsKey) as? Bool ?? true
 
         setupAutoSync()
 
@@ -617,13 +624,15 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 收集系统事件变更
+        // 收集系统事件变更（仅在启用同步系统事件时）
         var createdSystemEvents: [ServerSystemEvent] = []
-        let systemEvents = SystemEventStore.shared.events
-        for systemEvent in systemEvents {
-            if systemEvent.timestamp > lastSyncDate {
-                let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
-                createdSystemEvents.append(serverSystemEvent)
+        if syncSystemEvents {
+            let systemEvents = SystemEventStore.shared.events
+            for systemEvent in systemEvents {
+                if systemEvent.timestamp > lastSyncDate {
+                    let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
+                    createdSystemEvents.append(serverSystemEvent)
+                }
             }
         }
 
@@ -767,6 +776,9 @@ class SyncManager: ObservableObject {
 
     /// 应用系统事件数据
     private func applySystemEvents(_ serverSystemEvents: [ServerSystemEvent], mode: SyncMode) async {
+        // 如果禁用了系统事件同步，则跳过应用系统事件
+        guard syncSystemEvents else { return }
+
         let systemEventStore = SystemEventStore.shared
 
         DispatchQueue.main.async {
@@ -1093,19 +1105,21 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 2. 分析系统事件变更
-        let systemEvents = SystemEventStore.shared.events
-        for systemEvent in systemEvents {
-            if systemEvent.timestamp > lastSyncDate {
-                let item = WorkspaceItem(
-                    id: systemEvent.id.uuidString,
-                    type: .systemEvent,
-                    status: .added,
-                    title: systemEvent.type.displayName,
-                    description: "系统活动 - \(systemEvent.type.displayName)",
-                    timestamp: systemEvent.timestamp
-                )
-                staged.append(item)
+        // 2. 分析系统事件变更（仅在启用同步系统事件时）
+        if syncSystemEvents {
+            let systemEvents = SystemEventStore.shared.events
+            for systemEvent in systemEvents {
+                if systemEvent.timestamp > lastSyncDate {
+                    let item = WorkspaceItem(
+                        id: systemEvent.id.uuidString,
+                        type: .systemEvent,
+                        status: .added,
+                        title: systemEvent.type.displayName,
+                        description: "系统活动 - \(systemEvent.type.displayName)",
+                        timestamp: systemEvent.timestamp
+                    )
+                    staged.append(item)
+                }
             }
         }
 
@@ -1319,6 +1333,12 @@ class SyncManager: ObservableObject {
         userDefaults.set(url, forKey: serverURLKey)
     }
 
+    /// 更新同步系统事件设置
+    func updateSyncSystemEvents(_ enabled: Bool) {
+        syncSystemEvents = enabled
+        userDefaults.set(enabled, forKey: syncSystemEventsKey)
+    }
+
     /// 获取待同步数据数量
     func updatePendingSyncCount() {
         Task {
@@ -1343,11 +1363,13 @@ class SyncManager: ObservableObject {
             }.count
         }
 
-        // 计算待同步的系统事件
-        let systemEvents = SystemEventStore.shared.events
-        count += systemEvents.filter { event in
-            return event.timestamp > lastSyncDate
-        }.count
+        // 计算待同步的系统事件（仅在启用同步系统事件时）
+        if syncSystemEvents {
+            let systemEvents = SystemEventStore.shared.events
+            count += systemEvents.filter { event in
+                return event.timestamp > lastSyncDate
+            }.count
+        }
 
         // 计算待同步的设置变更
         if let timerModel = timerModel {

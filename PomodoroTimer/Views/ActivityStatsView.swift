@@ -12,6 +12,7 @@ struct ActivityStatsView: View {
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @State private var selectedDate = Date()
     @State private var selectedTab = 0
+    @State private var refreshTrigger = UUID() // 用于强制刷新数据
 
     var body: some View {
         // 内容区域
@@ -30,6 +31,20 @@ struct ActivityStatsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            refreshData()
+        }
+        .onChange(of: selectedDate) { _ in
+            refreshData()
+        }
+        .onReceive(activityMonitor.$isMonitoring) { _ in
+            // 当监控状态改变时刷新数据
+            refreshData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // 当应用重新激活时刷新数据
+            refreshData()
+        }
         .toolbar {
             // 左侧：Tab选项卡 Picker
             ToolbarItem(placement: .principal) {
@@ -97,6 +112,19 @@ struct ActivityStatsView: View {
         }
     }
 
+    // MARK: - 数据刷新方法
+
+    private func refreshData() {
+        // 触发数据刷新
+        refreshTrigger = UUID()
+
+        // 强制重新计算时间轴事件
+        DispatchQueue.main.async {
+            // 这里可以添加其他需要刷新的数据逻辑
+            print("Activity data refreshed for date: \(selectedDate)")
+        }
+    }
+
 
 
     // MARK: - 概览标签页
@@ -126,12 +154,12 @@ struct ActivityStatsView: View {
                             color: .orange
                         )
 
-                        StatCard(
-                            title: "网站访问",
-                            value: "\(overview.websiteVisits)",
-                            icon: "globe",
-                            color: .green
-                        )
+                        // StatCard(
+                        //     title: "网站访问",
+                        //     value: "\(overview.websiteVisits)",
+                        //     icon: "globe",
+                        //     color: .green
+                        // )
                     }
                 }
                 .padding()
@@ -141,8 +169,8 @@ struct ActivityStatsView: View {
                 // 快速应用统计
                 quickAppStats
 
-                // 快速网站统计
-                quickWebsiteStats
+                // // 快速网站统计
+                // quickWebsiteStats
             }
             .padding()
         }
@@ -155,12 +183,24 @@ struct ActivityStatsView: View {
             VStack(spacing: 16) {
                 let timelineEvents = generateTimelineEvents()
                 if timelineEvents.isEmpty {
-                    Text("暂无时间轴数据")
-                        .foregroundColor(.secondary)
-                        .padding()
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+
+                        Text("暂无时间轴数据")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+
+                        Text("请确保活动监控已开启，并且有应用使用记录")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
                 } else {
                     // 真实时间轴视图
-                    AppTimelineView(events: timelineEvents)
+                    AppTimelineView(events: timelineEvents, refreshTrigger: refreshTrigger)
                 }
             }
             .padding(.vertical)
@@ -246,7 +286,7 @@ struct ActivityStatsView: View {
             Text("热门应用")
                 .font(.headline)
 
-            let topApps = Array(activityMonitor.getAppUsageStats(for: selectedDate).prefix(3))
+            let topApps = Array(activityMonitor.getAppUsageStats(for: selectedDate).prefix(10))
 
             if topApps.isEmpty {
                 Text("暂无数据")
@@ -455,51 +495,181 @@ struct ActivityStatsView: View {
         return timelineData
     }
 
-    // MARK: - 新的时间轴事件生成
+    // MARK: - 时间轴事件生成（基于真实系统事件）
 
     private func generateTimelineEvents() -> [AppTimelineEvent] {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: selectedDate)
-        let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
+        // 直接从 ActivityMonitorManager 获取指定日期的真实系统事件
+        let systemEvents = activityMonitor.getSystemEvents(for: selectedDate)
+
+        print("Debug: Found \(systemEvents.count) system events for \(selectedDate)")
+
+        // 如果没有系统事件，尝试从应用统计数据生成简化的时间轴
+        if systemEvents.isEmpty {
+            return generateFallbackTimelineEvents()
+        }
 
         var events: [AppTimelineEvent] = []
-        let currentTime = calendar.date(byAdding: .hour, value: 8, to: startOfDay) ?? startOfDay // 从早上8点开始
+        var currentApp: String?
+        var appStartTime: Date?
 
-        // 模拟应用切换事件（实际应用中应该从真实的系统事件获取）
-        for (index, stat) in appStats.enumerated() {
-            let averageSessionDuration = stat.totalTime / Double(max(stat.activationCount, 1))
-            let sessionDuration = min(averageSessionDuration, 7200) // 每次使用最多2小时
+        // 按时间顺序处理系统事件
+        let sortedEvents = systemEvents.sorted { $0.timestamp < $1.timestamp }
 
-            for session in 0..<min(stat.activationCount, 8) { // 最多显示8个会话
-                // 更真实的时间分布
-                let randomOffset = Int.random(in: 0...120) // 随机偏移0-2小时
-                let baseTime = calendar.date(byAdding: .minute, value: index * 45 + session * 90 + randomOffset, to: currentTime) ?? currentTime
+        for event in sortedEvents {
+            switch event.type {
+            case .appActivated:
+                // 获取当前事件的应用名称
+                guard let eventAppName = event.appName else { break }
 
-                // 确保时间在当天范围内
-                let endOfDay = calendar.date(byAdding: .hour, value: 22, to: startOfDay) ?? startOfDay
-                guard baseTime < endOfDay else { break }
-
-                let startTime = baseTime
-                let endTime = min(
-                    calendar.date(byAdding: .second, value: Int(sessionDuration), to: startTime) ?? startTime,
-                    endOfDay
-                )
-
-                let actualDuration = endTime.timeIntervalSince(startTime)
-
-                if actualDuration > 60 { // 只显示超过1分钟的会话
-                    events.append(AppTimelineEvent(
-                        appName: stat.appName,
-                        startTime: startTime,
-                        endTime: endTime,
-                        duration: actualDuration
-                    ))
+                // 如果是同一个应用的重复激活事件，跳过处理
+                if currentApp == eventAppName {
+                    break
                 }
+
+                // 结束上一个应用的使用记录
+                if let lastApp = currentApp,
+                   let startTime = appStartTime {
+
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+
+                    // 只记录使用时间超过10秒的应用会话
+                    if duration > 10 {
+                        events.append(AppTimelineEvent(
+                            appName: lastApp,
+                            startTime: startTime,
+                            endTime: event.timestamp,
+                            duration: duration
+                        ))
+                    }
+                }
+
+                // 开始新应用的使用记录（只有当应用真正切换时）
+                currentApp = eventAppName
+                appStartTime = event.timestamp
+
+            case .appTerminated:
+                // 如果终止的是当前应用，结束其使用记录
+                if let appName = event.appName,
+                   appName == currentApp,
+                   let startTime = appStartTime {
+
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+
+                    if duration > 10 {
+                        events.append(AppTimelineEvent(
+                            appName: appName,
+                            startTime: startTime,
+                            endTime: event.timestamp,
+                            duration: duration
+                        ))
+                    }
+
+                    currentApp = nil
+                    appStartTime = nil
+                }
+
+            case .systemSleep:
+                // 系统休眠时结束当前应用记录
+                if let lastApp = currentApp,
+                   let startTime = appStartTime {
+
+                    let duration = event.timestamp.timeIntervalSince(startTime)
+
+                    if duration > 10 {
+                        events.append(AppTimelineEvent(
+                            appName: lastApp,
+                            startTime: startTime,
+                            endTime: event.timestamp,
+                            duration: duration
+                        ))
+                    }
+
+                    currentApp = nil
+                    appStartTime = nil
+                }
+
+            default:
+                break
             }
         }
 
-        // 按开始时间排序
-        return events.sorted { $0.startTime < $1.startTime }
+        // 处理仍在运行的应用（如果是今天的数据）
+        let calendar = Calendar.current
+        if calendar.isDateInToday(selectedDate),
+           let lastApp = currentApp,
+           let startTime = appStartTime {
+
+            let now = Date()
+            let duration = now.timeIntervalSince(startTime)
+
+            if duration > 10 {
+                events.append(AppTimelineEvent(
+                    appName: lastApp,
+                    startTime: startTime,
+                    endTime: now,
+                    duration: duration
+                ))
+            }
+        }
+
+        print("Debug: Generated \(events.count) timeline events from system events")
+
+        // 按开始时间排序并去重
+        let finalSortedEvents = events.sorted { $0.startTime < $1.startTime }
+        return removeDuplicateEvents(finalSortedEvents)
+    }
+
+    // 备用时间轴生成方法（当没有系统事件时使用）
+    private func generateFallbackTimelineEvents() -> [AppTimelineEvent] {
+        let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
+
+        print("Debug: Using fallback method with \(appStats.count) app stats")
+
+        guard !appStats.isEmpty else { return [] }
+
+        var events: [AppTimelineEvent] = []
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: selectedDate)
+
+        // 为每个应用创建一个简化的使用记录
+        var currentTime = calendar.date(byAdding: .hour, value: 9, to: startOfDay) ?? startOfDay
+
+        for stat in appStats.sorted(by: { $0.totalTime > $1.totalTime }) {
+            let duration = min(stat.totalTime, 3600) // 最多1小时
+            let endTime = calendar.date(byAdding: .second, value: Int(duration), to: currentTime) ?? currentTime
+
+            events.append(AppTimelineEvent(
+                appName: stat.appName,
+                startTime: currentTime,
+                endTime: endTime,
+                duration: duration
+            ))
+
+            // 下一个应用开始时间（添加5分钟间隔）
+            currentTime = calendar.date(byAdding: .minute, value: 5, to: endTime) ?? endTime
+        }
+
+        return events
+    }
+
+    // 去除重复或重叠的事件
+    private func removeDuplicateEvents(_ events: [AppTimelineEvent]) -> [AppTimelineEvent] {
+        var filteredEvents: [AppTimelineEvent] = []
+
+        for event in events {
+            // 检查是否与已有事件重叠
+            let hasOverlap = filteredEvents.contains { existingEvent in
+                // 检查时间重叠
+                let overlap = max(0, min(event.endTime, existingEvent.endTime).timeIntervalSince(max(event.startTime, existingEvent.startTime)))
+                return overlap > 5 && event.appName == existingEvent.appName
+            }
+
+            if !hasOverlap {
+                filteredEvents.append(event)
+            }
+        }
+
+        return filteredEvents
     }
 }
 
@@ -969,37 +1139,132 @@ struct HourDetailView: View {
 
 struct AppTimelineView: View {
     let events: [AppTimelineEvent]
+    let refreshTrigger: UUID?
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // 时间轴说明
-                HStack {
-                    Text("应用切换时间轴")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+            VStack(spacing: 20) {
+                // 时间轴标题和统计信息
+                timelineHeader
 
-                    Spacer()
+                if !events.isEmpty {
+                    // 时间范围显示
+                    timeRangeInfo
 
-                    Text("共 \(events.count) 个使用记录")
+                    // 时间序列时间轴
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(events.enumerated()), id: \.offset) { index, event in
+                            TimelineEventRow(
+                                event: event,
+                                isFirst: index == 0,
+                                isLast: index == events.count - 1,
+                                previousEvent: index > 0 ? events[index - 1] : nil
+                            )
+                        }
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+        .id(refreshTrigger ?? UUID()) // 使用refreshTrigger强制刷新
+    }
+
+    private var timelineHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("应用使用时间轴")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("按时间顺序显示应用切换记录")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(events.count) 个记录")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                if !events.isEmpty {
+                    let totalDuration = events.reduce(0) { $0 + $1.duration }
+                    Text("总计 \(formatDuration(totalDuration))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal)
+            }
+        }
+        .padding(.horizontal)
+    }
 
-                // 时间序列时间轴
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(events.enumerated()), id: \.offset) { index, event in
-                        TimelineEventRow(
-                            event: event,
-                            isFirst: index == 0,
-                            isLast: index == events.count - 1
-                        )
+    private var timeRangeInfo: some View {
+        Group {
+            if let firstEvent = events.first, let lastEvent = events.last {
+                HStack {
+                    Label {
+                        Text(formatEventTime(firstEvent))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } icon: {
+                        Image(systemName: "clock")
+                            .foregroundColor(.green)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+
+                    Spacer()
+
+                    Label {
+                        Text(formatEventTime(lastEvent, showEndTime: true))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } icon: {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.red)
                     }
                 }
                 .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+                .padding(.horizontal)
             }
-            .padding(.vertical)
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let totalMinutes = Int(duration) / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours > 0 {
+            return "\(hours)h\(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+
+    private func formatEventTime(_ event: AppTimelineEvent, showEndTime: Bool = false) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+
+        if showEndTime {
+            return formatter.string(from: event.endTime)
+        } else {
+            return formatter.string(from: event.startTime)
         }
     }
 
@@ -1011,68 +1276,130 @@ struct TimelineEventRow: View {
     let event: AppTimelineEvent
     let isFirst: Bool
     let isLast: Bool
+    let previousEvent: AppTimelineEvent?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // 左侧时间轴线和图标
-            VStack(spacing: 0) {
-                // 上方连接线
-                if !isFirst {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 2, height: 12)
-                }
-
-                // 应用图标
-                Circle()
-                    .fill(appColor(for: event.appName))
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Text(String(event.appName.prefix(1)).uppercased())
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                    )
-
-                // 下方连接线
-                if !isLast {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 2)
-                        .frame(minHeight: 20)
-                }
+        VStack(spacing: 0) {
+            // 显示时间间隔（如果有前一个事件）
+            if let prevEvent = previousEvent {
+                timeGapIndicator(from: prevEvent.endTime, to: event.startTime)
             }
 
-            // 右侧内容
-            VStack(alignment: .leading, spacing: 6) {
-                // 应用名称和操作描述
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(event.appName)
-                        .font(.system(size: 15, weight: .semibold))
+            // 主要事件行
+            HStack(alignment: .center, spacing: 16) {
+                // 左侧时间信息
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatTime(event.startTime))
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundColor(.primary)
 
-                    Text("使用了")
-                        .font(.system(size: 14))
+                    Text(formatTime(event.endTime))
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundColor(.secondary)
+                }
+                .frame(width: 60)
 
-                    Text(formatDuration(event.duration))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.primary)
+                // 中间时间轴指示器
+                VStack(spacing: 0) {
+                    // 上方连接线
+                    if !isFirst {
+                        Rectangle()
+                            .fill(appColor(for: event.appName).opacity(0.3))
+                            .frame(width: 3, height: 8)
+                    }
+
+                    // 应用图标
+                    Circle()
+                        .fill(appColor(for: event.appName))
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Text(String(event.appName.prefix(1)).uppercased())
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .shadow(color: appColor(for: event.appName).opacity(0.3), radius: 2, x: 0, y: 1)
+
+                    // 下方连接线
+                    if !isLast {
+                        Rectangle()
+                            .fill(appColor(for: event.appName).opacity(0.3))
+                            .frame(width: 3, height: 8)
+                    }
+                }
+
+                // 右侧应用信息和持续时间
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(event.appName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        // 持续时间标签
+                        Text(formatDuration(event.duration))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(appColor(for: event.appName))
+                            )
+                    }
+
+                    // 时间范围
+                    Text("\(formatTime(event.startTime)) - \(formatTime(event.endTime))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(appColor(for: event.appName).opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(appColor(for: event.appName).opacity(0.2), lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 12)
+        }
+    }
+
+    // 时间间隔指示器
+    private func timeGapIndicator(from endTime: Date, to startTime: Date) -> some View {
+        let gap = startTime.timeIntervalSince(endTime)
+
+        return Group {
+            if gap > 60 { // 只显示超过1分钟的间隔
+                HStack {
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+
+                        Text("间隔 \(formatDuration(gap))")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.1))
+                    )
 
                     Spacer()
                 }
-
-                // 时间信息
-                Text(formatEventTime(event))
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-
-                Spacer()
-                    .frame(height: 12)
+                .padding(.vertical, 4)
             }
-            .padding(.top, 2)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 6)
     }
 
     private func appColor(for appName: String) -> Color {
@@ -1081,22 +1408,35 @@ struct TimelineEventRow: View {
         return colors[abs(hash) % colors.count]
     }
 
-    private func formatEventTime(_ event: AppTimelineEvent) -> String {
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func formatEventTime(_ event: AppTimelineEvent, showEndTime: Bool = false) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM-dd HH:mm"
-        let startTime = formatter.string(from: event.startTime)
-        return startTime
+
+        if showEndTime {
+            return formatter.string(from: event.endTime)
+        } else {
+            return formatter.string(from: event.startTime)
+        }
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
+        let totalMinutes = Int(duration) / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        let seconds = Int(duration) % 60
 
         if hours > 0 {
-            return "\(hours)小时\(remainingMinutes)分钟"
+            return "\(hours)h\(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m\(seconds)s"
         } else {
-            return "\(minutes)分钟"
+            return "\(seconds)s"
         }
     }
 }

@@ -7,81 +7,49 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "D6DD6D06-BB7A-486A-8AD3-E1A041F1E18F"
+            uuid = "92DF1591-76DF-4E3C-83A0-23BDF81630F6"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/SyncView.swift"
+            filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "110"
-            endingLineNumber = "110"
-            landmarkName = "body"
+            startingLineNumber = "203"
+            endingLineNumber = "203"
+            landmarkName = "timelineTab"
             landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "68F01331-CC58-4C61-B57F-471418AF08E5"
+            uuid = "BF6D15F4-284B-4EF4-81B1-EA2DAA5EBCB1"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/SyncView.swift"
+            filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "619"
-            endingLineNumber = "619"
-            landmarkName = "syncHistorySection"
+            startingLineNumber = "184"
+            endingLineNumber = "184"
+            landmarkName = "timelineTab"
             landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "ED62CE7E-8DF9-4E58-BAC6-C6C672BEADEE"
+            uuid = "2D87F6A5-07C9-469C-BAE7-51F59171B117"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/SyncView.swift"
+            filePath = "PomodoroTimer/Views/ActivityStatsView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1133"
-            endingLineNumber = "1133"
-            landmarkName = "getComparisonIcon()"
+            startingLineNumber = "519"
+            endingLineNumber = "519"
+            landmarkName = "generateTimelineEvents()"
             landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "8BFE90D7-BF7D-4AEB-A7BE-C9ECA187DC98"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Views/CalendarView.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "90"
-            endingLineNumber = "90"
-            landmarkName = "previousPeriod()"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "1C358ED6-C8EF-442D-9DE6-C8A459939171"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "PomodoroTimer/Managers/ActivityMonitorManager.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "44"
-            endingLineNumber = "44"
-            landmarkName = "PermissionStatus"
-            landmarkType = "13">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

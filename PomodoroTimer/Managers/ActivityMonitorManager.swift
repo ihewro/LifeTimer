@@ -244,6 +244,16 @@ class ActivityMonitorManager: ObservableObject {
         #endif
     }
 
+    /// 获取指定日期的系统事件（用于时间轴生成）
+    func getSystemEvents(for date: Date) -> [SystemEvent] {
+        #if canImport(Cocoa)
+        return eventStore.getEvents(for: date)
+        #else
+        // iOS 版本返回空数组
+        return []
+        #endif
+    }
+
     /// 获取网站访问统计
     func getWebsiteStats(for date: Date = Date()) -> [WebsiteStats] {
         #if canImport(Cocoa)

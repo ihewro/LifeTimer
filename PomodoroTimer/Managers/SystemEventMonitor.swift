@@ -142,25 +142,31 @@ class SystemEventMonitor: ObservableObject {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
             return
         }
-        
+
         let appName = app.localizedName ?? "Unknown"
         let bundleIdentifier = app.bundleIdentifier ?? "unknown"
-        
+
+        // 如果是同一个应用的重复激活，跳过处理
+        if currentApp == appName {
+            print("跳过重复激活: \(appName)")
+            return
+        }
+
         // 记录上一个应用的使用时间
         recordCurrentAppUsage()
-        
+
         // 更新当前应用
         currentApp = appName
         lastActiveApp = appName
         appStartTime = Date()
-        
+
         // 记录应用激活事件
         eventStore.recordEvent(type: .appActivated, data: [
             "app": appName,
             "bundle_id": bundleIdentifier,
             "pid": "\(app.processIdentifier)"
         ])
-        
+
         print("应用激活: \(appName)")
     }
     
