@@ -51,19 +51,22 @@ struct ActivityStatsView: View {
                     }) {
                         Image(systemName: "chevron.left")
                     }
-                    .controlSize(.small)
-
-                    Button("今天") {
-                        selectedDate = Date()
-                    }
-                    .controlSize(.small)
-
                     Button(action: {
                         selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
                     }) {
                         Image(systemName: "chevron.right")
                     }
-                    .controlSize(.small)
+                    // 日期显示组件
+                    Text(formatSelectedDate(selectedDate))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+
+                    Button("今天") {
+                        selectedDate = Date()
+                    }
+                    .disabled(isToday(selectedDate))
+
                 }
             }
             // 中间：占位符确保 toolbar 铺满宽度
@@ -78,17 +81,17 @@ struct ActivityStatsView: View {
                             .fill(activityMonitor.isMonitoring ? Color.green : Color.red)
                             .frame(width: 6, height: 6)
 
-                        Text(activityMonitor.isMonitoring ? "监控中" : "未监控")
-                            .font(.caption)
+                        Text(activityMonitor.isMonitoring ? "" : "未监控")
+                            // .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     Button(activityMonitor.isMonitoring ? "停止" : "开始") {
                         activityMonitor.toggleMonitoring()
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    // .controlSize(.small)
+                    // .font(.caption)
                 }
             }
         }
@@ -151,21 +154,6 @@ struct ActivityStatsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 let timelineEvents = generateTimelineEvents()
-
-                // 日期标题
-                HStack {
-                    Text(formatDateTitle(selectedDate))
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
-                    Spacer()
-
-                    Text("应用切换时间轴")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-
                 if timelineEvents.isEmpty {
                     Text("暂无时间轴数据")
                         .foregroundColor(.secondary)
@@ -418,6 +406,16 @@ struct ActivityStatsView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy年MM月dd日"
         return formatter.string(from: date)
+    }
+
+    private func formatSelectedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM月dd日"
+        return formatter.string(from: date)
+    }
+
+    private func isToday(_ date: Date) -> Bool {
+        Calendar.current.isDate(date, inSameDayAs: Date())
     }
 
     // MARK: - 时间轴数据生成
