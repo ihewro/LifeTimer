@@ -53,6 +53,9 @@ class TimerModel: ObservableObject {
     // 音频管理器引用（用于计时器联动）
     weak var audioManager: AudioManager?
 
+    // 音效管理器引用
+    private let soundEffectManager = SoundEffectManager.shared
+
     // 设置
     @Published var pomodoroTime: TimeInterval = 25 * 60 { // 25分钟
         didSet {
@@ -222,6 +225,11 @@ class TimerModel: ObservableObject {
         case .singlePomodoro, .pureRest, .custom:
             if timeRemaining > 0 {
                 timeRemaining -= 1
+
+                // 番茄钟模式下，剩余1分钟时播放预警音效
+                if currentMode == .singlePomodoro && timeRemaining == 60 {
+                    soundEffectManager.playPomodoroOneMinuteWarning()
+                }
             } else {
                 completeTimer()
             }
@@ -234,6 +242,17 @@ class TimerModel: ObservableObject {
         timerState = .completed
         timer?.invalidate()
         timer = nil
+
+        // 播放完成音效
+        switch currentMode {
+        case .singlePomodoro:
+            soundEffectManager.playPomodoroCompleted()
+        case .pureRest:
+            soundEffectManager.playBreakCompleted()
+        case .custom, .countUp:
+            // 自定义模式和正计时模式不播放特定音效
+            break
+        }
 
         // 发送完成通知，包含会话信息
         let userInfo: [String: Any] = [

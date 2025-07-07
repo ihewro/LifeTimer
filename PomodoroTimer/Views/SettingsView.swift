@@ -78,6 +78,8 @@ struct SettingsView: View {
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
 
+    @StateObject private var soundEffectManager = SoundEffectManager.shared
+
     @State private var selectedTab = 0
 
     var body: some View {
@@ -218,6 +220,76 @@ struct SettingsView: View {
                             }
                             .padding(.horizontal, 20)
                         }
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 音效设置
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("音效设置")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 16) {
+                        // 自定义音效文件夹
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("自定义音效文件夹")
+                                Spacer()
+                                Button("选择") {
+                                    soundEffectManager.selectCustomSoundFolder()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+
+                            if !soundEffectManager.customSoundFolderPath.isEmpty {
+                                Text(soundEffectManager.customSoundFolderPath)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+
+                        Divider()
+                            .padding(.horizontal, 20)
+
+                        // 番茄钟1分钟预警音效
+                        SimpleSoundEffectSettingRow(
+                            title: "番茄钟1分钟预警",
+                            selectedSound: Binding(
+                                get: { soundEffectManager.pomodoroOneMinuteWarningSound },
+                                set: { soundEffectManager.pomodoroOneMinuteWarningSound = $0 }
+                            ),
+                            soundEffectManager: soundEffectManager
+                        )
+                        .padding(.horizontal, 20)
+
+                        // 番茄钟结束音效
+                        SimpleSoundEffectSettingRow(
+                            title: "番茄钟结束",
+                            selectedSound: Binding(
+                                get: { soundEffectManager.pomodoroCompletedSound },
+                                set: { soundEffectManager.pomodoroCompletedSound = $0 }
+                            ),
+                            soundEffectManager: soundEffectManager
+                        )
+                        .padding(.horizontal, 20)
+
+                        // 休息结束音效
+                        SimpleSoundEffectSettingRow(
+                            title: "休息结束",
+                            selectedSound: Binding(
+                                get: { soundEffectManager.breakCompletedSound },
+                                set: { soundEffectManager.breakCompletedSound = $0 }
+                            ),
+                            soundEffectManager: soundEffectManager
+                        )
+                        .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -720,4 +792,71 @@ struct StatisticsView: View {
         .environmentObject(AudioManager())
         .environmentObject(EventManager())
         .environmentObject(ActivityMonitorManager())
+}
+
+// MARK: - 音效设置行组件
+struct SoundEffectSettingRow: View {
+    let title: String
+    @Binding var isEnabled: Bool
+    let soundType: SoundEffectType
+    let soundEffectManager: SoundEffectManager
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+
+            // 预览按钮
+            Button("试听") {
+                soundEffectManager.previewSound(soundType)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            // 开关
+            Toggle("", isOn: $isEnabled)
+        }
+    }
+}
+
+// MARK: - 简化音效设置行组件
+struct SimpleSoundEffectSettingRow: View {
+    let title: String
+    @Binding var selectedSound: SoundSource
+    let soundEffectManager: SoundEffectManager
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+
+            Spacer()
+
+            // 音效选择下拉菜单
+            Picker("选择音效", selection: $selectedSound) {
+                // 无音效选项
+                Text("无").tag(SoundSource.none)
+
+                // 系统音效分组
+                Section("系统音效") {
+                    ForEach(SystemSoundOption.availableSystemSounds) { option in
+                        Text(option.name)
+                            .tag(SoundSource.system(option))
+                    }
+                }
+
+                // 自定义音效分组
+                if !soundEffectManager.customSounds.isEmpty {
+                    Section("自定义音效") {
+                        ForEach(soundEffectManager.customSounds) { file in
+                            Text(file.name)
+                                .tag(SoundSource.custom(file))
+                        }
+                    }
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: 200)
+        }
+    }
 }
