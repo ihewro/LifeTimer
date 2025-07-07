@@ -13,44 +13,46 @@ import AppKit
 /// 用户认证界面
 struct AuthenticationView: View {
     @StateObject private var authManager: AuthManager
-    @StateObject private var migrationManager: MigrationManager
     @State private var userUUID: String = ""
     @State private var showingUserUUIDInput = false
-    @State private var showingMigrationAlert = false
     @State private var authError: String?
-    
-    init(authManager: AuthManager, migrationManager: MigrationManager) {
+    @State private var serverURL: String = ""
+    @State private var showingServerConfig = false
+    @Environment(\.dismiss) private var dismiss
+
+    init(authManager: AuthManager) {
         self._authManager = StateObject(wrappedValue: authManager)
-        self._migrationManager = StateObject(wrappedValue: migrationManager)
     }
     
     var body: some View {
         VStack(spacing: 24) {
+            // 顶部工具栏
+            topToolbarSection
+
             // 标题区域
             headerSection
-            
+
+            // 服务器配置区域
+            serverConfigSection
+
             // 认证状态显示
             authStatusSection
-            
-            // 迁移状态显示
-            if migrationManager.migrationStatus == .required {
-                migrationSection
-            }
-            
+
             // 认证操作区域
             if !authManager.isAuthenticated {
                 authActionsSection
             } else {
                 userInfoSection
             }
-            
+
             Spacer()
         }
         .padding()
         .frame(maxWidth: 500)
         .onAppear {
-            checkInitialState()
+            loadServerURL()
         }
+
         .alert("认证错误", isPresented: .constant(authError != nil)) {
             Button("确定") {
                 authError = nil
@@ -67,25 +69,79 @@ struct AuthenticationView: View {
                 }
             }
         }
-        .alert("数据迁移", isPresented: $showingMigrationAlert) {
-            Button("自动迁移") {
-                Task {
-                    await migrationManager.performAutoMigration()
-                }
-            }
-            Button("手动迁移") {
-                showingUserUUIDInput = true
-            }
-            Button("跳过", role: .destructive) {
-                migrationManager.skipMigration()
-            }
-        } message: {
-            Text("检测到旧版本数据，是否要迁移到新的用户账户系统？")
-        }
+
     }
     
     // MARK: - View Components
-    
+
+    private var topToolbarSection: some View {
+        HStack {
+            Spacer()
+
+            Button(action: {
+                dismiss()
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("关闭")
+        }
+    }
+
+    private var serverConfigSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "server.rack")
+                    .foregroundColor(.blue)
+                Text("服务器配置")
+                    .font(.headline)
+                Spacer()
+
+                Button(action: {
+                    showingServerConfig.toggle()
+                }) {
+                    Image(systemName: showingServerConfig ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showingServerConfig {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("服务器地址:")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+
+                    HStack {
+                        TextField("http://localhost:8080", text: $serverURL)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.monospaced(.body)())
+
+                        Button("保存") {
+                            saveServerURL()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(serverURL.isEmpty)
+                    }
+
+                    Text("请输入同步服务器的完整地址，例如：http://192.168.1.100:8080")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding()
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+
     private var headerSection: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.circle.fill")
@@ -150,95 +206,7 @@ struct AuthenticationView: View {
         }
     }
     
-    private var migrationSection: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "arrow.up.circle.fill")
-                    .foregroundColor(.blue)
-                Text("数据迁移")
-                    .font(.headline)
-                Spacer()
-            }
-            
-            switch migrationManager.migrationStatus {
-            case .required:
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("检测到旧版本数据需要迁移")
-                        .font(.subheadline)
-                    
-                    HStack {
-                        Button("自动迁移") {
-                            Task {
-                                await migrationManager.performAutoMigration()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        
-                        Button("手动迁移") {
-                            showingUserUUIDInput = true
-                        }
-                        .buttonStyle(.bordered)
-                        
-                        Button("跳过") {
-                            migrationManager.skipMigration()
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.secondary)
-                    }
-                }
-                
-            case .inProgress:
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text(migrationManager.migrationMessage)
-                            .font(.subheadline)
-                    }
-                    
-                    ProgressView(value: migrationManager.migrationProgress)
-                        .progressViewStyle(LinearProgressViewStyle())
-                }
-                
-            case .completed:
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("迁移完成")
-                        .font(.subheadline)
-                        .foregroundColor(.green)
-                }
-                
-            case .failed(let error):
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.red)
-                        Text("迁移失败")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                    }
-                    
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Button("重试") {
-                        Task {
-                            await migrationManager.performAutoMigration()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                
-            default:
-                EmptyView()
-            }
-        }
-        .padding()
-        .background(Color(.controlBackgroundColor))
-        .cornerRadius(8)
-    }
+
     
     private var authActionsSection: some View {
         VStack(spacing: 16) {
@@ -315,12 +283,7 @@ struct AuthenticationView: View {
     
     // MARK: - Actions
     
-    private func checkInitialState() {
-        // 检查是否需要迁移
-        if migrationManager.migrationStatus == .required {
-            showingMigrationAlert = true
-        }
-    }
+
     
     private func initializeAsNewUser() async {
         do {
@@ -345,6 +308,42 @@ struct AuthenticationView: View {
         } catch {
             authError = error.localizedDescription
         }
+    }
+
+    // MARK: - Server Configuration Methods
+
+    private func loadServerURL() {
+        // 从 UserDefaults 加载服务器地址
+        let savedURL = UserDefaults.standard.string(forKey: "ServerURL") ?? "http://localhost:8080"
+        serverURL = savedURL
+    }
+
+    private func saveServerURL() {
+        // 验证URL格式
+        guard !serverURL.isEmpty else { return }
+
+        // 确保URL格式正确
+        var urlToSave = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !urlToSave.hasPrefix("http://") && !urlToSave.hasPrefix("https://") {
+            urlToSave = "http://" + urlToSave
+        }
+
+        // 移除末尾的斜杠
+        if urlToSave.hasSuffix("/") {
+            urlToSave = String(urlToSave.dropLast())
+        }
+
+        // 保存到 UserDefaults
+        UserDefaults.standard.set(urlToSave, forKey: "ServerURL")
+        serverURL = urlToSave
+
+        // 更新 AuthManager 的服务器地址
+        authManager.updateServerURL(urlToSave)
+
+        // 收起配置面板
+        showingServerConfig = false
+
+        print("✅ 服务器地址已保存: \(urlToSave)")
     }
 }
 

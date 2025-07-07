@@ -58,7 +58,7 @@ class Database {
     }
 
     private function initializeUserSystemTables() {
-        $schema = file_get_contents(__DIR__ . '/../database/user_schema.sql');
+        $schema = file_get_contents(__DIR__ . '/../database/schema.sql');
         if ($schema === false) {
             throw new Exception("Could not read user system schema file");
         }

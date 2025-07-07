@@ -144,6 +144,7 @@ function handleDeviceInit() {
                 'user_info' => [
                     'user_uuid' => $user['user_uuid'],
                     'user_name' => $user['user_name'],
+                    'email' => $user['email'],
                     'created_at' => $user['created_at']
                 ]
             ], 'Device initialized successfully');
@@ -167,6 +168,7 @@ function handleDeviceInit() {
                 'user_info' => [
                     'user_uuid' => $user['user_uuid'],
                     'user_name' => $user['user_name'],
+                    'email' => $user['email'],
                     'created_at' => $user['created_at']
                 ]
             ], 'Device initialized successfully');
@@ -238,6 +240,8 @@ function handleDeviceBind() {
             'user_data' => [
                 'user_uuid' => $user['user_uuid'],
                 'user_name' => $user['user_name'],
+                'email' => $user['email'],
+                'created_at' => $user['created_at'],
                 'device_count' => $deviceCount,
                 'last_sync_timestamp' => 0 // 新设备需要全量同步
             ]

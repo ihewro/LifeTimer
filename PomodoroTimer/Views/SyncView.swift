@@ -62,9 +62,7 @@ struct SyncView: View {
             }
         }
         .sheet(isPresented: $showingAuthView) {
-            if let migrationManager = createMigrationManager() {
-                AuthenticationView(authManager: authManager, migrationManager: migrationManager)
-            }
+            AuthenticationView(authManager: authManager)
         }
     }
 
@@ -2359,12 +2357,7 @@ extension SyncView {
 
     // MARK: - Helper Methods
 
-    private func createMigrationManager() -> MigrationManager? {
-        // 创建APIClient实例
-        let apiClient = APIClient(baseURL: syncManager.serverURL)
-        // 创建MigrationManager实例
-        return MigrationManager(authManager: authManager, apiClient: apiClient)
-    }
+
 
     private func formatTokenExpiry(_ date: Date) -> String {
         let formatter = DateFormatter()

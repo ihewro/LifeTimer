@@ -22,7 +22,7 @@ class AuthManager: ObservableObject {
     
     // MARK: - Private Properties
     private let userDefaults = UserDefaults.standard
-    private let apiClient: APIClient
+    private var apiClient: APIClient
     
     // UserDefaults Keys
     private let userUUIDKey = "UserUUID"
@@ -35,7 +35,7 @@ class AuthManager: ObservableObject {
     private let deviceUUID: String
     
     // MARK: - Initialization
-    init(serverURL: String) {
+    init(serverURL: String? = nil) {
         // 获取或生成设备UUID
         if let existingUUID = userDefaults.string(forKey: deviceUUIDKey) {
             self.deviceUUID = existingUUID
@@ -43,9 +43,14 @@ class AuthManager: ObservableObject {
             self.deviceUUID = UUID().uuidString
             userDefaults.set(self.deviceUUID, forKey: deviceUUIDKey)
         }
-        
-        self.apiClient = APIClient(baseURL: serverURL)
-        
+
+        // 使用传入的URL或从UserDefaults读取，默认为localhost
+        let finalServerURL = serverURL ??
+                            userDefaults.string(forKey: "ServerURL") ??
+                            "http://localhost:8080"
+
+        self.apiClient = APIClient(baseURL: finalServerURL)
+
         // 加载存储的认证信息
         loadStoredCredentials()
         
@@ -296,6 +301,40 @@ class AuthManager: ObservableObject {
             return Date()
         }
     }
+
+    // MARK: - Server Configuration
+
+    /// 更新服务器URL
+    func updateServerURL(_ newURL: String) {
+        // 创建新的 APIClient 实例
+        self.apiClient = APIClient(baseURL: newURL)
+
+        // 保存新的服务器地址到 UserDefaults
+        userDefaults.set(newURL, forKey: "ServerURL")
+
+        print("📡 服务器地址已更新为: \(newURL)")
+
+        // 清除当前认证状态，因为新服务器可能需要重新认证
+        clearAuthenticationState()
+    }
+
+    /// 清除认证状态
+    private func clearAuthenticationState() {
+        DispatchQueue.main.async {
+            self.isAuthenticated = false
+            self.currentUser = nil
+            self.sessionToken = nil
+            self.tokenExpiresAt = nil
+            self.authStatus = .notAuthenticated
+        }
+
+        // 清除存储的认证信息
+        userDefaults.removeObject(forKey: sessionTokenKey)
+        userDefaults.removeObject(forKey: tokenExpiresAtKey)
+        userDefaults.removeObject(forKey: userInfoKey)
+
+        print("🔄 认证状态已清除，请重新认证")
+    }
 }
 
 // MARK: - Supporting Types
@@ -321,6 +360,7 @@ enum AuthStatus: Equatable {
             return false
         }
     }
+
 }
 
 /// 认证结果

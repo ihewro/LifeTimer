@@ -96,11 +96,7 @@ class APIClient {
         return try await performAuthenticatedRequest(url: url, method: "POST", body: request, token: token)
     }
 
-    /// 数据迁移
-    func performMigration(_ request: MigrationRequest) async throws -> APIResponse<MigrationResult> {
-        let url = URL(string: "\(baseURL)/api/user/sync/migrate")!
-        return try await performRequest(url: url, method: "POST", body: request)
-    }
+
 
     // MARK: - Private Helper Methods
 

@@ -25,24 +25,21 @@ if (!str_starts_with($path, '/')) {
 
 // 路由映射
 $routes = [
-    // 传统设备注册
-    'POST /api/device/register' => 'api/device.php',
-
     // 用户认证系统
     'POST /api/auth/device-init' => 'api/auth.php',
     'POST /api/auth/device-bind' => 'api/auth.php',
-    'POST /api/auth/token-refresh' => 'api/auth.php',
+    'POST /api/auth/refresh' => 'api/auth.php',
     'POST /api/auth/logout' => 'api/auth.php',
-
-    // 同步API
-    'GET /api/sync/full' => 'api/sync.php',
-    'POST /api/sync/incremental' => 'api/sync.php',
-    'POST /api/sync/migrate' => 'api/sync_user.php',
 
     // 用户同步API
     'GET /api/user/sync/full' => 'api/sync_user.php',
     'POST /api/user/sync/incremental' => 'api/sync_user.php',
     'POST /api/user/sync/migrate' => 'api/sync_user.php',
+
+    // 用户管理API
+    'GET /api/user/profile' => 'api/user.php',
+    'GET /api/user/devices' => 'api/user.php',
+    'DELETE /api/user/devices' => 'api/user.php',
 
     // 统计和健康检查
     'GET /get_week_statistic' => 'statistic.php',
