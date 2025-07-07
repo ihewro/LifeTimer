@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import AudioToolbox
+import UserNotifications
 import AppKit
 
 // 音效类型枚举
@@ -110,6 +111,9 @@ private struct SoundSourceData: Codable {
 class SoundEffectManager: ObservableObject {
     static let shared = SoundEffectManager()
 
+    // 通知权限状态
+    @Published var notificationPermissionGranted: Bool = false
+
     // 音效选择设置
     @Published var pomodoroOneMinuteWarningSound: SoundSource = .system(SystemSoundOption.defaultFor(.pomodoroOneMinuteWarning)) {
         didSet {
@@ -157,6 +161,7 @@ class SoundEffectManager: ObservableObject {
     private init() {
         loadSettings()
         loadCustomSounds()
+        requestNotificationPermission()
     }
 
     // MARK: - 设置管理
@@ -528,5 +533,71 @@ class SoundEffectManager: ObservableObject {
         }
 
         return sounds
+    }
+
+    // MARK: - 通知管理
+
+    /// 请求通知权限
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                self.notificationPermissionGranted = granted
+                if let error = error {
+                    print("通知权限请求失败: \(error)")
+                }
+            }
+        }
+    }
+
+    /// 发送一分钟倒计时警告通知
+    func sendOneMinuteWarningNotification() {
+        guard notificationPermissionGranted else {
+            print("通知权限未授予，无法发送通知")
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "还有一分钟即将结束专注 ⚠️"
+        content.subtitle = "进行当前工作的收尾流程吧！"
+        content.sound = UNNotificationSound.default
+
+        // 立即发送通知
+        let request = UNNotificationRequest(
+            identifier: "pomodoro_one_minute_warning",
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送一分钟警告通知失败: \(error)")
+            }
+        }
+    }
+
+    /// 发送番茄钟完成通知
+    func sendPomodoroCompletedNotification() {
+        guard notificationPermissionGranted else {
+            print("通知权限未授予，无法发送通知")
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "番茄钟已完成 🍅"
+        content.subtitle = "恭喜完成一个专注时段！"
+        content.sound = UNNotificationSound.default
+
+        // 立即发送通知
+        let request = UNNotificationRequest(
+            identifier: "pomodoro_completed",
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送番茄钟完成通知失败: \(error)")
+            }
+        }
     }
 }

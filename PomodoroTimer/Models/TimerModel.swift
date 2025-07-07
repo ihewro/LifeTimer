@@ -56,7 +56,7 @@ class TimerModel: ObservableObject {
     // 音效管理器引用
     private let soundEffectManager = SoundEffectManager.shared
 
-    // 设置
+    // 设置（永久保存的默认值）
     @Published var pomodoroTime: TimeInterval = 25 * 60 { // 25分钟
         didSet {
             if pomodoroTime != oldValue {
@@ -90,6 +90,10 @@ class TimerModel: ObservableObject {
         }
     }
 
+    // 当前会话的临时时间设置（不会保存到设置中）
+    private var currentSessionPomodoroTime: TimeInterval?
+    private var currentSessionBreakTime: TimeInterval?
+
     // 自动休息设置
     @Published var autoStartBreak: Bool = false {
         didSet {
@@ -101,7 +105,7 @@ class TimerModel: ObservableObject {
     }
 
     // 跟踪是否是从番茄模式进入的休息
-    private var isBreakFromPomodoro: Bool = false
+    var isBreakFromPomodoro: Bool = false
 
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -124,11 +128,15 @@ class TimerModel: ObservableObject {
     private func setupTimer() {
         switch currentMode {
         case .singlePomodoro:
-            timeRemaining = pomodoroTime
-            totalTime = pomodoroTime
+            // 使用当前会话的临时时间，如果没有则使用默认设置
+            let sessionTime = currentSessionPomodoroTime ?? pomodoroTime
+            timeRemaining = sessionTime
+            totalTime = sessionTime
         case .pureRest:
-            timeRemaining = shortBreakTime
-            totalTime = shortBreakTime
+            // 使用当前会话的临时时间，如果没有则使用默认设置
+            let sessionTime = currentSessionBreakTime ?? shortBreakTime
+            timeRemaining = sessionTime
+            totalTime = sessionTime
         case .countUp:
             currentTime = 0
             totalTime = 0
@@ -186,25 +194,42 @@ class TimerModel: ObservableObject {
         resetTimer()
         currentMode = mode
         isBreakFromPomodoro = false // 重置标志
+        resetSessionTimes() // 重置临时时间设置
         setupTimer()
     }
 
     func setCustomTime(minutes: Int) {
         guard timerState == .idle else { return }
 
-        // 如果当前是番茄模式，只修改番茄时间设置，不切换到自定义模式
+        // 如果当前是番茄模式，只修改当前会话的临时时间，不影响永久设置
         if currentMode == .singlePomodoro {
-            pomodoroTime = TimeInterval(minutes * 60)
+            currentSessionPomodoroTime = TimeInterval(minutes * 60)
             setupTimer()
         } else if currentMode == .pureRest {
-            // 如果当前是休息模式，只修改休息时间设置
-            shortBreakTime = TimeInterval(minutes * 60)
+            // 如果当前是休息模式，只修改当前会话的临时时间，不影响永久设置
+            currentSessionBreakTime = TimeInterval(minutes * 60)
             setupTimer()
         } else {
             // 其他模式才切换到自定义模式
             currentMode = .custom(minutes: minutes)
             setupTimer()
         }
+    }
+
+    /// 重置当前会话的临时时间设置，回到默认设置
+    func resetSessionTimes() {
+        currentSessionPomodoroTime = nil
+        currentSessionBreakTime = nil
+    }
+
+    /// 获取当前实际使用的番茄钟时间（包括临时调整）
+    func getCurrentPomodoroTime() -> TimeInterval {
+        return currentSessionPomodoroTime ?? pomodoroTime
+    }
+
+    /// 获取当前实际使用的休息时间（包括临时调整）
+    func getCurrentBreakTime() -> TimeInterval {
+        return currentSessionBreakTime ?? shortBreakTime
     }
 
     func stopTimer() {
@@ -226,9 +251,10 @@ class TimerModel: ObservableObject {
             if timeRemaining > 0 {
                 timeRemaining -= 1
 
-                // 番茄钟模式下，剩余1分钟时播放预警音效
+                // 番茄钟模式下，剩余1分钟时播放预警音效和发送通知
                 if currentMode == .singlePomodoro && timeRemaining == 60 {
                     soundEffectManager.playPomodoroOneMinuteWarning()
+                    soundEffectManager.sendOneMinuteWarningNotification()
                 }
             } else {
                 completeTimer()
@@ -243,10 +269,14 @@ class TimerModel: ObservableObject {
         timer?.invalidate()
         timer = nil
 
-        // 播放完成音效
+        // 停止BGM音乐播放
+        audioManager?.stopTimerPlayback()
+
+        // 播放完成音效和发送通知
         switch currentMode {
         case .singlePomodoro:
             soundEffectManager.playPomodoroCompleted()
+            soundEffectManager.sendPomodoroCompletedNotification()
         case .pureRest:
             soundEffectManager.playBreakCompleted()
         case .custom, .countUp:
@@ -276,6 +306,13 @@ class TimerModel: ObservableObject {
                     self.returnToPomodoroMode()
                 }
             }
+        } else {
+            // 即使没有开启自动休息，休息完成后也应该回到番茄模式
+            if currentMode == .pureRest && isBreakFromPomodoro {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.returnToPomodoroMode()
+                }
+            }
         }
     }
 
@@ -291,10 +328,20 @@ class TimerModel: ObservableObject {
 
     // 回到番茄模式
     func returnToPomodoroMode() {
+        // 先停止当前计时器和清理状态
+        timer?.invalidate()
+        timer = nil
+
+        // 设置状态和模式
+        timerState = .idle
         isBreakFromPomodoro = false
         currentMode = .singlePomodoro
+
+        // 最后设置时间显示
         setupTimer()
-        timerState = .idle
+
+        // 停止音乐播放
+        audioManager?.stopTimerPlayback()
     }
 
     // 手动开始休息（用于"开始休息"按钮）
