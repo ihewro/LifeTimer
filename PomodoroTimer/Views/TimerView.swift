@@ -71,6 +71,17 @@ struct TimerView: View {
                         Button(action: {
                             // 正计时模式下不允许编辑时间
                             if timerModel.timerState == .idle && timerModel.currentMode != .countUp {
+                                // 根据当前模式获取对应的分钟数
+                                switch timerModel.currentMode {
+                                case .singlePomodoro:
+                                    editingMinutes = Int(timerModel.pomodoroTime / 60)
+                                case .pureRest:
+                                    editingMinutes = Int(timerModel.shortBreakTime / 60)
+                                case .custom(let minutes):
+                                    editingMinutes = minutes
+                                case .countUp:
+                                    break // 不应该到这里
+                                }
                                 showingTimeEditor = true
                             }
                         }) {
@@ -80,6 +91,12 @@ struct TimerView: View {
                                 .multilineTextAlignment(.center)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showingTimeEditor, arrowEdge: .bottom) {
+                            TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
+                                timerModel.setCustomTime(minutes: newMinutes)
+                                showingTimeEditor = false
+                            }
+                        }
 
                         // 其他信息显示区域（使用绝对定位，不影响时间居中）
                         VStack(spacing: 4) {
@@ -359,11 +376,7 @@ struct TimerView: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
-        .sheet(isPresented: $showingTimeEditor) {
-            TimeEditorView(minutes: $editingMinutes) { newMinutes in
-                timerModel.setCustomTime(minutes: newMinutes)
-            }
-        }
+
     }
     
     private var buttonText: String {
@@ -418,7 +431,114 @@ struct TimerView: View {
     }
 }
 
-// MARK: - 时间编辑器
+// MARK: - 时间编辑器 Popover
+struct TimeEditorPopoverView: View {
+    @Binding var minutes: Int
+    let onConfirm: (Int) -> Void
+    @State private var tempMinutes: Int
+    @State private var inputText: String
+    @FocusState private var isInputFocused: Bool
+
+    init(minutes: Binding<Int>, onConfirm: @escaping (Int) -> Void) {
+        self._minutes = minutes
+        self.onConfirm = onConfirm
+        self._tempMinutes = State(initialValue: minutes.wrappedValue)
+        self._inputText = State(initialValue: String(minutes.wrappedValue))
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // 当前时间显示
+            Text("\(tempMinutes) 分钟")
+                .font(.title2)
+                .fontWeight(.medium)
+
+            // 数字输入框和调整按钮
+            HStack(spacing: 8) {
+                // 数字输入框
+                TextField("分钟", text: $inputText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+                    .multilineTextAlignment(.center)
+                    .focused($isInputFocused)
+                    .onSubmit {
+                        validateAndUpdateMinutes()
+                    }
+                    .onChange(of: inputText) { newValue in
+                        // 实时验证输入
+                        if let value = Int(newValue), value >= 1, value <= 99 {
+                            tempMinutes = value
+                        }
+                    }
+
+                // 减少按钮
+                Button(action: {
+                    adjustMinutes(by: -1)
+                }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .frame(width: 28, height: 28)
+
+                // 增加按钮
+                Button(action: {
+                    adjustMinutes(by: 1)
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .frame(width: 28, height: 28)
+            }
+
+            // 按钮区域
+            HStack(spacing: 12) {
+                Button("取消") {
+                    // Popover 会自动关闭，不需要调用 dismiss
+                }
+                .controlSize(.small)
+
+                Button("确定") {
+                    validateAndUpdateMinutes()
+                    minutes = tempMinutes
+                    onConfirm(tempMinutes)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+        .padding(16)
+        .frame(width: 220)
+        .onAppear {
+            // 确保输入框显示正确的初始值
+            inputText = String(tempMinutes)
+        }
+    }
+
+    // 验证并更新分钟数
+    private func validateAndUpdateMinutes() {
+        if let value = Int(inputText) {
+            let clampedValue = max(1, min(99, value))
+            tempMinutes = clampedValue
+            inputText = String(clampedValue)
+        } else {
+            // 如果输入无效，恢复到当前值
+            inputText = String(tempMinutes)
+        }
+    }
+
+    // 调整分钟数
+    private func adjustMinutes(by delta: Int) {
+        let newValue = max(1, min(99, tempMinutes + delta))
+        tempMinutes = newValue
+        inputText = String(newValue)
+    }
+}
+
+// MARK: - 原时间编辑器（保留作为备用）
 struct TimeEditorView: View {
     @Binding var minutes: Int
     let onConfirm: (Int) -> Void
