@@ -85,6 +85,35 @@ struct ContentView: View {
         }
         .frame(minWidth: 800, minHeight: 600)
         .navigationTitle("")
+        // 添加快捷键支持
+        .background(
+            // 隐藏的按钮用于处理快捷键
+            VStack {
+                Button("Settings") { selectedView = .settings }
+                    .keyboardShortcut(",", modifiers: .command)
+                    .hidden()
+
+                Button("Timer") { selectedView = .timer }
+                    .keyboardShortcut("1", modifiers: .command)
+                    .hidden()
+
+                Button("Calendar") { selectedView = .calendar }
+                    .keyboardShortcut("2", modifiers: .command)
+                    .hidden()
+
+                Button("Activity") { selectedView = .activityStats }
+                    .keyboardShortcut("3", modifiers: .command)
+                    .hidden()
+
+                Button("Sync") { selectedView = .sync }
+                    .keyboardShortcut("4", modifiers: .command)
+                    .hidden()
+
+                Button("Settings2") { selectedView = .settings }
+                    .keyboardShortcut("5", modifiers: .command)
+                    .hidden()
+            }
+        )
         // 权限请求弹窗 - 使用sheet模态表单方式显示
         .sheet(isPresented: $activityMonitor.showPermissionAlert) {
             PermissionRequestAlert(isPresented: $activityMonitor.showPermissionAlert)
