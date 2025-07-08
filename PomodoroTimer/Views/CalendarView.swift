@@ -38,11 +38,14 @@ struct CurrentTimeIndicator: View {
                 .foregroundColor(.red)
                 .frame(width: 50, alignment: .trailing)
                 .padding(.trailing, 4)
-
+            // 红色圆点
+            Circle()
+                    .fill(Color.red)
+                    .frame(width: 8, height: 8)
             // 红色水平线
             Rectangle()
                 .fill(Color.red)
-                .frame(height: 2)
+                .frame(height: 1)
                 .frame(maxWidth: .infinity)
         }
         .position(x: containerWidth / 2, y: position)
@@ -79,10 +82,12 @@ struct CurrentTimeIndicator: View {
     }()
 }
 
-/// 周视图当前时间指示器 - 红色圆点
+/// 周视图当前时间指示器 - 红色圆点和横线
 struct WeekCurrentTimeIndicator: View {
     let hourHeight: CGFloat
     let date: Date
+    let weekDates: [Date]
+    let containerWidth: CGFloat
     @State private var currentTime = Date()
     @State private var timer: Timer?
 
@@ -93,23 +98,41 @@ struct WeekCurrentTimeIndicator: View {
         calendar.isDate(date, inSameDayAs: currentTime)
     }
 
+    // 计算当天在周视图中的索引
+    private var todayIndex: Int? {
+        weekDates.firstIndex { calendar.isDate($0, inSameDayAs: currentTime) }
+    }
+
     var body: some View {
-        if isToday {
+        if isToday, let todayIndex = todayIndex {
             let position = calculateTimePosition()
+            let dayWidth = containerWidth / CGFloat(weekDates.count)
+            let dotX = CGFloat(todayIndex) * dayWidth
 
-            HStack(spacing: 4) {
-                // 红色圆点
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 8, height: 8)
+            HStack(spacing: 0) {
+                // 时间标签
+                Text(timeFormatter.string(from: currentTime))
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.red)
+                    .frame(width: 50, alignment: .trailing)
+                    .padding(.trailing, 4)
 
-                // 红色水平线（延伸到列的右边）
-                Rectangle()
-                    .fill(Color.red)
-                    .frame(height: 2)
-                    .frame(maxWidth: .infinity)
+                // 红色水平线跨越整个周视图
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.red)
+                        .frame(height: 1)
+                        .frame(width: containerWidth)
+
+                    // 红色圆点在当天位置
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .offset(x: dotX)
+                }
             }
-            .position(x: 0, y: position)
+            .position(x: 50 + containerWidth / 2, y: position)
             .onAppear {
                 startTimer()
             }
@@ -125,9 +148,98 @@ struct WeekCurrentTimeIndicator: View {
         return CGFloat(hour) * hourHeight + CGFloat(minute) * hourHeight / 60
     }
 
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+
     private func startTimer() {
         // 每分钟更新一次时间
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
+/// 周视图时间指示器覆盖层 - 跨越整个周视图宽度
+struct WeekTimeIndicatorOverlay: View {
+    let hourHeight: CGFloat
+    let weekDates: [Date]
+    let containerWidth: CGFloat
+    @State private var currentTime = Date()
+    @State private var timer: Timer?
+
+    private let calendar = Calendar.current
+
+    // 计算当天在周视图中的索引
+    private var todayIndex: Int? {
+        weekDates.firstIndex { calendar.isDate($0, inSameDayAs: currentTime) }
+    }
+
+    // 检查今天是否在当前周视图中
+    private var isTodayInWeek: Bool {
+        todayIndex != nil
+    }
+
+    var body: some View {
+        if isTodayInWeek, let todayIndex = todayIndex {
+            let position = calculateTimePosition()
+            let timeLabelsWidth: CGFloat = 60
+            let weekGridWidth = containerWidth - timeLabelsWidth
+            let dayWidth = weekGridWidth / CGFloat(weekDates.count)
+            let dotX = timeLabelsWidth + CGFloat(todayIndex) * dayWidth
+
+            HStack(spacing: 0) {
+                // 时间标签
+                Text(timeFormatter.string(from: currentTime))
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.red)
+                    .frame(width: 50, alignment: .trailing)
+                    .padding(.trailing, 4)
+
+                // 红色水平线跨越整个周事件网格
+                Rectangle()
+                    .fill(Color.red)
+                    .frame(height: 1)
+                    .frame(width: weekGridWidth)
+            }
+            .position(x: containerWidth / 2, y: position)
+
+            // 红色圆点在当天位置
+            Circle()
+                .fill(Color.red)
+                .frame(width: 8, height: 8)
+                .position(x: dotX, y: position)
+                .onAppear {
+                    startTimer()
+                }
+                .onDisappear {
+                    stopTimer()
+                }
+        }
+    }
+
+    private func calculateTimePosition() -> CGFloat {
+        let hour = calendar.component(.hour, from: currentTime)
+        let minute = calendar.component(.minute, from: currentTime)
+        return CGFloat(hour) * hourHeight + CGFloat(minute) * hourHeight / 60
+    }
+
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             currentTime = Date()
         }
     }
@@ -425,19 +537,26 @@ struct TimelineView: View {
                         // 时间标签和网格线
                         VStack(spacing: 0) {
                             ForEach(hours, id: \.self) { (hour: Int) in
-                                HStack {
+                                HStack(alignment: .top) {
                                     // 时间标签
                                     Text(String(format: "%02d:00", hour))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                         .frame(width: 50, alignment: .trailing)
 
-                                    // 网格线
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(height: 1)
+                                    // 网格线 - 00:00 不显示横线，因为上面已经有 Divider
+                                    if hour != 0 {
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(height: 1)
+                                    } else {
+                                        // 00:00 位置不显示横线，但保持布局空间
+                                        Rectangle()
+                                            .fill(Color.clear)
+                                            .frame(height: 1)
+                                    }
                                 }
-                                .frame(height: hourHeight)
+                                .frame(height: hourHeight, alignment: .top)
                             }
                         }
 
@@ -1198,14 +1317,26 @@ struct WeekView: View {
 
                     // 时间轴和事件网格
                     ScrollView {
-                        HStack(alignment: .top, spacing: 0) {
-                            // 左侧时间标签
-                            timeLabelsView
-                                .frame(width: 60)
+                        GeometryReader { scrollGeometry in
+                            ZStack(alignment: .topLeading) {
+                                HStack(alignment: .top, spacing: 0) {
+                                    // 左侧时间标签
+                                    timeLabelsView
+                                        .frame(width: 60)
 
-                            // 周事件网格
-                            weekGridView
+                                    // 周事件网格
+                                    weekGridView
+                                }
+
+                                // 周视图时间指示器（跨越整个宽度）
+                                WeekTimeIndicatorOverlay(
+                                    hourHeight: hourHeight,
+                                    weekDates: weekDates,
+                                    containerWidth: scrollGeometry.size.width
+                                )
+                            }
                         }
+                        .frame(height: CGFloat(24) * hourHeight) // 24小时的总高度
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -1276,7 +1407,7 @@ struct WeekView: View {
     private var timeLabelsView: some View {
         VStack(spacing: 0) {
             ForEach(Array(0...23), id: \.self) { hour in
-                HStack {
+                HStack(alignment: .top) {
                     Text(String(format: "%02d:00", hour))
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -1284,7 +1415,7 @@ struct WeekView: View {
 
                     Spacer()
                 }
-                .frame(height: hourHeight)
+                .frame(height: hourHeight, alignment: .top)
             }
         }
     }
@@ -1323,11 +1454,7 @@ struct WeekView: View {
                                     )
                                 }
 
-                                // 当前时间指示器（只在今天显示）
-                                WeekCurrentTimeIndicator(
-                                    hourHeight: hourHeight,
-                                    date: date
-                                )
+
 
                                 // 选择区域覆盖层（只在当前选择的日期显示）
                                 if isSelecting, let start = selectionStart, let end = selectionEnd, selectionDate == date {
