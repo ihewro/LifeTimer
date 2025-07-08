@@ -176,13 +176,18 @@ class SystemEventStore: ObservableObject {
     
     /// 获取今日总体统计
     func getTodayOverview() -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
-        let todayEvents = getEvents(for: Date())
+        return getOverview(for: Date())
+    }
 
-        let appSwitches = todayEvents.filter { $0.type == .appActivated }.count
-        let websiteVisits = todayEvents.filter { $0.type == .urlVisit }.count
+    /// 获取指定日期的总体统计
+    func getOverview(for date: Date) -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
+        let dayEvents = getEvents(for: date)
+
+        let appSwitches = dayEvents.filter { $0.type == .appActivated }.count
+        let websiteVisits = dayEvents.filter { $0.type == .urlVisit }.count
 
         // 计算真实的活跃时间
-        let activeTime = calculateRealActiveTime(from: todayEvents)
+        let activeTime = calculateRealActiveTime(from: dayEvents)
 
         return (activeTime: activeTime, appSwitches: appSwitches, websiteVisits: websiteVisits)
     }

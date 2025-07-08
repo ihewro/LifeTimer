@@ -984,7 +984,7 @@ struct DayStatsPanel: View {
         let pomodoroSessions = dayEvents.filter { $0.type == .pomodoro }.count
 
         // 获取应用切换次数
-        let overview = activityMonitor.getTodayOverview()
+        let overview = activityMonitor.getOverview(for: selectedDate)
         let appSwitches = overview.appSwitches
 
         return (totalActiveTime, pomodoroSessions, appSwitches)
@@ -1975,7 +1975,7 @@ struct MonthView: View {
                 activeDays += 1
             }
 
-            let overview = activityMonitor.getTodayOverview()
+            let overview = activityMonitor.getOverview(for: date)
             totalActiveTime += overview.activeTime
 
             pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count

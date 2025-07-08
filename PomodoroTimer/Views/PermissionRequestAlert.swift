@@ -15,16 +15,12 @@ struct PermissionRequestAlert: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             // 图标
             Image(systemName: "shield.checkered")
-                .font(.system(size: 48))
+                .font(.system(size: 64))
                 .foregroundColor(.blue)
-            
-            // 标题
-            Text("需要辅助功能权限")
-                .font(.title2)
-                .fontWeight(.semibold)
+                .padding(.bottom, 8)
             
             // 说明文字
             VStack(alignment: .leading, spacing: 12) {
@@ -81,11 +77,10 @@ struct PermissionRequestAlert: View {
                 .buttonStyle(.bordered)
             }
         }
-        .padding(24)
-        .frame(maxWidth: 400)
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .shadow(radius: 10)
+        .navigationTitle("需要辅助功能权限")
     }
 }
 

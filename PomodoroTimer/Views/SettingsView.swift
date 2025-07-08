@@ -81,6 +81,12 @@ struct SettingsView: View {
     @StateObject private var soundEffectManager = SoundEffectManager.shared
 
     @State private var selectedTab = 0
+    @State private var showingClearAllDataAlert = false
+    @State private var showingExportSheet = false
+    @State private var showingImportSheet = false
+    @State private var exportedData: Data? = nil
+    @State private var importResult: String = ""
+    @State private var showingImportResult = false
 
     var body: some View {
         // 内容区域
@@ -100,6 +106,41 @@ struct SettingsView: View {
                     .frame(width: 210)
                 }
 
+            }
+            .alert("清除所有数据", isPresented: $showingClearAllDataAlert) {
+                Button("取消", role: .cancel) { }
+                Button("确认清除", role: .destructive) {
+                    clearAllData()
+                }
+            } message: {
+                Text("此操作将清除所有计时器历史记录和活动监控数据，且无法恢复。确定要继续吗？")
+            }
+            .fileExporter(
+                isPresented: $showingExportSheet,
+                document: exportedData != nil ? ExportDocument(data: exportedData!) : nil,
+                contentType: .json,
+                defaultFilename: "PomodoroTimer_Export_\(formatDateForFilename(Date()))"
+            ) { result in
+                switch result {
+                case .success(let url):
+                    importResult = "数据已成功导出到: \(url.lastPathComponent)"
+                    showingImportResult = true
+                case .failure(let error):
+                    importResult = "导出失败: \(error.localizedDescription)"
+                    showingImportResult = true
+                }
+            }
+            .fileImporter(
+                isPresented: $showingImportSheet,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                handleImportResult(result)
+            }
+            .alert("导入结果", isPresented: $showingImportResult) {
+                Button("确定") { }
+            } message: {
+                Text(importResult)
             }
     }
 
@@ -328,7 +369,7 @@ struct SettingsView: View {
                     .padding(.horizontal, 20)
                 }
 
-                // 数据文件路径
+                // 数据存储
                 VStack(alignment: .leading, spacing: 12) {
                     Text("数据存储")
                         .font(.headline)
@@ -339,6 +380,29 @@ struct SettingsView: View {
                             title: "事件数据文件",
                             path: eventManager.dataFilePath
                         )
+                        .padding(.horizontal, 20)
+
+                        Divider()
+                            .padding(.horizontal, 20)
+
+                        // 数据管理按钮
+                        HStack(spacing: 12) {
+                            Button("导出数据") {
+                                exportAllData()
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("导入数据") {
+                                showingImportSheet = true
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("清除所有数据") {
+                                showingClearAllDataAlert = true
+                            }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.red)
+                        }
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
@@ -858,5 +922,143 @@ struct SimpleSoundEffectSettingRow: View {
             .pickerStyle(.menu)
             .frame(maxWidth: 200)
         }
+    }
+}
+
+// MARK: - SettingsView 数据管理扩展
+
+extension SettingsView {
+    /// 导出所有数据
+    private func exportAllData() {
+        do {
+            // 获取活动数据
+            let activityData = activityMonitor.exportData()
+
+            // 创建导出数据结构
+            let exportData = ExportData(
+                events: eventManager.events,
+                activityData: activityData
+            )
+
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = .prettyPrinted
+
+            let data = try encoder.encode(exportData)
+            exportedData = data
+            showingExportSheet = true
+
+            print("导出数据准备完成，事件数量: \(eventManager.events.count)")
+
+        } catch {
+            print("导出数据编码失败: \(error)")
+            importResult = "导出失败: \(error.localizedDescription)"
+            showingImportResult = true
+        }
+    }
+
+    /// 清除所有数据
+    private func clearAllData() {
+        eventManager.clearAllEvents()
+        activityMonitor.clearAllData()
+        importResult = "所有数据已清除"
+        showingImportResult = true
+    }
+
+    /// 处理导入结果
+    private func handleImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                importResult = "未选择文件"
+                showingImportResult = true
+                return
+            }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+
+                let importData = try decoder.decode(ExportData.self, from: data)
+
+                // 导入事件数据
+                let eventSuccess = true
+                if !importData.events.isEmpty {
+                    eventManager.events = importData.events
+                    eventManager.saveEvents()
+                }
+
+                // 导入活动数据
+                var activitySuccess = true
+                if let activityData = importData.activityData {
+                    activitySuccess = activityMonitor.importData(from: activityData)
+                }
+
+                if eventSuccess && activitySuccess {
+                    importResult = "成功导入 \(importData.events.count) 个事件记录"
+                } else {
+                    importResult = "部分数据导入失败"
+                }
+
+            } catch {
+                importResult = "导入失败: \(error.localizedDescription)"
+            }
+
+            showingImportResult = true
+
+        case .failure(let error):
+            importResult = "文件选择失败: \(error.localizedDescription)"
+            showingImportResult = true
+        }
+    }
+
+    /// 格式化日期用于文件名
+    private func formatDateForFilename(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - 导出数据结构
+
+struct ExportData: Codable {
+    let events: [PomodoroEvent]
+    let activityData: Data?
+    let exportDate: Date
+    let version: String
+
+    init(events: [PomodoroEvent], activityData: Data?) {
+        self.events = events
+        self.activityData = activityData
+        self.exportDate = Date()
+        self.version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+}
+
+// MARK: - 导出文档
+
+import UniformTypeIdentifiers
+
+struct ExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    static var writableContentTypes: [UTType] { [.json] }
+
+    let data: Data
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        return FileWrapper(regularFileWithContents: data)
     }
 }

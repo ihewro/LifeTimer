@@ -132,11 +132,11 @@ struct ActivityStatsView: View {
     private var overviewTab: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                let overview = activityMonitor.getTodayOverview()
+                let overview = activityMonitor.getOverview(for: selectedDate)
 
-                // 今日概览卡片
+                // 概览卡片
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("今日概览")
+                    Text(isToday(selectedDate) ? "今日概览" : "\(formatSelectedDate(selectedDate))概览")
                         .font(.headline)
 
                     HStack(spacing: 20) {
@@ -688,6 +688,92 @@ struct TimelineAppUsage {
     let endTime: Date
 }
 
+struct TimelineHourGroup {
+    let hour: Int
+    let hourStart: Date
+    let events: [AppTimelineEvent]
+}
+
+// MARK: - 时间轴小时分组视图
+
+struct TimelineHourGroupView: View {
+    let hourGroup: TimelineHourGroup
+    let isCollapsed: Bool
+    let onToggleCollapse: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 小时标题栏
+            HStack {
+                Button(action: onToggleCollapse) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        Text(formatHourTitle(hourGroup.hourStart))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        Text("(\(hourGroup.events.count)个事件)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Text(formatTotalDuration(hourGroup.events))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.08))
+            .cornerRadius(8)
+
+            // 事件列表（可折叠）
+            if !isCollapsed {
+                LazyVStack(spacing: 2) {
+                    ForEach(Array(hourGroup.events.enumerated()), id: \.offset) { index, event in
+                        TimelineEventRow(
+                            event: event,
+                            isFirst: index == 0,
+                            isLast: index == hourGroup.events.count - 1,
+                            previousEvent: index > 0 ? hourGroup.events[index - 1] : nil
+                        )
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.03))
+                )
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func formatHourTitle(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:00"
+        return formatter.string(from: date)
+    }
+
+    private func formatTotalDuration(_ events: [AppTimelineEvent]) -> String {
+        let totalDuration = events.reduce(0) { $0 + $1.duration }
+        let hours = Int(totalDuration) / 3600
+        let minutes = Int(totalDuration) % 3600 / 60
+
+        if hours > 0 {
+            return "\(hours)h\(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+}
+
 // MARK: - 新的时间轴事件数据结构
 
 struct AppTimelineEvent {
@@ -907,6 +993,8 @@ struct AppTimelineView: View {
     let events: [AppTimelineEvent]
     let refreshTrigger: UUID?
 
+    @State private var collapsedHours: Set<Int> = Set()
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -917,27 +1005,67 @@ struct AppTimelineView: View {
                     // 时间范围显示
                     timeRangeInfo
 
-                    // 时间序列时间轴
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(events.enumerated()), id: \.offset) { index, event in
-                            TimelineEventRow(
-                                event: event,
-                                isFirst: index == 0,
-                                isLast: index == events.count - 1,
-                                previousEvent: index > 0 ? events[index - 1] : nil
+                    // 分组时间轴
+                    LazyVStack(spacing: 8) {
+                        ForEach(groupedEvents, id: \.hour) { hourGroup in
+                            TimelineHourGroupView(
+                                hourGroup: hourGroup,
+                                isCollapsed: collapsedHours.contains(hourGroup.hour),
+                                onToggleCollapse: {
+                                    if collapsedHours.contains(hourGroup.hour) {
+                                        collapsedHours.remove(hourGroup.hour)
+                                    } else {
+                                        collapsedHours.insert(hourGroup.hour)
+                                    }
+                                }
                             )
                         }
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.primary.opacity(0.05))
-                    )
                     .padding(.horizontal)
                 }
             }
             .padding(.vertical)
         }
         .id(refreshTrigger ?? UUID()) // 使用refreshTrigger强制刷新
+        .onAppear {
+            initializeCollapsedState()
+        }
+    }
+
+    // 按小时分组事件
+    private var groupedEvents: [TimelineHourGroup] {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 按小时分组
+        let grouped = Dictionary(grouping: events) { event in
+            calendar.component(.hour, from: event.startTime)
+        }
+
+        // 转换为TimelineHourGroup并排序
+        return grouped.map { hour, hourEvents in
+            let hourStart = calendar.dateInterval(of: .hour, for: hourEvents.first?.startTime ?? now)?.start ?? now
+            return TimelineHourGroup(
+                hour: hour,
+                hourStart: hourStart,
+                events: hourEvents.sorted { $0.startTime > $1.startTime }
+            )
+        }.sorted { $0.hour > $1.hour } // 按小时倒序排列
+    }
+
+    // 初始化折叠状态
+    private func initializeCollapsedState() {
+        let calendar = Calendar.current
+        let now = Date()
+        let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now) ?? now
+
+        // 默认折叠1小时之前的数据
+        collapsedHours = Set(groupedEvents.compactMap { group in
+            if group.hourStart < oneHourAgo {
+                return group.hour
+            }
+            return nil
+        })
     }
 
     private var timelineHeader: some View {

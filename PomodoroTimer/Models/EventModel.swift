@@ -255,7 +255,7 @@ class EventManager: ObservableObject {
         }
     }
     
-    private func saveEvents() {
+    func saveEvents() {
         if let encoded = try? JSONEncoder().encode(events) {
             userDefaults.set(encoded, forKey: eventsKey)
         }
@@ -274,5 +274,48 @@ class EventManager: ObservableObject {
             name: Notification.Name("EventDataChanged"),
             object: self
         )
+    }
+
+    /// 清除所有事件数据
+    func clearAllEvents() {
+        events.removeAll()
+        saveEvents()
+        notifyEventDataChanged()
+    }
+
+    /// 导出事件数据
+    func exportEvents() -> Data? {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = .prettyPrinted
+            return try encoder.encode(events)
+        } catch {
+            print("导出事件数据失败: \(error)")
+            return nil
+        }
+    }
+
+    /// 导入事件数据
+    func importEvents(from data: Data) -> Bool {
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let importedEvents = try decoder.decode([PomodoroEvent].self, from: data)
+
+            // 清除现有数据
+            events.removeAll()
+
+            // 导入新数据
+            events = importedEvents
+            saveEvents()
+            notifyEventDataChanged()
+
+            print("成功导入 \(importedEvents.count) 个事件")
+            return true
+        } catch {
+            print("导入事件数据失败: \(error)")
+            return false
+        }
     }
 }

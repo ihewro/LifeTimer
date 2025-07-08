@@ -341,8 +341,13 @@ class ActivityMonitorManager: ObservableObject {
 
     /// 获取今日统计概览
     func getTodayOverview() -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
+        return getOverview(for: Date())
+    }
+
+    /// 获取指定日期的统计概览
+    func getOverview(for date: Date) -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
         #if canImport(Cocoa)
-        return eventStore.getTodayOverview()
+        return eventStore.getOverview(for: date)
         #else
         return (activeTime: 3600, appSwitches: 10, websiteVisits: 5)
         #endif
@@ -423,6 +428,45 @@ class ActivityMonitorManager: ObservableObject {
         // iOS 版本返回模拟数据
         let mockData = ["message": "iOS版本暂不支持导出功能"]
         return try? JSONSerialization.data(withJSONObject: mockData)
+        #endif
+    }
+
+    /// 导入数据
+    func importData(from data: Data) -> Bool {
+        #if canImport(Cocoa)
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+
+            let importedEvents = try decoder.decode([SystemEvent].self, from: data)
+
+            // 清除现有数据
+            eventStore.clearAllEvents()
+
+            // 导入新数据
+            for event in importedEvents {
+                eventStore.recordEvent(type: event.type, data: event.data)
+            }
+
+            print("成功导入 \(importedEvents.count) 条记录")
+            return true
+        } catch {
+            print("导入数据失败: \(error)")
+            return false
+        }
+        #else
+        print("iOS版本暂不支持导入功能")
+        return false
+        #endif
+    }
+
+    /// 清除所有数据
+    func clearAllData() {
+        #if canImport(Cocoa)
+        eventStore.clearAllEvents()
+        print("已清除所有活动监控数据")
+        #else
+        print("iOS版本暂不支持清除数据功能")
         #endif
     }
 
