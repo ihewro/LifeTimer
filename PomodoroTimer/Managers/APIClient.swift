@@ -55,33 +55,7 @@ class APIClient {
         return try await performAuthenticatedRequest(url: url, method: "POST", token: token)
     }
     
-    /// 注册设备
-    func registerDevice(_ request: DeviceRegistrationRequest) async throws -> DeviceRegistrationResponse {
-        let url = URL(string: "\(baseURL)/api/device/register")!
-        
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try JSONEncoder().encode(request)
-        
-        let (data, response) = try await session.data(for: urlRequest)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.httpError(httpResponse.statusCode)
-        }
-        
-        let apiResponse = try JSONDecoder().decode(APIResponse<DeviceRegistrationResponse>.self, from: data)
-        
-        guard apiResponse.success else {
-            throw APIError.serverError(apiResponse.message)
-        }
-        
-        return apiResponse.data
-    }
+
     
     /// 全量同步（用户认证版本）
     func fullSync(token: String) async throws -> APIResponse<FullSyncData> {

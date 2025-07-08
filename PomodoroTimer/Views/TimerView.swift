@@ -300,6 +300,9 @@ struct TimerView: View {
         .onAppear {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
+
+            // 设置默认任务为最近的事件
+            setDefaultTaskFromRecentEvent()
         }
         .onChange(of: timerModel.timerState) { newState in
             // 监听番茄钟完成状态
@@ -325,6 +328,7 @@ struct TimerView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 400)
+                .disabled(timerModel.timerState == .running) // 计时器运行时禁用模式切换
             }
 
             // 右侧：音频控制菜单
@@ -444,6 +448,19 @@ struct TimerView: View {
     private func formatTime(_ timeInterval: TimeInterval) -> String {
         let minutes = Int(timeInterval) / 60
         return "\(minutes)"
+    }
+
+    /// 从最近的事件中设置默认任务
+    private func setDefaultTaskFromRecentEvent() {
+        // 获取最近的已完成事件
+        let recentEvents = eventManager.events
+            .filter { $0.isCompleted }
+            .sorted { $0.startTime > $1.startTime }
+
+        // 如果有最近的事件，使用其标题作为默认任务
+        if let mostRecentEvent = recentEvents.first {
+            selectedTask = mostRecentEvent.title
+        }
     }
 }
 

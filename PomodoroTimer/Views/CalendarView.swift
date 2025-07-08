@@ -8,12 +8,135 @@
 import SwiftUI
 import AppKit
 import Foundation
+import Combine
 
 // 导入事件模型
 // 注意：确保EventModel.swift在同一个target中
 
 // 确保PomodoroEvent类型可用
 typealias Event = PomodoroEvent
+
+// MARK: - 当前时间指示器组件
+
+/// 日视图当前时间指示器 - 红色水平线
+struct CurrentTimeIndicator: View {
+    let hourHeight: CGFloat
+    let containerWidth: CGFloat
+    @State private var currentTime = Date()
+    @State private var timer: Timer?
+
+    private let calendar = Calendar.current
+
+    var body: some View {
+        let position = calculateTimePosition()
+
+        HStack(spacing: 0) {
+            // 时间标签
+            Text(timeFormatter.string(from: currentTime))
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundColor(.red)
+                .frame(width: 50, alignment: .trailing)
+                .padding(.trailing, 4)
+
+            // 红色水平线
+            Rectangle()
+                .fill(Color.red)
+                .frame(height: 2)
+                .frame(maxWidth: .infinity)
+        }
+        .position(x: containerWidth / 2, y: position)
+        .onAppear {
+            startTimer()
+        }
+        .onDisappear {
+            stopTimer()
+        }
+    }
+
+    private func calculateTimePosition() -> CGFloat {
+        let hour = calendar.component(.hour, from: currentTime)
+        let minute = calendar.component(.minute, from: currentTime)
+        return CGFloat(hour) * hourHeight + CGFloat(minute) * hourHeight / 60
+    }
+
+    private func startTimer() {
+        // 每分钟更新一次时间
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+}
+
+/// 周视图当前时间指示器 - 红色圆点
+struct WeekCurrentTimeIndicator: View {
+    let hourHeight: CGFloat
+    let date: Date
+    @State private var currentTime = Date()
+    @State private var timer: Timer?
+
+    private let calendar = Calendar.current
+
+    // 检查是否为今天
+    private var isToday: Bool {
+        calendar.isDate(date, inSameDayAs: currentTime)
+    }
+
+    var body: some View {
+        if isToday {
+            let position = calculateTimePosition()
+
+            HStack(spacing: 4) {
+                // 红色圆点
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 8, height: 8)
+
+                // 红色水平线（延伸到列的右边）
+                Rectangle()
+                    .fill(Color.red)
+                    .frame(height: 2)
+                    .frame(maxWidth: .infinity)
+            }
+            .position(x: 0, y: position)
+            .onAppear {
+                startTimer()
+            }
+            .onDisappear {
+                stopTimer()
+            }
+        }
+    }
+
+    private func calculateTimePosition() -> CGFloat {
+        let hour = calendar.component(.hour, from: currentTime)
+        let minute = calendar.component(.minute, from: currentTime)
+        return CGFloat(hour) * hourHeight + CGFloat(minute) * hourHeight / 60
+    }
+
+    private func startTimer() {
+        // 每分钟更新一次时间
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
 
 enum CalendarViewMode: String, CaseIterable {
     case day = "日"
@@ -336,6 +459,14 @@ struct TimelineView: View {
                         .drawingGroup() // 将事件块渲染为单个图层，提高性能
                     }
                 
+                // 当前时间指示器（只在今天显示）
+                if calendar.isDateInToday(selectedDate) {
+                    CurrentTimeIndicator(
+                        hourHeight: hourHeight,
+                        containerWidth: geometry.size.width
+                    )
+                }
+
                 // 选择区域覆盖层
                 if isSelecting, let start = selectionStart, let end = selectionEnd {
                     SelectionOverlay(start: start, end: end)
@@ -1191,6 +1322,12 @@ struct WeekView: View {
                                         containerWidth: dayGeometry.size.width
                                     )
                                 }
+
+                                // 当前时间指示器（只在今天显示）
+                                WeekCurrentTimeIndicator(
+                                    hourHeight: hourHeight,
+                                    date: date
+                                )
 
                                 // 选择区域覆盖层（只在当前选择的日期显示）
                                 if isSelecting, let start = selectionStart, let end = selectionEnd, selectionDate == date {

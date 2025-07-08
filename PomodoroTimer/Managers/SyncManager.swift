@@ -294,16 +294,7 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 注册设备
-    func registerDevice() async {
-        do {
-            try await ensureDeviceRegistered()
-        } catch {
-            DispatchQueue.main.async {
-                self.syncStatus = .error("Device registration failed: \(error.localizedDescription)")
-            }
-        }
-    }
+
 
     /// 确保用户已认证
     private func ensureAuthenticated() async throws {
@@ -320,31 +311,7 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 确保设备已注册（旧版本兼容）
-    private func ensureDeviceRegistered() async throws {
-        // 检查是否已经注册过（通过检查是否有设备注册标记）
-        let deviceRegisteredKey = "device_registered_\(deviceUUID)"
-        let hasRegistered = userDefaults.bool(forKey: deviceRegisteredKey)
 
-        if !hasRegistered {
-            print("Device not registered, registering now...")
-            let deviceInfo = DeviceRegistrationRequest(
-                deviceUUID: deviceUUID,
-                deviceName: getDeviceName(),
-                platform: getPlatform()
-            )
-
-            let response = try await apiClient.registerDevice(deviceInfo)
-
-            DispatchQueue.main.async {
-                self.userDefaults.set(response.lastSyncTimestamp, forKey: self.lastSyncTimestampKey)
-                self.userDefaults.set(true, forKey: deviceRegisteredKey)
-                print("Device registered successfully: \(response.deviceUUID)")
-            }
-        } else {
-            print("Device already registered: \(deviceUUID)")
-        }
-    }
 
     /// 获取设备名称
     private func getDeviceName() -> String {
@@ -522,9 +489,7 @@ class SyncManager: ObservableObject {
 
         guard let authManager = authManager,
               let _ = authManager.sessionToken else {
-            // 回退到旧版本的设备注册方式
-            try await ensureDeviceRegistered()
-            return try await performLegacySyncInternal(mode: mode)
+            throw SyncError.notAuthenticated
         }
 
         // 创建同步详情收集器
@@ -563,45 +528,7 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 旧版本同步实现（向后兼容）
-    private func performLegacySyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int, syncDetails: SyncDetails?) {
-        // 确保设备已注册
-        try await ensureDeviceRegistered()
 
-        var syncDetailsCollector = SyncDetailsCollector()
-
-        switch mode {
-        case .forceOverwriteLocal:
-            try await performForceOverwriteLocal(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (0, details.downloadedItems.count, 0, details)
-
-        case .forceOverwriteRemote:
-            try await performForceOverwriteRemote(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (details.uploadedItems.count, 0, 0, details)
-
-        case .incremental:
-            try await performIncrementalSyncInternal()
-            let details = syncDetailsCollector.build()
-            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
-
-        case .pullOnly:
-            try await performPullOnly(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (0, details.downloadedItems.count, 0, details)
-
-        case .pushOnly:
-            try await performPushOnly(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (details.uploadedItems.count, 0, 0, details)
-
-        case .smartMerge:
-            try await performSmartMerge(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
-        }
-    }
 
     /// 强制覆盖本地
     private func performForceOverwriteLocal(detailsCollector: inout SyncDetailsCollector) async throws {
@@ -753,9 +680,6 @@ class SyncManager: ObservableObject {
     }
     
     private func performIncrementalSyncInternal() async throws {
-        // 确保设备已注册
-        try await ensureDeviceRegistered()
-
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
 
         // 收集本地变更
@@ -1212,10 +1136,6 @@ class SyncManager: ObservableObject {
         }
 
         do {
-            // 确保设备已注册
-            print("📝 确保设备已注册...")
-            try await ensureDeviceRegistered()
-
             // 获取服务端数据
             print("📡 请求服务端数据...")
             guard let authManager = authManager,
@@ -1976,29 +1896,7 @@ enum PendingSyncItemType {
     }
 }
 
-struct DeviceRegistrationRequest: Codable {
-    let deviceUUID: String
-    let deviceName: String
-    let platform: String
-    
-    private enum CodingKeys: String, CodingKey {
-        case deviceUUID = "device_uuid"
-        case deviceName = "device_name"
-        case platform
-    }
-}
 
-struct DeviceRegistrationResponse: Codable {
-    let deviceUUID: String
-    let lastSyncTimestamp: Int64
-    let status: String
-
-    private enum CodingKeys: String, CodingKey {
-        case deviceUUID = "device_uuid"
-        case lastSyncTimestamp = "last_sync_timestamp"
-        case status
-    }
-}
 
 // MARK: - 服务端数据预览
 struct ServerDataPreview {

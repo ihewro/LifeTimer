@@ -60,8 +60,14 @@ class MenuBarManager: ObservableObject {
             button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp])
 
-            // 设置初始标题
-            button.title = "00:00"
+            // 设置初始标题，使用等宽字体
+            let initialAttributedString = NSAttributedString(
+                string: "00:00",
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+                ]
+            )
+            button.attributedTitle = initialAttributedString
         }
 
         NSLog("MenuBarManager: Menu bar status item created successfully")
@@ -127,8 +133,14 @@ class MenuBarManager: ObservableObject {
         button.image?.size = NSSize(width: 16, height: 16)
         button.image?.isTemplate = true
         
-        // 更新标题文本
-        button.title = timeString
+        // 更新标题文本，使用等宽字体
+        let attributedString = NSAttributedString(
+            string: timeString,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            ]
+        )
+        button.attributedTitle = attributedString
         
         // 设置工具提示
         button.toolTip = "计时器 - \(timerModel.currentMode.rawValue) - \(getStateDescription())"
@@ -180,12 +192,28 @@ class MenuBarManager: ObservableObject {
     }
     
     @objc private func statusItemClicked() {
-        // 激活应用并显示主窗口
+        // 激活应用
         NSApp.activate(ignoringOtherApps: true)
-        
-        // 如果有窗口，将其置于前台
-        if let window = NSApp.windows.first {
+
+        // 查找主应用窗口（排除系统窗口和菜单栏窗口）
+        let mainWindows = NSApp.windows.filter { window in
+            // 过滤掉系统窗口、菜单栏窗口等
+            return window.canBecomeMain &&
+                   !window.className.contains("NSStatusBarWindow") &&
+                   !window.className.contains("NSMenuWindow")
+        }
+
+        // 查找可见的主窗口
+        let visibleWindow = mainWindows.first { $0.isVisible }
+
+        if let window = visibleWindow {
+            // 如果有可见窗口，将其置于前台
             window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        } else {
+            // 如果没有可见窗口，触发应用重新打开逻辑
+            // 这会调用 AppDelegate 的 applicationShouldHandleReopen 方法
+            _ = NSApp.delegate?.applicationShouldHandleReopen?(NSApp, hasVisibleWindows: false)
         }
     }
 }
