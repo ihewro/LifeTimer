@@ -308,7 +308,8 @@ struct TimerView: View {
         }
         .onChange(of: timerModel.timerState) { newState in
             // 监听番茄钟完成状态
-            if newState == .completed && timerModel.currentMode == .singlePomodoro {
+            // 只有在未开启自动休息时才显示完成弹窗
+            if newState == .completed && timerModel.currentMode == .singlePomodoro && !timerModel.autoStartBreak {
                 showingCompletionDialog = true
             }
 
