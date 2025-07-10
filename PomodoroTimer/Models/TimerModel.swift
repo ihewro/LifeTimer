@@ -50,6 +50,10 @@ class TimerModel: ObservableObject {
     @Published var sessionStartTime: Date?
     @Published var sessionTask: String = ""
 
+    // 用户自定义的任务标题（在计时会话期间保持）
+    @Published var userCustomTaskTitle: String = ""
+    @Published var hasUserSetCustomTask: Bool = false
+
     // 音频管理器引用（用于计时器联动）
     weak var audioManager: AudioManager?
 
@@ -154,6 +158,10 @@ class TimerModel: ObservableObject {
         if timerState == .idle {
             sessionStartTime = Date()
             sessionTask = task
+            // 如果用户设置了自定义任务，使用自定义任务
+            if hasUserSetCustomTask {
+                sessionTask = userCustomTaskTitle
+            }
         }
 
         timerState = .running
@@ -184,6 +192,11 @@ class TimerModel: ObservableObject {
         timer?.invalidate()
         timer = nil
         sessionStartTime = nil
+
+        // 重置用户自定义任务状态
+        hasUserSetCustomTask = false
+        userCustomTaskTitle = ""
+
         setupTimer()
 
         // 重置计时器时停止音乐
@@ -353,6 +366,22 @@ class TimerModel: ObservableObject {
         startTimer(with: "休息")
     }
     
+    // 设置用户自定义任务标题
+    func setUserCustomTask(_ task: String) {
+        userCustomTaskTitle = task
+        hasUserSetCustomTask = true
+    }
+
+    // 获取当前应该显示的任务标题
+    func getCurrentDisplayTask(fallback: String) -> String {
+        // 如果计时器正在运行或暂停，且用户设置了自定义任务，返回自定义任务
+        if hasUserSetCustomTask {
+            return userCustomTaskTitle
+        }
+        // 否则返回fallback任务
+        return fallback
+    }
+
     // 格式化时间显示
     func formattedTime() -> String {
         let time: TimeInterval

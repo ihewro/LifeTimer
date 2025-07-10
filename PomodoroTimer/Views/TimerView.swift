@@ -14,7 +14,7 @@ struct TimerView: View {
     @State private var showingModeSelector = false
     @State private var showingTimeEditor = false
     @State private var showingTaskSelector = false
-    @State private var selectedTask = "专注"
+    @State private var selectedTask = "无标题"
     @State private var editingMinutes = 30
     @State private var isHoveringTimeCircle = false
     @State private var showingCompletionDialog = false
@@ -29,7 +29,7 @@ struct TimerView: View {
                 showingTaskSelector = true
             }) {
                 HStack {
-                    Text(selectedTask)
+                    Text(timerModel.getCurrentDisplayTask(fallback: selectedTask))
                         .font(.title3)
                         .foregroundColor(.primary)
                     Image(systemName: "chevron.right")
@@ -301,14 +301,21 @@ struct TimerView: View {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
 
-            // 设置默认任务为最近的事件
-            setDefaultTaskFromRecentEvent()
+            // 只有在计时器空闲状态且用户未设置自定义任务时，才从最近事件设置默认任务
+            if timerModel.timerState == .idle && !timerModel.hasUserSetCustomTask {
+                setDefaultTaskFromRecentEvent()
+            }
         }
         .onChange(of: timerModel.timerState) { newState in
             // 监听番茄钟完成状态
             if newState == .completed && timerModel.currentMode == .singlePomodoro {
                 showingCompletionDialog = true
             }
+
+        }
+        .onChange(of: selectedTask) { newTask in
+            // 用户修改任务时，设置自定义任务到TimerModel
+            timerModel.setUserCustomTask(newTask)
         }
         .toolbar {
             // 左侧：占位符
@@ -398,7 +405,7 @@ struct TimerView: View {
         }
 
     }
-    
+
     private var buttonText: String {
         switch timerModel.timerState {
         case .idle:
