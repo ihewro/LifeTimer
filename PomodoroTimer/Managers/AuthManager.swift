@@ -163,12 +163,48 @@ class AuthManager: ObservableObject {
         if let token = sessionToken {
             try? await apiClient.logout(token: token)
         }
-        
+
         await MainActor.run {
             clearAuthState()
         }
     }
-    
+
+    /// 设备解绑
+    func unbindDevice() async throws -> DeviceUnbindResult {
+        guard let token = sessionToken else {
+            throw AuthError.notAuthenticated
+        }
+
+        await MainActor.run {
+            authStatus = .authenticating
+        }
+
+        do {
+            let request = DeviceUnbindRequest(deviceUUID: deviceUUID)
+            let response = try await apiClient.deviceUnbind(request, token: token)
+
+            let result = DeviceUnbindResult(
+                deviceUUID: response.data.deviceUUID,
+                remainingDeviceCount: response.data.remainingDeviceCount,
+                unboundAt: parseDate(response.data.unboundAt)
+            )
+
+            // 清理本地认证状态
+            await MainActor.run {
+                clearAuthState()
+                authStatus = .notAuthenticated
+            }
+
+            return result
+
+        } catch {
+            await MainActor.run {
+                authStatus = .error(error.localizedDescription)
+            }
+            throw error
+        }
+    }
+
     /// 检查是否有存储的凭据
     func hasStoredCredentials() -> Bool {
         return userDefaults.string(forKey: sessionTokenKey) != nil &&
@@ -380,7 +416,9 @@ enum AuthError: LocalizedError {
     case invalidUserUUID
     case noSessionToken
     case networkError
-    
+    case notAuthenticated
+    case deviceUnbindFailed
+
     var errorDescription: String? {
         switch self {
         case .deviceInitializationFailed:
@@ -395,6 +433,10 @@ enum AuthError: LocalizedError {
             return "没有有效的会话令牌"
         case .networkError:
             return "网络连接错误"
+        case .notAuthenticated:
+            return "用户未认证，请先登录"
+        case .deviceUnbindFailed:
+            return "设备解绑失败，请稍后重试"
         }
     }
 }
@@ -412,4 +454,11 @@ struct User: Codable, Identifiable {
         case email
         case createdAt = "created_at"
     }
+}
+
+/// 设备解绑结果
+struct DeviceUnbindResult {
+    let deviceUUID: String
+    let remainingDeviceCount: Int
+    let unboundAt: Date
 }

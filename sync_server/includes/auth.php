@@ -233,7 +233,7 @@ function getOrCreateDevice($deviceUuid, $userId, $deviceName = null, $platform =
     if ($device) {
         // 检查设备是否属于正确的用户
         if ($device['user_id'] != $userId) {
-            throw new Exception('Device belongs to another user');
+            throw new Exception('Device belongs to another user'.$device['user_id']);
         }
         
         // 更新设备信息

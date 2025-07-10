@@ -43,6 +43,12 @@ class APIClient {
         return try await performRequest(url: url, method: "POST", body: request)
     }
 
+    /// 设备解绑
+    func deviceUnbind(_ request: DeviceUnbindRequest, token: String) async throws -> APIResponse<DeviceUnbindResponse> {
+        let url = URL(string: "\(baseURL)/api/auth/device-unbind")!
+        return try await performAuthenticatedRequest(url: url, method: "POST", body: request, token: token)
+    }
+
     /// Token刷新
     func refreshToken(token: String) async throws -> APIResponse<TokenRefreshResponse> {
         let url = URL(string: "\(baseURL)/api/auth/refresh")!
@@ -508,12 +514,34 @@ struct ServerTimerSettings: Codable {
     let shortBreakTime: Int
     let longBreakTime: Int
     let updatedAt: Int64
-    
+
     private enum CodingKeys: String, CodingKey {
         case pomodoroTime = "pomodoro_time"
         case shortBreakTime = "short_break_time"
         case longBreakTime = "long_break_time"
         case updatedAt = "updated_at"
+    }
+}
+
+/// 设备解绑请求
+struct DeviceUnbindRequest: Codable {
+    let deviceUUID: String
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceUUID = "device_uuid"
+    }
+}
+
+/// 设备解绑响应
+struct DeviceUnbindResponse: Codable {
+    let deviceUUID: String
+    let remainingDeviceCount: Int
+    let unboundAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceUUID = "device_uuid"
+        case remainingDeviceCount = "remaining_device_count"
+        case unboundAt = "unbound_at"
     }
 }
 

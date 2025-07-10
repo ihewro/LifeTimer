@@ -46,6 +46,9 @@ struct SyncView: View {
     @State private var showingDeletionDebug = false
     @State private var showingDeletionLog = false
     @State private var showingAuthView = false
+    @State private var showingUnbindConfirmation = false
+    @State private var isUnbinding = false
+    @State private var unbindError: String?
 
     enum DataType: String, CaseIterable {
         case pomodoroEvents = "番茄钟事件"
@@ -63,6 +66,25 @@ struct SyncView: View {
         }
         .sheet(isPresented: $showingAuthView) {
             AuthenticationView(authManager: authManager)
+        }
+        .alert("确认解绑设备", isPresented: $showingUnbindConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("解绑", role: .destructive) {
+                Task {
+                    await performDeviceUnbind()
+                }
+            }
+        } message: {
+            Text("解绑设备后，您需要重新登录才能继续使用同步功能。此操作不可撤销，确定要继续吗？")
+        }
+        .alert("解绑失败", isPresented: .constant(unbindError != nil)) {
+            Button("确定") {
+                unbindError = nil
+            }
+        } message: {
+            if let error = unbindError {
+                Text(error)
+            }
         }
     }
 
@@ -2276,6 +2298,14 @@ extension SyncView {
                     .font(.headline)
                 Spacer()
 
+                Button("解绑设备") {
+                    showingUnbindConfirmation = true
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .foregroundColor(.red)
+                .disabled(isUnbinding)
+
                 Button("管理账户") {
                     showingAuthView = true
                 }
@@ -2388,6 +2418,25 @@ extension SyncView {
             return "认证已过期"
         }
         return authManager.isAuthenticated ? "已认证" : "未认证"
+    }
+
+    /// 执行设备解绑
+    private func performDeviceUnbind() async {
+        isUnbinding = true
+
+        do {
+            let result = try await authManager.unbindDevice()
+            print("设备解绑成功: \(result.deviceUUID)")
+
+            // 解绑成功后，UI会自动切换到未认证状态
+            // 因为AuthManager会清理认证状态
+
+        } catch {
+            unbindError = error.localizedDescription
+            print("设备解绑失败: \(error)")
+        }
+
+        isUnbinding = false
     }
 }
 

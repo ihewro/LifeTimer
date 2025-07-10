@@ -49,6 +49,14 @@ try {
             }
             break;
 
+        case 'device-unbind':
+            if ($method === 'POST') {
+                handleDeviceUnbind();
+            } else {
+                throw new Exception('Method not allowed', 405);
+            }
+            break;
+
         case 'token-refresh':
             if ($method === 'POST') {
                 handleTokenRefresh();
@@ -212,13 +220,13 @@ function handleDeviceBind() {
             throw new Exception('User not found');
         }
         
-        // 检查设备是否已被其他用户使用
-        $stmt = $db->prepare('SELECT d.*, u.user_uuid FROM devices d JOIN users u ON d.user_id = u.id WHERE d.device_uuid = ?');
+        // 检查设备是否已被其他用户使用（只检查活跃设备）
+        $stmt = $db->prepare('SELECT d.*, u.user_uuid FROM devices d JOIN users u ON d.user_id = u.id WHERE d.device_uuid = ? AND d.is_active = 1');
         $stmt->execute([$deviceUuid]);
         $existingDevice = $stmt->fetch();
-        
+
         if ($existingDevice && $existingDevice['user_uuid'] !== $userUuid) {
-            throw new Exception('Device is already bound to another user');
+            throw new Exception('Device is already bound to another user: ' . $existingDevice['user_uuid']);
         }
         
         // 创建或更新设备
@@ -415,6 +423,76 @@ function handleUserLogin() {
             ]
         ], 'Login successful');
         
+    } catch (Exception $e) {
+        $db->rollback();
+        throw $e;
+    }
+}
+
+/**
+ * 设备解绑
+ */
+function handleDeviceUnbind() {
+    // 需要认证才能解绑设备
+    $userInfo = requireAuth();
+
+    $data = getRequestData();
+
+    // 验证必需参数
+    validateRequired($data, ['device_uuid']);
+
+    $deviceUuid = $data['device_uuid'];
+
+    // 验证UUID格式
+    if (!validateUUID($deviceUuid)) {
+        throw new Exception('Invalid device UUID format');
+    }
+
+
+    $db = getDB();
+    $db->beginTransaction();
+
+    try {
+        // 检查设备是否属于当前用户
+        $stmt = $db->prepare('
+            SELECT d.*, u.user_uuid
+            FROM devices d
+            JOIN users u ON d.user_id = u.id
+            WHERE d.device_uuid = ? AND d.user_id = ?
+        ');
+        $stmt->execute([$deviceUuid, $userInfo['user_id']]);
+        $device = $stmt->fetch();
+
+        if (!$device) {
+            throw new Exception('Device not found or not owned by current user');
+        }
+
+        error_log("Debug: 'unbind ,did:'".$deviceUuid."user_id:".$userInfo['user_id']);
+
+        // 撤销该设备的所有会话
+        $stmt = $db->prepare('UPDATE user_sessions SET is_active = 0 WHERE device_id = ?');
+        $stmt->execute([$device['id']]);
+
+        // 删除设备记录（彻底解绑）
+        $stmt = $db->prepare('DELETE FROM devices WHERE id = ?');
+
+        $stmt->execute([$device['id']]);
+
+        // 获取用户剩余活跃设备数量
+        $stmt = $db->prepare('SELECT COUNT(*) FROM devices WHERE user_id = ? AND is_active = 1');
+        $stmt->execute([$userInfo['user_id']]);
+        $remainingDeviceCount = $stmt->fetchColumn();
+
+        $db->commit();
+
+        logMessage("Device unbound: $deviceUuid from user: {$userInfo['user_uuid']}");
+
+        sendSuccess([
+            'device_uuid' => $deviceUuid,
+            'remaining_device_count' => $remainingDeviceCount,
+            'unbound_at' => date('c')
+        ], 'Device unbound successfully');
+
     } catch (Exception $e) {
         $db->rollback();
         throw $e;

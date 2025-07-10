@@ -28,6 +28,7 @@ $routes = [
     // 用户认证系统
     'POST /api/auth/device-init' => 'api/auth.php',
     'POST /api/auth/device-bind' => 'api/auth.php',
+    'POST /api/auth/device-unbind' => 'api/auth.php',
     'POST /api/auth/refresh' => 'api/auth.php',
     'POST /api/auth/logout' => 'api/auth.php',
 
