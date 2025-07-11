@@ -1051,7 +1051,7 @@ class SyncManager: ObservableObject {
                             title: serverEvent.title,
                             startTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.startTime) / 1000),
                             endTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.endTime) / 1000),
-                            type: PomodoroEvent.EventType(rawValue: serverEvent.eventType) ?? .custom,
+                            type: self.mapServerEventTypeToLocal(serverEvent.eventType),
                             isCompleted: serverEvent.isCompleted
                         )
                         eventManager.addEvent(updatedEvent)
@@ -1061,7 +1061,7 @@ class SyncManager: ObservableObject {
                             title: serverEvent.title,
                             startTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.startTime) / 1000),
                             endTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.endTime) / 1000),
-                            type: PomodoroEvent.EventType(rawValue: serverEvent.eventType) ?? .custom,
+                            type: self.mapServerEventTypeToLocal(serverEvent.eventType),
                             isCompleted: serverEvent.isCompleted
                         )
                         eventManager.addEvent(newEvent)
