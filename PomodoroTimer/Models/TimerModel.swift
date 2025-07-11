@@ -193,9 +193,9 @@ class TimerModel: ObservableObject {
         timer = nil
         sessionStartTime = nil
 
-        // 重置用户自定义任务状态
-        hasUserSetCustomTask = false
-        userCustomTaskTitle = ""
+//        // 重置用户自定义任务状态
+//        hasUserSetCustomTask = false
+//        userCustomTaskTitle = ""
 
         setupTimer()
 
