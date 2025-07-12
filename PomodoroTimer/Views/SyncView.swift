@@ -65,7 +65,7 @@ struct SyncView: View {
             }
         }
         .sheet(isPresented: $showingAuthView) {
-            AuthenticationView(authManager: authManager)
+            AuthenticationView(authManager: authManager, syncManager: syncManager)
         }
         .alert("确认解绑设备", isPresented: $showingUnbindConfirmation) {
             Button("取消", role: .cancel) { }
