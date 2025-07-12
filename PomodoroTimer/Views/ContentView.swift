@@ -118,8 +118,8 @@ struct ContentView: View {
         .sheet(isPresented: $activityMonitor.showPermissionAlert) {
             PermissionRequestAlert(isPresented: $activityMonitor.showPermissionAlert)
                 .environmentObject(activityMonitor)
-                .frame(minWidth: 500, minHeight: 400)
-                .interactiveDismissDisabled(true) // 禁止通过手势关闭，确保用户必须做出选择
+                // .frame(minWidth: 500, minHeight: 300)
+                // .interactiveDismissDisabled(true) // 禁止通过手势关闭，确保用户必须做出选择
         }
         #else
         // iOS 版本使用 TabView

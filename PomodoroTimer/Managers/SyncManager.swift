@@ -214,7 +214,7 @@ class SyncManager: ObservableObject {
         self.serverURL = userDefaults.string(forKey: serverURLKey) ?? serverURL
 
         // 加载同步系统事件设置（默认为true）
-        self.syncSystemEvents = userDefaults.object(forKey: syncSystemEventsKey) as? Bool ?? true
+        self.syncSystemEvents = userDefaults.object(forKey: syncSystemEventsKey) as? Bool ?? false
 
         setupAutoSync()
 
@@ -602,12 +602,14 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 收集本地系统事件并转换为服务端格式
+        // 收集本地系统事件并转换为服务端格式（仅在启用同步系统事件时）
         var serverSystemEvents: [ServerSystemEvent] = []
-        let systemEvents = SystemEventStore.shared.events
-        for systemEvent in systemEvents {
-            let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
-            serverSystemEvents.append(serverSystemEvent)
+        if syncSystemEvents {
+            let systemEvents = SystemEventStore.shared.events
+            for systemEvent in systemEvents {
+                let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
+                serverSystemEvents.append(serverSystemEvent)
+            }
         }
 
         // 收集本地计时器设置并转换为服务端格式
@@ -1390,12 +1392,14 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 收集所有系统事件
+        // 收集所有系统事件（仅在启用同步系统事件时）
         var allSystemEvents: [ServerSystemEvent] = []
-        let systemEvents = SystemEventStore.shared.events
-        for systemEvent in systemEvents {
-            let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
-            allSystemEvents.append(serverSystemEvent)
+        if syncSystemEvents {
+            let systemEvents = SystemEventStore.shared.events
+            for systemEvent in systemEvents {
+                let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
+                allSystemEvents.append(serverSystemEvent)
+            }
         }
 
         var timerSettings: ServerTimerSettings? = nil
@@ -2388,21 +2392,23 @@ extension SyncManager {
             collector.addDownloadedItem(detail)
         }
 
-        // 收集系统事件下载详情
-        for systemEvent in data.systemEvents {
-            let detail = SyncItemDetail(
-                id: systemEvent.uuid,
-                type: .systemEvent,
-                operation: .download,
-                title: "系统事件",
-                description: systemEvent.eventType,
-                timestamp: Date(timeIntervalSince1970: TimeInterval(systemEvent.timestamp) / 1000),
-                details: SyncItemSpecificDetails(
-                    systemEventType: systemEvent.eventType,
-                    systemEventData: systemEvent.data.description
+        // 收集系统事件下载详情（仅在启用同步系统事件时）
+        if syncSystemEvents {
+            for systemEvent in data.systemEvents {
+                let detail = SyncItemDetail(
+                    id: systemEvent.uuid,
+                    type: .systemEvent,
+                    operation: .download,
+                    title: "系统事件",
+                    description: systemEvent.eventType,
+                    timestamp: Date(timeIntervalSince1970: TimeInterval(systemEvent.timestamp) / 1000),
+                    details: SyncItemSpecificDetails(
+                        systemEventType: systemEvent.eventType,
+                        systemEventData: systemEvent.data.description
+                    )
                 )
-            )
-            collector.addDownloadedItem(detail)
+                collector.addDownloadedItem(detail)
+            }
         }
     }
 
