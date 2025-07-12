@@ -163,7 +163,7 @@ class SyncManager: ObservableObject {
     private let deletedEventsKey = "DeletedEventUUIDs"
     private let deletedEventInfosKey = "DeletedEventInfos"
 
-    private let apiClient: APIClient
+    private var apiClient: APIClient
     private var authManager: AuthManager?
     private let userDefaults = UserDefaults.standard
 
@@ -1484,6 +1484,14 @@ class SyncManager: ObservableObject {
     func updateServerURL(_ url: String) {
         serverURL = url
         userDefaults.set(url, forKey: serverURLKey)
+
+        // 更新APIClient以使用新的服务器地址
+        apiClient = APIClient(baseURL: url)
+
+        // 通知AuthManager更新服务器地址（这会清除旧的认证状态）
+        authManager?.updateServerURL(url)
+
+        print("🔄 SyncManager: 服务器地址已更新为 \(url)，认证状态已重置")
     }
 
     /// 更新同步系统事件设置

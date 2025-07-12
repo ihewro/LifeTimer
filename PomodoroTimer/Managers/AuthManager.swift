@@ -364,7 +364,8 @@ class AuthManager: ObservableObject {
             self.authStatus = .notAuthenticated
         }
 
-        // 清除存储的认证信息
+        // 清除存储的认证信息（与clearStoredCredentials保持一致）
+        userDefaults.removeObject(forKey: userUUIDKey)
         userDefaults.removeObject(forKey: sessionTokenKey)
         userDefaults.removeObject(forKey: tokenExpiresAtKey)
         userDefaults.removeObject(forKey: userInfoKey)

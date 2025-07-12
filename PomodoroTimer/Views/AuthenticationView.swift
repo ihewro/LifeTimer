@@ -13,6 +13,7 @@ import AppKit
 /// 用户认证界面
 struct AuthenticationView: View {
     @StateObject private var authManager: AuthManager
+    @StateObject private var syncManager: SyncManager
     @State private var userUUID: String = ""
     @State private var showingUserUUIDInput = false
     @State private var authError: String?
@@ -20,8 +21,9 @@ struct AuthenticationView: View {
     @State private var showingServerConfig = false
     @Environment(\.dismiss) private var dismiss
 
-    init(authManager: AuthManager) {
+    init(authManager: AuthManager, syncManager: SyncManager) {
         self._authManager = StateObject(wrappedValue: authManager)
+        self._syncManager = StateObject(wrappedValue: syncManager)
     }
     
     var body: some View {
@@ -335,8 +337,8 @@ struct AuthenticationView: View {
         UserDefaults.standard.set(urlToSave, forKey: "ServerURL")
         serverURL = urlToSave
 
-        // 更新 AuthManager 的服务器地址
-        authManager.updateServerURL(urlToSave)
+        // 更新 SyncManager 的服务器地址（这会同时更新 AuthManager）
+        syncManager.updateServerURL(urlToSave)
 
         // 收起配置面板
         showingServerConfig = false

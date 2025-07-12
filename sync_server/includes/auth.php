@@ -50,13 +50,14 @@ function getAuthTokenFromHeader() {
  */
 function validateSessionToken($token) {
     if (empty($token)) {
+        logMessage("Session validation failed: Empty token provided", 'WARNING');
         return null;
     }
-    
+
     $db = getDB();
-    
+
     $stmt = $db->prepare('
-        SELECT 
+        SELECT
             s.user_id,
             s.device_id,
             s.expires_at,
@@ -71,27 +72,44 @@ function validateSessionToken($token) {
         JOIN devices d ON s.device_id = d.id
         WHERE s.session_token = ? AND s.is_active = 1
     ');
-    
+
     $stmt->execute([$token]);
     $session = $stmt->fetch();
-    
+
     if (!$session) {
+        // 进一步检查token是否存在但不活跃
+        $stmt = $db->prepare('SELECT is_active, expires_at FROM user_sessions WHERE session_token = ?');
+        $stmt->execute([$token]);
+        $inactiveSession = $stmt->fetch();
+
+        if ($inactiveSession) {
+            if ($inactiveSession['is_active'] == 0) {
+                logMessage("Session validation failed: Token exists but is inactive (token: " . substr($token, 0, 8) . "...)", 'WARNING');
+            }
+        } else {
+            logMessage("Session validation failed: Token not found in database (token: " . substr($token, 0, 8) . "...)", 'WARNING');
+        }
         return null;
     }
-    
+
     // 检查token是否过期
     $expiresAt = new DateTime($session['expires_at']);
-    if ($expiresAt < new DateTime()) {
+    $currentTime = new DateTime();
+    if ($expiresAt < $currentTime) {
         // Token过期，标记为无效
         $stmt = $db->prepare('UPDATE user_sessions SET is_active = 0 WHERE session_token = ?');
         $stmt->execute([$token]);
+
+        logMessage("Session validation failed: Token expired (token: " . substr($token, 0, 8) . "..., expired_at: " . $session['expires_at'] . ", current_time: " . $currentTime->format('Y-m-d H:i:s') . ")", 'WARNING');
         return null;
     }
-    
+
     // 更新最后使用时间
     $stmt = $db->prepare('UPDATE user_sessions SET last_used_at = CURRENT_TIMESTAMP WHERE session_token = ?');
     $stmt->execute([$token]);
-    
+
+    logMessage("Session validation successful for user: " . $session['user_name'] . " (device: " . $session['device_name'] . ")", 'INFO');
+
     return [
         'user_id' => $session['user_id'],
         'user_uuid' => $session['user_uuid'],
@@ -253,14 +271,23 @@ function getOrCreateDevice($deviceUuid, $userId, $deviceName = null, $platform =
  */
 function requireAuth() {
     $token = getAuthTokenFromHeader();
-    $userInfo = validateSessionToken($token);
-    
-    if (!$userInfo) {
+
+    if (!$token) {
+        logMessage("Authentication failed: No token provided in Authorization header", 'WARNING');
         http_response_code(401);
         sendError('Authentication required', 401);
         exit;
     }
-    
+
+    $userInfo = validateSessionToken($token);
+
+    if (!$userInfo) {
+        logMessage("Authentication failed: Invalid session token (token: " . substr($token, 0, 8) . "...)", 'WARNING');
+        http_response_code(401);
+        sendError('Authentication required', 401);
+        exit;
+    }
+
     return $userInfo;
 }
 
