@@ -57,7 +57,7 @@ try {
             }
             break;
 
-        case 'token-refresh':
+        case 'refresh':
             if ($method === 'POST') {
                 handleTokenRefresh();
             } else {
