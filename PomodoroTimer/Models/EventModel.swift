@@ -194,6 +194,25 @@ class EventManager: ObservableObject {
             .filter { $0.type == .pomodoro && $0.isCompleted }
             .reduce(0) { $0 + $1.duration }
     }
+
+    /// 搜索事件
+    /// - Parameter searchText: 搜索关键词
+    /// - Returns: 匹配的事件列表，按时间倒序排列
+    func searchEvents(_ searchText: String) -> [PomodoroEvent] {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return []
+        }
+
+        let trimmedText = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        return events.filter { event in
+            // 搜索标题
+            event.title.lowercased().contains(trimmedText) ||
+            // 搜索事件类型
+            event.type.displayName.lowercased().contains(trimmedText)
+        }
+        .sorted { $0.startTime > $1.startTime } // 按时间倒序排列，最新的在前
+    }
     
     private func addCompletedSession(from notification: Notification) {
         guard let userInfo = notification.userInfo,

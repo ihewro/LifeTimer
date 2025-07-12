@@ -264,6 +264,164 @@ enum CalendarViewMode: String, CaseIterable {
     }
 }
 
+// MARK: - 搜索结果侧边栏
+struct SearchResultsSidebar: View {
+    let searchResults: [PomodoroEvent]
+    let onEventSelected: (PomodoroEvent) -> Void
+    let onClose: () -> Void
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 标题栏
+            HStack {
+                Text("搜索结果")
+                    .font(.headline)
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                Text("\(searchResults.count) 个结果")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(.plain)
+                .help("关闭搜索")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(NSColor.controlBackgroundColor))
+
+            Divider()
+
+            // 搜索结果列表
+            if searchResults.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 32))
+                        .foregroundColor(.secondary)
+
+                    Text("未找到匹配的事件")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.controlBackgroundColor))
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 1) {
+                        ForEach(searchResults) { event in
+                            SearchResultRow(
+                                event: event,
+                                dateFormatter: dateFormatter,
+                                timeFormatter: timeFormatter,
+                                onTap: { onEventSelected(event) }
+                            )
+                        }
+                    }
+                }
+                .background(Color(NSColor.controlBackgroundColor))
+            }
+        }
+        .frame(width: 280)
+        .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+    }
+}
+
+// MARK: - 搜索结果行
+struct SearchResultRow: View {
+    let event: PomodoroEvent
+    let dateFormatter: DateFormatter
+    let timeFormatter: DateFormatter
+    let onTap: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                // 事件类型图标
+                Image(systemName: event.type.icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(event.type.color)
+                    .frame(width: 16, height: 16)
+
+                // 事件标题
+                Text(event.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+
+                Spacer()
+
+                // 事件类型标签
+                Text(event.type.displayName)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(event.type.color)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(event.type.color.opacity(0.1))
+                    .cornerRadius(4)
+            }
+
+            // 时间信息
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Text(dateFormatter.string(from: event.startTime))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Text("•")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Text("\(timeFormatter.string(from: event.startTime)) - \(timeFormatter.string(from: event.endTime))")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                // 持续时间
+                Text(event.formattedDuration)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(isHovered ? Color(NSColor.controlAccentColor).opacity(0.1) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
 // MARK: - 可重用的日历导航工具栏组件
 struct CalendarNavigationToolbar: View {
     let viewMode: CalendarViewMode
@@ -355,36 +513,63 @@ struct CalendarView: View {
     @State private var draggedEvent: PomodoroEvent?
     @State private var dragOffset: CGSize = .zero
     @State private var searchText = ""
-    
+
+    // 搜索相关状态
+    @State private var searchResults: [PomodoroEvent] = []
+    @State private var showingSearchResults = false
+    @State private var highlightedEventId: UUID?
+
     private let calendar = Calendar.current
     
     var body: some View {
-        Group {
+        HStack(spacing: 0) {
             // 主要内容区域
-            switch currentViewMode {
-                case .day:
-                    DayView(
-                        selectedDate: $selectedDate,
-                        selectedEvent: $selectedEvent,
-                        showingAddEvent: $showingAddEvent,
-                        draggedEvent: $draggedEvent,
-                        dragOffset: $dragOffset
-                    )
-                    .environmentObject(eventManager)
-                    .environmentObject(activityMonitor)
-                    .background(Color(NSColor.controlBackgroundColor))
-
-                case .week:
-                    WeekView(selectedDate: $selectedDate)
+            Group {
+                switch currentViewMode {
+                    case .day:
+                        DayView(
+                            selectedDate: $selectedDate,
+                            selectedEvent: $selectedEvent,
+                            showingAddEvent: $showingAddEvent,
+                            draggedEvent: $draggedEvent,
+                            dragOffset: $dragOffset,
+                            highlightedEventId: $highlightedEventId
+                        )
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
                         .background(Color(NSColor.controlBackgroundColor))
 
-                case .month:
-                    MonthView(viewMode: currentViewMode, selectedDate: $selectedDate)
+                    case .week:
+                        WeekView(
+                            selectedDate: $selectedDate,
+                            highlightedEventId: $highlightedEventId
+                        )
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
                         .background(Color(NSColor.controlBackgroundColor))
+
+                    case .month:
+                        MonthView(
+                            viewMode: currentViewMode,
+                            selectedDate: $selectedDate,
+                            highlightedEventId: $highlightedEventId
+                        )
+                        .environmentObject(eventManager)
+                        .environmentObject(activityMonitor)
+                        .background(Color(NSColor.controlBackgroundColor))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // 搜索结果侧边栏
+            if showingSearchResults {
+                SearchResultsSidebar(
+                    searchResults: searchResults,
+                    onEventSelected: handleEventSelection,
+                    onClose: closeSearchResults
+                )
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -440,9 +625,59 @@ struct CalendarView: View {
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
                             .frame(width: 140)
+                            .onSubmit {
+                                performSearch()
+                            }
+                            .onChange(of: searchText) { newValue in
+                                if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    closeSearchResults()
+                                }
+                            }
                 }
             }
         }
+    }
+
+    // MARK: - 搜索相关方法
+
+    /// 执行搜索
+    private func performSearch() {
+        let trimmedText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            closeSearchResults()
+            return
+        }
+
+        searchResults = eventManager.searchEvents(trimmedText)
+        showingSearchResults = true
+    }
+
+    /// 关闭搜索结果
+    private func closeSearchResults() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showingSearchResults = false
+        }
+        searchResults = []
+        highlightedEventId = nil
+    }
+
+    /// 处理事件选择
+    private func handleEventSelection(_ event: PomodoroEvent) {
+        // 跳转到事件对应的日期
+        selectedDate = event.startTime
+
+        // 高亮显示选中的事件
+        highlightedEventId = event.id
+
+        // 500毫秒后取消高亮
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                highlightedEventId = nil
+            }
+        }
+
+        // 保持搜索结果侧边栏显示状态，不自动关闭
+        // 用户可以通过点击关闭按钮或清空搜索框来手动关闭
     }
 }
 
@@ -453,6 +688,7 @@ struct DayView: View {
     @Binding var showingAddEvent: Bool
     @Binding var draggedEvent: PomodoroEvent?
     @Binding var dragOffset: CGSize
+    @Binding var highlightedEventId: UUID?
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     private let calendar = Calendar.current
@@ -468,7 +704,8 @@ struct DayView: View {
                     showingAddEvent: $showingAddEvent,
                     draggedEvent: $draggedEvent,
                     dragOffset: $dragOffset,
-                    hourHeight: hourHeight
+                    hourHeight: hourHeight,
+                    highlightedEventId: $highlightedEventId
                 )
                 .environmentObject(eventManager)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -506,7 +743,8 @@ struct TimelineView: View {
     @Binding var draggedEvent: PomodoroEvent?
     @Binding var dragOffset: CGSize
     let hourHeight: CGFloat
-    
+    @Binding var highlightedEventId: UUID?
+
     @EnvironmentObject var eventManager: EventManager
     @State private var selectionStart: CGPoint?
     @State private var selectionEnd: CGPoint?
@@ -577,7 +815,8 @@ struct TimelineView: View {
                             selectedDate: selectedDate,
                             column: column,
                             totalColumns: totalColumns,
-                            containerWidth: geometry.size.width-50 // 使用TimelineView本身的宽度
+                            containerWidth: geometry.size.width-50, // 使用TimelineView本身的宽度
+                            highlightedEventId: $highlightedEventId
                         )
                         .id(event.id) // 确保正确的视图标识，提高更新性能
                         .drawingGroup() // 将事件块渲染为单个图层，提高性能
@@ -763,6 +1002,7 @@ struct EventBlock: View {
     var column: Int = 0
     var totalColumns: Int = 1
     let containerWidth: CGFloat // 新增：容器宽度参数
+    @Binding var highlightedEventId: UUID?
     @EnvironmentObject var eventManager: EventManager
     @State private var showingPopover = false
 
@@ -827,7 +1067,9 @@ struct EventBlock: View {
         .frame(width: width, height: max(20, position.height))
         .position(x: x + width / 2, y: position.y + position.height / 2)
         .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
+        .scaleEffect(highlightedEventId == event.id ? 1.1 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
+        .animation(.easeInOut(duration: 0.5), value: highlightedEventId == event.id)
             .onTapGesture(count: 2) {
                 showingPopover = true
             }
@@ -1469,6 +1711,7 @@ struct DayStatsPanel: View {
 // MARK: - 周视图
 struct WeekView: View {
     @Binding var selectedDate: Date
+    @Binding var highlightedEventId: UUID?
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @State private var selectedEvent: PomodoroEvent?
@@ -1658,7 +1901,8 @@ struct WeekView: View {
                                         date: date,
                                         column: column,
                                         totalColumns: totalColumns,
-                                        containerWidth: dayGeometry.size.width
+                                        containerWidth: dayGeometry.size.width,
+                                        highlightedEventId: $highlightedEventId
                                     )
                                 }
 
@@ -1989,6 +2233,7 @@ struct WeekEventBlock: View {
     var column: Int = 0
     var totalColumns: Int = 1
     let containerWidth: CGFloat
+    @Binding var highlightedEventId: UUID?
 
     @State private var showingPopover = false
     @State private var dragOffset: CGSize = .zero
@@ -2054,7 +2299,9 @@ struct WeekEventBlock: View {
         .frame(width: width, height: position.height)
         .position(x: x + width / 2, y: position.y + position.height / 2)
         .offset(dragOffset)
+        .scaleEffect(highlightedEventId == event.id ? 1.1 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
+        .animation(.easeInOut(duration: 0.5), value: highlightedEventId == event.id)
         .onTapGesture(count: 2) {
             showingPopover = true
         }
@@ -2133,6 +2380,7 @@ struct WeekEventBlock: View {
 struct MonthView: View {
     let viewMode: CalendarViewMode
     @Binding var selectedDate: Date
+    @Binding var highlightedEventId: UUID?
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @State private var selectedEvent: PomodoroEvent?
@@ -2339,7 +2587,8 @@ struct MonthView: View {
                         events: monthEventsCache[date] ?? [],
                         activityStats: monthActivityCache[date] ?? [],
                         cellHeight: cellHeight,
-                        isLoading: isDataMismatch
+                        isLoading: isDataMismatch,
+                        highlightedEventId: $highlightedEventId
                     )
                     .id("\(date.timeIntervalSince1970)-\(isLoadingData)") // 确保正确的视图标识
                     .drawingGroup() // 将单元格渲染为单个图层，提高性能
@@ -2895,6 +3144,7 @@ struct MonthDayCell: View {
     let activityStats: [AppUsageStats]
     let cellHeight: CGFloat
     let isLoading: Bool
+    @Binding var highlightedEventId: UUID?
 
     private let calendar = Calendar.current
 
@@ -3029,6 +3279,8 @@ struct MonthDayCell: View {
             RoundedRectangle(cornerRadius: 3)
                 .fill(event.type.color.opacity(0.1))
         )
+        .scaleEffect(highlightedEventId == event.id ? 1.1 : 1.0)
+        .animation(.easeInOut(duration: 0.5), value: highlightedEventId == event.id)
     }
 
     // 加载骨架屏视图
