@@ -63,10 +63,8 @@ struct AuthenticationView: View {
             }
         }
         .sheet(isPresented: $showingUserUUIDInput) {
-            UserUUIDInputView { uuid in
-                Task {
-                    await bindToUser(uuid)
-                }
+            UserUUIDInputView(authManager: authManager) {
+                showingUserUUIDInput = false
             }
         }
 
@@ -296,7 +294,6 @@ struct AuthenticationView: View {
     private func bindToUser(_ userUUID: String) async {
         do {
             _ = try await authManager.bindToUser(userUUID: userUUID)
-            showingUserUUIDInput = false
         } catch {
             authError = error.localizedDescription
         }
@@ -435,38 +432,82 @@ struct UserInfoCard: View {
 struct UserUUIDInputView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var userUUID: String = ""
-    let onSubmit: (String) -> Void
-    
+    @State private var isBinding: Bool = false
+    @State private var bindingError: String?
+
+    let authManager: AuthManager
+    let onSuccess: () -> Void
+
     var body: some View {
         VStack(spacing: 20) {
             Text("绑定到现有账户")
                 .font(.title2)
                 .fontWeight(.semibold)
-            
+
             Text("请输入您的用户UUID")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             TextField("用户UUID", text: $userUUID)
                 .textFieldStyle(.roundedBorder)
                 .font(.monospaced(.body)())
-            
+                .disabled(isBinding)
+
+            // 错误信息显示
+            if let error = bindingError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
             HStack {
                 Button("取消") {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
-                
+                .disabled(isBinding)
+
                 Spacer()
-                
-                Button("绑定") {
-                    onSubmit(userUUID)
+
+                Button(isBinding ? "绑定中..." : "绑定") {
+                    Task {
+                        await performBinding()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(userUUID.isEmpty)
+                .disabled(userUUID.isEmpty || isBinding)
+            }
+
+            // 加载指示器
+            if isBinding {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .padding(.top, 8)
             }
         }
         .padding()
         .frame(width: 400)
+    }
+
+    private func performBinding() async {
+        // 清除之前的错误信息
+        bindingError = nil
+        isBinding = true
+
+        do {
+            _ = try await authManager.bindToUser(userUUID: userUUID)
+            // 绑定成功，关闭视图
+            await MainActor.run {
+                onSuccess()
+            }
+        } catch {
+            // 绑定失败，显示错误信息但保持视图打开
+            await MainActor.run {
+                bindingError = error.localizedDescription
+                isBinding = false
+            }
+        }
     }
 }
