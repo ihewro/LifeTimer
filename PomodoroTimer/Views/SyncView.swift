@@ -2331,6 +2331,7 @@ extension SyncView {
 
                         Button(action: {
                             #if canImport(AppKit)
+                            NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(user.id, forType: .string)
                             #endif
                         }) {

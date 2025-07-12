@@ -270,6 +270,7 @@ struct AuthenticationView: View {
                 if let userUUID = authManager.currentUser?.id {
                     Button("复制用户ID") {
                         #if canImport(AppKit)
+                        NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(userUUID, forType: .string)
                         #endif
                     }
