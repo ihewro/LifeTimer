@@ -4,9 +4,16 @@
  * 替换原有的基于设备隔离的同步系统
  */
 
-// 注意：config/database.php 和基础函数已经在 index.php 中包含了
-// 只需要包含认证相关的函数
-require_once 'includes/auth.php';
+// 配置错误处理，防止警告信息污染JSON响应
+// error_reporting(E_ERROR | E_PARSE); // 只报告严重错误
+// ini_set('display_errors', 0); // 不显示错误到输出
+// ini_set('log_errors', 1); // 记录错误到日志
+
+
+// 包含必要的函数文件
+require_once 'api/base.php';           // API基础函数（响应、验证等）
+require_once 'includes/functions.php'; // 通用工具函数（UUID、Token生成等）
+require_once 'includes/auth.php';      // 认证相关函数
 
 // 设置响应头
 header('Content-Type: application/json; charset=utf-8');
@@ -179,14 +186,26 @@ function getUserPomodoroEvents($db, $userId) {
  */
 function getUserSystemEvents($db, $userId) {
     $stmt = $db->prepare('
-        SELECT 
+        SELECT
             uuid, event_type, timestamp, data, created_at
-        FROM system_events 
+        FROM system_events
         WHERE user_id = ? AND deleted_at IS NULL
         ORDER BY timestamp DESC
     ');
     $stmt->execute([$userId]);
-    return $stmt->fetchAll();
+    $events = $stmt->fetchAll();
+
+    // 解码JSON数据字段
+    foreach ($events as &$event) {
+        if ($event['data']) {
+            $decoded = json_decode($event['data'], true);
+            $event['data'] = $decoded !== null ? $decoded : [];
+        } else {
+            $event['data'] = [];
+        }
+    }
+
+    return $events;
 }
 
 /**
@@ -243,14 +262,26 @@ function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
  */
 function getUserSystemEventsAfter($db, $userId, $timestamp) {
     $stmt = $db->prepare('
-        SELECT 
+        SELECT
             uuid, event_type, timestamp, data, created_at
-        FROM system_events 
+        FROM system_events
         WHERE user_id = ? AND created_at > ? AND deleted_at IS NULL
         ORDER BY created_at ASC
     ');
     $stmt->execute([$userId, $timestamp]);
-    return $stmt->fetchAll();
+    $events = $stmt->fetchAll();
+
+    // 解码JSON数据字段
+    foreach ($events as &$event) {
+        if ($event['data']) {
+            $decoded = json_decode($event['data'], true);
+            $event['data'] = $decoded !== null ? $decoded : [];
+        } else {
+            $event['data'] = [];
+        }
+    }
+
+    return $events;
 }
 
 /**
@@ -383,7 +414,7 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
                     $deviceId,
                     $event['event_type'],
                     $event['timestamp'],
-                    $event['data'],
+                    is_array($event['data']) ? json_encode($event['data']) : $event['data'],
                     $event['created_at']
                 ]);
             } catch (PDOException $e) {
@@ -620,7 +651,7 @@ function migrateDeviceSystemEvents($db, $deviceUuid, $userId, $deviceId) {
                 $deviceId,
                 $event['event_type'],
                 $event['timestamp'],
-                $event['data'],
+                is_array($event['data']) ? json_encode($event['data']) : $event['data'],
                 $event['created_at']
             ]);
             $migratedCount++;

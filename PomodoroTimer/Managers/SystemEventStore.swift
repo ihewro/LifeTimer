@@ -67,6 +67,11 @@ class SystemEventStore: ObservableObject {
             self.saveToFile()
         }
     }
+
+    /// 保存当前事件数组到文件（用于同步后的数据持久化）
+    func saveCurrentEvents() {
+        saveToFile()
+    }
     
     /// 获取指定日期的事件
     func getEvents(for date: Date) -> [SystemEvent] {

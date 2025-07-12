@@ -864,6 +864,8 @@ class SyncManager: ObservableObject {
                 case .forceOverwriteLocal:
                     // 强制覆盖本地：完全使用服务端数据
                     eventManager.events = data.pomodoroEvents.map { self.createEventFromServer($0) }
+                    // 立即保存到持久化存储
+                    eventManager.saveEvents()
 
                 case .forceOverwriteRemote:
                     // 强制覆盖远程：保持本地数据不变（这个模式在这里不适用）
@@ -911,6 +913,8 @@ class SyncManager: ObservableObject {
             case .forceOverwriteLocal:
                 // 强制覆盖本地：完全使用服务端数据
                 systemEventStore.events = serverSystemEvents.map { self.createSystemEventFromServer($0) }
+                // 立即保存到持久化存储
+                systemEventStore.saveCurrentEvents()
 
             case .forceOverwriteRemote:
                 // 强制覆盖远程：保持本地数据不变
@@ -975,6 +979,8 @@ class SyncManager: ObservableObject {
 
         // 3. 按时间排序并应用
         systemEventStore.events = mergedEvents.sorted { $0.timestamp < $1.timestamp }
+        // 保存合并后的数据
+        systemEventStore.saveCurrentEvents()
     }
 
     /// 智能合并服务端数据到本地
@@ -1019,6 +1025,8 @@ class SyncManager: ObservableObject {
 
         // 3. 按时间排序并应用
         eventManager.events = mergedEvents.sorted { $0.startTime < $1.startTime }
+        // 保存合并后的数据
+        eventManager.saveEvents()
     }
 
     /// 应用计时器设置

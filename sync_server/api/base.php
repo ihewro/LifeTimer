@@ -1,5 +1,8 @@
 <?php
 // 基础API响应函数
+
+// 引用通用函数（因为 validateDevice 函数需要使用 getDB）
+require_once __DIR__ . '/../includes/functions.php';
 function sendResponse($success, $data = null, $message = '', $httpCode = 200) {
     http_response_code($httpCode);
     echo json_encode([

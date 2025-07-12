@@ -3,26 +3,8 @@
  * 用户认证相关函数
  */
 
-/**
- * 生成会话token
- */
-function generateSessionToken() {
-    return bin2hex(random_bytes(32));
-}
-
-/**
- * 生成用户UUID
- */
-function generateUserUUID() {
-    return sprintf(
-        '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-        mt_rand(0, 0xffff),
-        mt_rand(0, 0x0fff) | 0x4000,
-        mt_rand(0, 0x3fff) | 0x8000,
-        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-    );
-}
+// 引用通用函数
+require_once __DIR__ . '/functions.php';
 
 /**
  * 验证UUID格式
