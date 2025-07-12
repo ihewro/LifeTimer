@@ -1873,82 +1873,96 @@ struct WeekView: View {
 
     // 周事件网格视图
     private var weekGridView: some View {
-        HStack(alignment: .top, spacing: 0) {
-            ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
-                HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        // 移除横线，只保留空间占位
-                        ForEach(Array(0...23), id: \.self) { hour in
-                            Rectangle()
-                                .fill(Color.clear)
-                                .frame(height: hourHeight)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .background(
-                        // 当日事件 - 使用并列布局算法
-                        GeometryReader { dayGeometry in
-                            ZStack(alignment: .topLeading) {
-                                let dayEvents = eventManager.eventsForDate(date)
-                                let eventLayoutInfo = computeEventColumns(events: dayEvents)
-
-                                ForEach(eventLayoutInfo, id: \.0.id) { info in
-                                    let (event, column, totalColumns) = info
-                                    WeekEventBlock(
-                                        event: event,
-                                        selectedEvent: $selectedEvent,
-                                        hourHeight: hourHeight,
-                                        date: date,
-                                        column: column,
-                                        totalColumns: totalColumns,
-                                        containerWidth: dayGeometry.size.width,
-                                        highlightedEventId: $highlightedEventId
-                                    )
-                                }
-
-
-
-                                // 选择区域覆盖层（只在当前选择的日期显示）
-                                if isSelecting, let start = selectionStart, let end = selectionEnd, selectionDate == date {
-                                    WeekSelectionOverlay(start: start, end: end, containerWidth: dayGeometry.size.width)
-                                }
-                            }
-                        }
-                    )
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // 点击取消选中事件
-                        selectedEvent = nil
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 5)
-                            .onChanged { value in
-                                // 开始拖拽选择
-                                if selectionStart == nil {
-                                    selectionStart = value.startLocation
-                                    selectionDate = date
-                                    isSelecting = true
-                                }
-
-                                // 只有在同一天内才更新选择
-                                if selectionDate == date {
-                                    selectionEnd = value.location
-                                }
-                            }
-                            .onEnded { value in
-                                if isSelecting && selectionDate == date {
-                                    createEventFromWeekSelection(date: date)
-                                }
-                                resetSelection()
-                            }
-                    )
-
-                    // 添加竖线分隔（除了最后一列）
-                    if index < weekDates.count - 1 {
+        ZStack(alignment: .topLeading) {
+            // 横线网格层 - 比竖线颜色更浅
+            VStack(spacing: 0) {
+                ForEach(Array(0...23), id: \.self) { hour in
+                    HStack {
+                        // 跨越整个周视图宽度的横线
                         Rectangle()
-                            .fill(Color.secondary.opacity(0.3))
-                            .frame(width: 1)
+                            .fill(Color.secondary.opacity(0.05)) // 比竖线更浅的颜色
+                            .frame(height: 1)
+                    }
+                    .frame(height: hourHeight, alignment: .top)
+                }
+            }
+
+            // 主要内容层
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
+                    HStack(spacing: 0) {
+                        VStack(spacing: 0) {
+                            // 保留空间占位
+                            ForEach(Array(0...23), id: \.self) { hour in
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .frame(height: hourHeight)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .background(
+                            // 当日事件 - 使用并列布局算法
+                            GeometryReader { dayGeometry in
+                                ZStack(alignment: .topLeading) {
+                                    let dayEvents = eventManager.eventsForDate(date)
+                                    let eventLayoutInfo = computeEventColumns(events: dayEvents)
+
+                                    ForEach(eventLayoutInfo, id: \.0.id) { info in
+                                        let (event, column, totalColumns) = info
+                                        WeekEventBlock(
+                                            event: event,
+                                            selectedEvent: $selectedEvent,
+                                            hourHeight: hourHeight,
+                                            date: date,
+                                            column: column,
+                                            totalColumns: totalColumns,
+                                            containerWidth: dayGeometry.size.width,
+                                            highlightedEventId: $highlightedEventId
+                                        )
+                                    }
+
+                                    // 选择区域覆盖层（只在当前选择的日期显示）
+                                    if isSelecting, let start = selectionStart, let end = selectionEnd, selectionDate == date {
+                                        WeekSelectionOverlay(start: start, end: end, containerWidth: dayGeometry.size.width)
+                                    }
+                                }
+                            }
+                        )
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // 点击取消选中事件
+                            selectedEvent = nil
+                        }
+                        .gesture(
+                            DragGesture(minimumDistance: 5)
+                                .onChanged { value in
+                                    // 开始拖拽选择
+                                    if selectionStart == nil {
+                                        selectionStart = value.startLocation
+                                        selectionDate = date
+                                        isSelecting = true
+                                    }
+
+                                    // 只有在同一天内才更新选择
+                                    if selectionDate == date {
+                                        selectionEnd = value.location
+                                    }
+                                }
+                                .onEnded { value in
+                                    if isSelecting && selectionDate == date {
+                                        createEventFromWeekSelection(date: date)
+                                    }
+                                    resetSelection()
+                                }
+                        )
+
+                        // 添加竖线分隔（除了最后一列）
+                        if index < weekDates.count - 1 {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.3)) // 竖线保持原来的颜色
+                                .frame(width: 1)
+                        }
                     }
                 }
             }
