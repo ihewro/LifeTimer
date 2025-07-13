@@ -480,6 +480,8 @@ class TimerModel: ObservableObject {
     // MARK: - 设置变更通知
 
     private func notifySettingsChanged() {
+        print("⚙️ Timer settings changed - notifying sync manager")
+        print("   - Pomodoro: \(Int(pomodoroTime))s, Short break: \(Int(shortBreakTime))s, Long break: \(Int(longBreakTime))s")
         NotificationCenter.default.post(name: TimerModel.settingsChangedNotification, object: self)
     }
 

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS devices (
     device_name VARCHAR(100),
     platform VARCHAR(20),
     last_sync_timestamp BIGINT DEFAULT 0,
+    last_access_timestamp BIGINT DEFAULT 0, -- 最后访问时间（用于数据预览等轻量操作）
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT 1, -- 设备是否活跃

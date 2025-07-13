@@ -385,19 +385,19 @@ struct SyncView: View {
             dataComparisonRow(
                 title: "番茄钟事件",
                 localCount: syncManager.localData?.eventCount ?? 0,
-                serverCount: syncManager.serverData?.eventCount ?? 0
+                serverCount: getServerEventCount()
             )
 
             dataComparisonRow(
                 title: "系统事件",
                 localCount: syncManager.localData?.systemEventCount ?? 0,
-                serverCount: syncManager.serverData?.systemEventCount ?? 0
+                serverCount: getServerSystemEventCount()
             )
 
             dataComparisonRow(
                 title: "计时器设置",
                 localCount: syncManager.localData?.timerSettings != nil ? 1 : 0,
-                serverCount: syncManager.serverData?.timerSettings != nil ? 1 : 0
+                serverCount: hasServerTimerSettings() ? 1 : 0
             )
 
             // 同步状态说明
@@ -507,7 +507,31 @@ struct SyncView: View {
 
     /// 检查服务器数据是否可用
     private func isServerDataAvailable() -> Bool {
-        return syncManager.serverData != nil && syncManager.serverConnectionStatus == "已连接"
+        return (syncManager.serverData != nil || syncManager.serverDataSummary != nil) && syncManager.serverConnectionStatus == "已连接"
+    }
+
+    /// 获取服务端事件数量（兼容摘要和完整数据）
+    private func getServerEventCount() -> Int {
+        if let summary = syncManager.serverDataSummary {
+            return summary.pomodoroEventCount
+        }
+        return syncManager.serverData?.eventCount ?? 0
+    }
+
+    /// 获取服务端系统事件数量（兼容摘要和完整数据）
+    private func getServerSystemEventCount() -> Int {
+        if let summary = syncManager.serverDataSummary {
+            return summary.systemEventCount
+        }
+        return syncManager.serverData?.systemEventCount ?? 0
+    }
+
+    /// 检查服务端是否有计时器设置（兼容摘要和完整数据）
+    private func hasServerTimerSettings() -> Bool {
+        if let summary = syncManager.serverDataSummary {
+            return summary.hasTimerSettings
+        }
+        return syncManager.serverData?.timerSettings != nil
     }
 
     /// 根据标题获取数据类型
@@ -544,13 +568,13 @@ struct SyncView: View {
             switch dataType {
             case .pomodoroEvents:
                 localCount = syncManager.localData?.eventCount ?? 0
-                serverCount = syncManager.serverData?.eventCount ?? 0
+                serverCount = getServerEventCount()
             case .systemEvents:
                 localCount = syncManager.localData?.systemEventCount ?? 0
-                serverCount = syncManager.serverData?.systemEventCount ?? 0
+                serverCount = getServerSystemEventCount()
             case .timerSettings:
                 localCount = syncManager.localData?.timerSettings != nil ? 1 : 0
-                serverCount = syncManager.serverData?.timerSettings != nil ? 1 : 0
+                serverCount = hasServerTimerSettings() ? 1 : 0
             }
 
             if localCount == serverCount {
@@ -811,28 +835,52 @@ struct SyncView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            } else if let serverData = syncManager.serverData {
+            } else if syncManager.serverDataSummary != nil || syncManager.serverData != nil {
                 VStack(alignment: .leading, spacing: 8) {
                     dataCountRow(
                         title: "番茄钟事件",
-                        count: serverData.eventCount,
-                        isClickable: debugMode,
+                        count: getServerEventCount(),
+                        isClickable: debugMode && syncManager.serverData != nil, // 只有完整数据才能点击查看详情
                         action: { showServerDataDetail(.pomodoroEvents) }
                     )
 
                     dataCountRow(
                         title: "系统事件",
-                        count: serverData.systemEventCount,
-                        isClickable: debugMode,
+                        count: getServerSystemEventCount(),
+                        isClickable: debugMode && syncManager.serverData != nil,
                         action: { showServerDataDetail(.systemEvents) }
                     )
 
                     dataCountRow(
                         title: "计时器设置",
-                        count: serverData.timerSettings != nil ? 1 : 0,
-                        isClickable: debugMode,
+                        count: hasServerTimerSettings() ? 1 : 0,
+                        isClickable: debugMode && syncManager.serverData != nil,
                         action: { showServerDataDetail(.timerSettings) }
                     )
+
+                    // 如果只有摘要数据，显示加载完整数据的按钮
+                    if syncManager.serverDataSummary != nil && syncManager.serverData == nil {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                                Text("轻量级预览")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Button("加载完整数据") {
+                                Task {
+                                    await syncManager.loadFullServerDataPreview()
+                                }
+                            }
+                            .font(.caption2)
+                            .buttonStyle(BorderlessButtonStyle())
+                            .foregroundColor(.accentColor)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             } else {
                 Text("暂无数据")
@@ -912,21 +960,12 @@ struct SyncView: View {
 
             // 主要操作按钮
             VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    // 仅拉取
-                    syncActionButton(
-                        mode: .pullOnly,
-                        enabled: shouldEnablePullButton(),
-                        style: .bordered
-                    )
-
-                    // 仅推送
-                    syncActionButton(
-                        mode: .pushOnly,
-                        enabled: shouldEnablePushButton(),
-                        style: .bordered
-                    )
-                }
+                // 统一的增量同步按钮
+                syncActionButton(
+                    mode: .incremental,
+                    enabled: shouldEnableIncrementalSync(),
+                    style: .bordered
+                )
 
                 // 危险操作
                 HStack(spacing: 12) {
@@ -1272,8 +1311,12 @@ struct SyncView: View {
 
     /// 获取对比图标
     private func getComparisonIcon() -> String {
-        guard let localData = syncManager.localData,
-              let serverData = syncManager.serverData else {
+        guard let localData = syncManager.localData else {
+            return "questionmark.circle"
+        }
+
+        // 检查是否有服务端数据（完整或摘要）
+        guard syncManager.serverData != nil || syncManager.serverDataSummary != nil else {
             return "questionmark.circle"
         }
 
@@ -1287,8 +1330,8 @@ struct SyncView: View {
         }
 
         // 如果没有工作区信息，回退到数量比较
-        if localData.eventCount == serverData.eventCount &&
-           localData.systemEventCount == serverData.systemEventCount {
+        if localData.eventCount == getServerEventCount() &&
+           localData.systemEventCount == getServerSystemEventCount() {
             return "checkmark.circle"
         } else {
             return "arrow.left.arrow.right"
@@ -1297,8 +1340,12 @@ struct SyncView: View {
 
     /// 获取对比颜色
     private func getComparisonColor() -> Color {
-        guard let localData = syncManager.localData,
-              let serverData = syncManager.serverData else {
+        guard let localData = syncManager.localData else {
+            return .secondary
+        }
+
+        // 检查是否有服务端数据（完整或摘要）
+        guard syncManager.serverData != nil || syncManager.serverDataSummary != nil else {
             return .secondary
         }
 
@@ -1314,8 +1361,8 @@ struct SyncView: View {
         }
 
         // 如果没有工作区信息，回退到数量比较
-        if localData.eventCount == serverData.eventCount &&
-           localData.systemEventCount == serverData.systemEventCount {
+        if localData.eventCount == getServerEventCount() &&
+           localData.systemEventCount == getServerSystemEventCount() {
             return .green
         } else {
             return .orange
@@ -1324,8 +1371,12 @@ struct SyncView: View {
 
     /// 获取对比文本
     private func getComparisonText() -> String {
-        guard let localData = syncManager.localData,
-              let serverData = syncManager.serverData else {
+        guard let localData = syncManager.localData else {
+            return "数据加载中"
+        }
+
+        // 检查是否有服务端数据（完整或摘要）
+        guard syncManager.serverData != nil || syncManager.serverDataSummary != nil else {
             return "数据加载中"
         }
 
@@ -1345,8 +1396,8 @@ struct SyncView: View {
         }
 
         // 如果没有工作区信息，回退到数量比较
-        if localData.eventCount == serverData.eventCount &&
-           localData.systemEventCount == serverData.systemEventCount {
+        if localData.eventCount == getServerEventCount() &&
+           localData.systemEventCount == getServerSystemEventCount() {
             return "数据一致"
         } else {
             return "数据不一致"
@@ -1667,22 +1718,17 @@ struct SyncView: View {
 
     // MARK: - 按钮状态管理
 
-    /// 是否启用拉取按钮
-    private func shouldEnablePullButton() -> Bool {
-        guard let workspace = syncManager.syncWorkspace else { return false }
-        return workspace.hasRemoteChanges && !workspace.hasChanges
-    }
-
-    /// 是否启用推送按钮
-    private func shouldEnablePushButton() -> Bool {
-        guard let workspace = syncManager.syncWorkspace else { return false }
-        return workspace.hasChanges && !workspace.hasRemoteChanges
+    /// 是否启用增量同步按钮
+    private func shouldEnableIncrementalSync() -> Bool {
+        // 增量同步可以在有本地变更或远程变更时使用
+        guard let workspace = syncManager.syncWorkspace else { return true }
+        return workspace.hasChanges || workspace.hasRemoteChanges || true // 总是允许增量同步
     }
 
     /// 是否显示强制操作按钮
     private func shouldShowForceOperations() -> Bool {
         let hasLocalData = (syncManager.localData?.eventCount ?? 0) > 0
-        let hasRemoteData = (syncManager.serverData?.eventCount ?? 0) > 0
+        let hasRemoteData = getServerEventCount() > 0
         return hasLocalData || hasRemoteData
     }
 
@@ -1768,19 +1814,20 @@ struct SyncView: View {
                         .foregroundColor(.secondary)
                 }
             } else {
+                // 优先显示完整数据，回退到摘要数据
                 if let serverData = syncManager.serverData {
                     Text("总数: \(serverData.eventCount)")
                         .font(.caption)
                     Text("已完成: \(serverData.completedEventCount)")
                         .font(.caption)
 
-                    if !serverData.recentEvents.isEmpty {
+                    if !serverData.pomodoroEvents.isEmpty {
                         Text("最近事件:")
                             .font(.caption)
                             .fontWeight(.medium)
                             .padding(.top, 8)
 
-                        ForEach(serverData.recentEvents.prefix(5), id: \.uuid) { event in
+                        ForEach(serverData.pomodoroEvents.prefix(5), id: \.uuid) { event in
                             HStack {
                                 Circle()
                                     .fill(eventTypeColor(event.eventType))
@@ -1793,6 +1840,40 @@ struct SyncView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                    }
+                } else if let summary = syncManager.serverDataSummary {
+                    Text("总数: \(summary.pomodoroEventCount)")
+                        .font(.caption)
+
+                    if !summary.recentEvents.isEmpty {
+                        Text("最近事件 (预览):")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.top, 8)
+
+                        ForEach(summary.recentEvents.prefix(5), id: \.uuid) { event in
+                            HStack {
+                                Circle()
+                                    .fill(eventTypeColor(event.eventType))
+                                    .frame(width: 6, height: 6)
+                                Text(event.title)
+                                    .font(.caption2)
+                                Spacer()
+                                Text(formatServerTime(event.startTime))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Button("加载完整数据") {
+                            Task {
+                                await syncManager.loadFullServerDataPreview()
+                            }
+                        }
+                        .font(.caption2)
+                        .buttonStyle(BorderlessButtonStyle())
+                        .foregroundColor(.accentColor)
+                        .padding(.top, 4)
                     }
                 } else {
                     Text("暂无数据")
@@ -1822,6 +1903,9 @@ struct SyncView: View {
             } else {
                 if let serverData = syncManager.serverData {
                     Text("总数: \(serverData.systemEventCount)")
+                        .font(.caption)
+                } else if let summary = syncManager.serverDataSummary {
+                    Text("总数: \(summary.systemEventCount)")
                         .font(.caption)
                 } else {
                     Text("暂无数据")
@@ -1859,6 +1943,23 @@ struct SyncView: View {
                             .font(.caption)
                         Text("休息时长: \(Int(settings.shortBreakTime/60))分钟")
                             .font(.caption)
+                    }
+                } else if let summary = syncManager.serverDataSummary {
+                    if summary.hasTimerSettings {
+                        Text("已配置计时器设置")
+                            .font(.caption)
+                        Button("查看详情") {
+                            Task {
+                                await syncManager.loadFullServerDataPreview()
+                            }
+                        }
+                        .font(.caption2)
+                        .buttonStyle(BorderlessButtonStyle())
+                        .foregroundColor(.accentColor)
+                    } else {
+                        Text("暂无设置")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 } else {
                     Text("暂无设置")

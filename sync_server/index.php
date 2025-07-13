@@ -34,6 +34,7 @@ $routes = [
 
     // 用户同步API
     'GET /api/user/sync/full' => 'api/sync_user.php',
+    'GET /api/user/sync/summary' => 'api/sync_user.php',
     'POST /api/user/sync/incremental' => 'api/sync_user.php',
     'POST /api/user/sync/migrate' => 'api/sync_user.php',
 

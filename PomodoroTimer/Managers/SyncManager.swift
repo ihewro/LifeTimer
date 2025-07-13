@@ -65,8 +65,6 @@ enum SyncError: LocalizedError {
 enum SyncMode: String, Codable {
     case forceOverwriteLocal = "forceOverwriteLocal"    // 强制覆盖本地 (类似 git reset --hard origin/main)
     case forceOverwriteRemote = "forceOverwriteRemote"   // 强制覆盖远程 (类似 git push --force)
-    case pullOnly = "pullOnly"              // 仅拉取 (类似 git pull)
-    case pushOnly = "pushOnly"              // 仅推送 (类似 git push)
     case smartMerge = "smartMerge"            // 智能同步 (类似 git pull + git push)
     case incremental = "incremental"          // 增量同步
     case autoIncremental = "autoIncremental"  // 自动增量同步
@@ -77,10 +75,6 @@ enum SyncMode: String, Codable {
             return "强制覆盖本地"
         case .forceOverwriteRemote:
             return "强制覆盖远程"
-        case .pullOnly:
-            return "拉取"
-        case .pushOnly:
-            return "推送"
         case .smartMerge:
             return "智能同步"
         case .incremental:
@@ -96,10 +90,6 @@ enum SyncMode: String, Codable {
             return "用服务端数据完全替换本地数据"
         case .forceOverwriteRemote:
             return "用本地数据完全替换服务端数据"
-        case .pullOnly:
-            return "从服务端拉取数据并智能合并到本地"
-        case .pushOnly:
-            return "将本地未同步数据推送到服务端"
         case .smartMerge:
             return "双向同步：拉取并推送数据"
         case .incremental:
@@ -115,10 +105,6 @@ enum SyncMode: String, Codable {
             return "arrow.down.circle.fill"
         case .forceOverwriteRemote:
             return "arrow.up.circle.fill"
-        case .pullOnly:
-            return "arrow.down"
-        case .pushOnly:
-            return "arrow.up"
         case .smartMerge:
             return "arrow.up.arrow.down"
         case .incremental:
@@ -153,6 +139,7 @@ class SyncManager: ObservableObject {
     @Published var isDebugMode = false
     private var deletionTrackingLog: [String] = []
     @Published var serverData: ServerDataPreview? = nil
+    @Published var serverDataSummary: ServerDataSummary? = nil // 轻量级数据摘要
     @Published var isLoadingServerData = false
     @Published var localData: LocalDataPreview? = nil
     @Published var syncWorkspace: SyncWorkspace? = nil
@@ -163,6 +150,11 @@ class SyncManager: ObservableObject {
     @Published var lastServerResponseStatus: String = "未知"
     @Published var lastServerResponseTime: Date? = nil
     @Published var serverConnectionStatus: String = "未连接"
+
+    // 数据预览缓存
+    private var serverDataSummaryCache: ServerDataSummary? = nil
+    private var summaryCache: (summary: ServerDataSummary, timestamp: Date)? = nil
+    private let summaryCacheExpiry: TimeInterval = 30 // 30秒缓存过期时间
 
     // 跟踪删除的事件
     private var deletedEventUUIDs: Set<String> = [] // 保持向后兼容
@@ -273,10 +265,12 @@ class SyncManager: ObservableObject {
     }
 
     @objc private func settingsDidChange() {
+        print("🔄 SyncManager: Received settings change notification")
         Task {
             await generateSyncWorkspace()
             loadLocalDataPreview()
             updatePendingSyncCount()
+            print("🔄 SyncManager: Updated sync workspace and pending count after settings change")
         }
     }
 
@@ -340,19 +334,9 @@ class SyncManager: ObservableObject {
         #endif
     }
     
-    /// 执行全量同步
-    func performFullSync() async {
-        await performSync(isFullSync: true)
-    }
-    
     /// 执行增量同步
     func performIncrementalSync() async {
-        await performSync(isFullSync: false)
-    }
-    
-    /// 手动同步
-    func manualSync() async {
-        await performIncrementalSync()
+        await performSync(mode: .autoIncremental)
     }
     
     /// 启用自动同步
@@ -367,108 +351,6 @@ class SyncManager: ObservableObject {
     }
     
     // MARK: - Private Methods
-
-    private func performSync(isFullSync: Bool) async {
-        guard !isSyncing else { return }
-
-        let startTime = Date()
-
-        DispatchQueue.main.async {
-            self.isSyncing = true
-            self.syncStatus = .syncing
-        }
-
-        do {
-            var uploadedCount = 0
-            var downloadedCount = 0
-            var conflictCount = 0
-            var syncDetails: SyncDetails? = nil
-
-            if isFullSync {
-                let result = try await performSyncInternal(mode: .smartMerge)
-                uploadedCount = result.uploadedCount
-                downloadedCount = result.downloadedCount
-                conflictCount = result.conflictCount
-                syncDetails = result.syncDetails
-            } else {
-                let result = try await performSyncInternal(mode: .autoIncremental)
-                uploadedCount = result.uploadedCount
-                downloadedCount = result.downloadedCount
-                conflictCount = result.conflictCount
-                syncDetails = result.syncDetails
-            }
-
-            let duration = Date().timeIntervalSince(startTime)
-            let syncMode: SyncMode = isFullSync ? .smartMerge : .autoIncremental
-            let record = SyncRecord(
-                syncMode: syncMode,
-                success: true,
-                uploadedCount: uploadedCount,
-                downloadedCount: downloadedCount,
-                conflictCount: conflictCount,
-                duration: duration,
-                syncDetails: syncDetails
-            )
-
-            // 刷新数据预览和工作区状态
-            await loadServerDataPreview()
-            loadLocalDataPreview()
-            await generateSyncWorkspace()
-            updatePendingSyncCount()
-
-            DispatchQueue.main.async {
-                self.syncStatus = .success
-                self.lastSyncTime = Date()
-                self.userDefaults.set(self.lastSyncTime, forKey: self.lastSyncTimeKey)
-                self.isSyncing = false
-
-                // 更新服务器响应状态
-                self.lastServerResponseStatus = "同步成功 (HTTP 200)"
-                self.lastServerResponseTime = Date()
-                self.serverConnectionStatus = "已连接"
-
-                // 清除已同步的删除记录
-                self.clearSyncedDeletions()
-
-                // 记录同步历史
-                self.addSyncRecord(record)
-
-                // 发送同步完成通知，用于UI刷新
-                NotificationCenter.default.post(
-                    name: Notification.Name("SyncCompleted"),
-                    object: self
-                )
-            }
-        } catch {
-            let duration = Date().timeIntervalSince(startTime)
-            let syncMode: SyncMode = isFullSync ? .smartMerge : .autoIncremental
-            let record = SyncRecord(
-                syncMode: syncMode,
-                success: false,
-                errorMessage: error.localizedDescription,
-                duration: duration
-            )
-
-            let errorMessage = self.formatError(error)
-            print("Sync failed: \(errorMessage)")
-            DispatchQueue.main.async {
-                self.syncStatus = .error(errorMessage)
-                self.isSyncing = false
-
-                // 更新服务器响应状态
-                self.lastServerResponseStatus = "同步失败: \(error.localizedDescription)"
-                self.lastServerResponseTime = Date()
-                self.serverConnectionStatus = "连接失败"
-
-                // 记录同步历史（包括失败的同步）
-                self.addSyncRecord(record)
-            }
-        }
-    }
-    
-    private func performFullSyncInternal() async throws {
-        _ = try await performSyncInternal(mode: .smartMerge)
-    }
 
     /// 执行指定模式的同步
     func performSync(mode: SyncMode) async {
@@ -496,6 +378,7 @@ class SyncManager: ObservableObject {
             )
 
             // 同步成功后刷新所有数据预览和工作区状态
+            clearServerDataSummaryCache() // 清除缓存，确保获取最新数据
             await loadServerDataPreview() // 总是刷新服务端数据
             loadLocalDataPreview()
             await generateSyncWorkspace()
@@ -571,16 +454,6 @@ class SyncManager: ObservableObject {
 
         case .forceOverwriteRemote:
             try await performForceOverwriteRemote(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (details.uploadedItems.count, 0, 0, details)
-
-        case .pullOnly:
-            try await performPullOnly(detailsCollector: &syncDetailsCollector)
-            let details = syncDetailsCollector.build()
-            return (0, details.downloadedItems.count, 0, details)
-
-        case .pushOnly:
-            try await performPushOnly(detailsCollector: &syncDetailsCollector)
             let details = syncDetailsCollector.build()
             return (details.uploadedItems.count, 0, 0, details)
 
@@ -709,29 +582,22 @@ class SyncManager: ObservableObject {
         }
     }
 
-    /// 仅拉取
-    private func performPullOnly(detailsCollector: inout SyncDetailsCollector) async throws {
-        guard let authManager = authManager,
-              let token = authManager.sessionToken else {
-            throw SyncError.notAuthenticated
-        }
-        let response = try await apiClient.fullSync(token: token)
 
-        // 收集下载的详情
-        collectDownloadDetails(from: response.data, to: &detailsCollector)
 
-        await applyServerData(response.data, mode: .pullOnly)
-        userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
-    }
 
-    /// 仅推送
-    private func performPushOnly(detailsCollector: inout SyncDetailsCollector) async throws {
+
+    /// 智能合并 - 使用单一增量同步操作
+    private func performSmartMerge(detailsCollector: inout SyncDetailsCollector) async throws {
+        // 获取当前的同步基准时间戳
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
-        let changes = await collectLocalChanges(since: lastSyncTimestamp)
 
-        // 收集上传的详情
-        collectUploadDetails(from: changes, to: &detailsCollector)
+        // 收集本地变更（基于当前的同步基准时间戳）
+        let localChanges = await collectLocalChanges(since: lastSyncTimestamp)
 
+        // 收集上传详情
+        collectUploadDetails(from: localChanges, to: &detailsCollector)
+
+        // 执行增量同步：同时发送本地变更并接收服务器变更
         guard let authManager = authManager,
               let token = authManager.sessionToken else {
             throw SyncError.notAuthenticated
@@ -739,27 +605,290 @@ class SyncManager: ObservableObject {
 
         let request = IncrementalSyncRequest(
             lastSyncTimestamp: lastSyncTimestamp,
-            changes: changes
+            changes: localChanges
         )
 
         let response = try await apiClient.incrementalSync(request, token: token)
+
+        // 收集下载详情（服务器返回的变更）
+        collectDownloadDetails(from: response.data.serverChanges, to: &detailsCollector)
+
+        // 收集冲突详情
+        collectConflictDetails(from: response.data.conflicts, to: &detailsCollector)
+
+        // 应用服务器端的变更到本地
+        await applyServerChanges(response.data.serverChanges)
+
+        // 最后统一更新同步时间戳
         userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
+
+        // 更新服务端数据预览
+        await updateServerDataPreviewFromIncrementalResponse(response.data)
     }
 
-    /// 智能合并
-    private func performSmartMerge(detailsCollector: inout SyncDetailsCollector) async throws {
-        // 先拉取
-        try await performPullOnly(detailsCollector: &detailsCollector)
-        // 再推送
-        try await performPushOnly(detailsCollector: &detailsCollector)
+    /// 收集增量同步响应的下载详情
+    private func collectDownloadDetails(from serverChanges: ServerChanges, to collector: inout SyncDetailsCollector) {
+        // 收集番茄事件下载详情
+        for event in serverChanges.pomodoroEvents {
+            let item = SyncItemDetail(
+                id: event.uuid,
+                type: .pomodoroEvent,
+                operation: .download,
+                title: event.title,
+                description: "从服务器下载 - \(event.eventType)",
+                timestamp: Date(timeIntervalSince1970: TimeInterval(event.updatedAt) / 1000),
+                details: SyncItemSpecificDetails(
+                    eventStartTime: Date(timeIntervalSince1970: TimeInterval(event.startTime) / 1000),
+                    eventEndTime: Date(timeIntervalSince1970: TimeInterval(event.endTime) / 1000),
+                    eventType: event.eventType,
+                    taskName: event.title
+                )
+            )
+            collector.addDownloadedItem(item)
+        }
+
+        // 收集系统事件下载详情
+        for event in serverChanges.systemEvents {
+            let item = SyncItemDetail(
+                id: event.uuid,
+                type: .systemEvent,
+                operation: .download,
+                title: event.eventType,
+                description: "从服务器下载系统事件",
+                timestamp: Date(timeIntervalSince1970: TimeInterval(event.createdAt) / 1000),
+                details: SyncItemSpecificDetails(
+                    systemEventType: event.eventType,
+                    systemEventData: String(describing: event.data)
+                )
+            )
+            collector.addDownloadedItem(item)
+        }
+
+        // 收集计时器设置下载详情
+        if let settings = serverChanges.timerSettings {
+            let item = SyncItemDetail(
+                id: "timer_settings",
+                type: .timerSettings,
+                operation: .download,
+                title: "计时器设置",
+                description: "从服务器下载计时器设置",
+                timestamp: Date(timeIntervalSince1970: TimeInterval(settings.updatedAt) / 1000),
+                details: SyncItemSpecificDetails(
+                    pomodoroTime: TimeInterval(settings.pomodoroTime),
+                    shortBreakTime: TimeInterval(settings.shortBreakTime),
+                    longBreakTime: TimeInterval(settings.longBreakTime)
+                )
+            )
+            collector.addDownloadedItem(item)
+        }
+    }
+
+    /// 收集冲突详情
+    private func collectConflictDetails(from conflicts: [SyncConflict], to collector: inout SyncDetailsCollector) {
+        for conflict in conflicts {
+            let item = SyncItemDetail(
+                id: conflict.uuid,
+                type: conflict.type == "pomodoro_event" ? .pomodoroEvent : .systemEvent,
+                operation: .conflict,
+                title: "冲突项目",
+                description: "同步冲突: \(conflict.reason)",
+                timestamp: Date(),
+                details: nil
+            )
+            collector.addConflictItem(item)
+        }
+    }
+
+    /// 应用服务器端的增量变更到本地
+    private func applyServerChanges(_ serverChanges: ServerChanges) async {
+        // 1. 应用番茄事件变更
+        if let eventManager = eventManager {
+            DispatchQueue.main.async {
+                // 设置同步更新标志，防止误跟踪删除
+                self.isPerformingSyncUpdate = true
+
+                // 智能合并服务器端的番茄事件
+                self.smartMergeServerPomodoroEvents(serverChanges.pomodoroEvents, into: eventManager)
+
+                // 重置同步更新标志
+                self.isPerformingSyncUpdate = false
+            }
+        }
+
+        // 2. 应用系统事件变更
+        await applySystemEventChanges(serverChanges.systemEvents)
+
+        // 3. 应用计时器设置变更
+        if let serverSettings = serverChanges.timerSettings {
+            await applyTimerSettingsChanges(serverSettings)
+        }
+    }
+
+    /// 智能合并服务器端的番茄事件
+    private func smartMergeServerPomodoroEvents(_ serverEvents: [ServerPomodoroEvent], into eventManager: EventManager) {
+        let existingEvents = eventManager.events
+        var mergedEvents = existingEvents
+
+        for serverEvent in serverEvents {
+            // 查找本地是否已存在该事件
+            if let existingIndex = existingEvents.firstIndex(where: { $0.id.uuidString == serverEvent.uuid }) {
+                // 事件已存在：比较更新时间，使用较新的版本
+                let localEvent = existingEvents[existingIndex]
+                let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
+
+                if serverUpdatedAt > localEvent.updatedAt {
+                    // 服务端版本更新，替换本地数据
+                    mergedEvents[existingIndex] = self.createEventFromServer(serverEvent)
+                }
+                // 如果本地版本更新或相同，保留本地数据（不做任何操作）
+            } else {
+                // 新事件：直接添加服务端事件
+                mergedEvents.append(self.createEventFromServer(serverEvent))
+            }
+        }
+
+        // 按时间排序并应用
+        eventManager.events = mergedEvents.sorted { $0.startTime < $1.startTime }
+        // 立即保存到持久化存储
+        eventManager.saveEvents()
+    }
+
+    /// 应用系统事件变更
+    private func applySystemEventChanges(_ serverSystemEvents: [ServerSystemEvent]) async {
+        // 如果禁用了系统事件同步，则跳过
+        guard syncSystemEvents else { return }
+
+        let systemEventStore = SystemEventStore.shared
+
+        DispatchQueue.main.async {
+            // 智能合并系统事件
+            self.smartMergeServerSystemEvents(serverSystemEvents, into: systemEventStore)
+        }
+    }
+
+    /// 智能合并服务器端的系统事件
+    private func smartMergeServerSystemEvents(_ serverEvents: [ServerSystemEvent], into systemEventStore: SystemEventStore) {
+        let existingEvents = systemEventStore.events
+        var mergedEvents = existingEvents
+
+        for serverEvent in serverEvents {
+            // 查找本地是否已存在该事件
+            if !existingEvents.contains(where: { $0.id.uuidString == serverEvent.uuid }) {
+                // 新事件：添加到本地
+                mergedEvents.append(self.createSystemEventFromServer(serverEvent))
+            }
+            // 系统事件通常不会更新，所以如果已存在就跳过
+        }
+
+        // 按时间排序并应用
+        systemEventStore.events = mergedEvents.sorted { $0.timestamp < $1.timestamp }
+        // 保存合并后的数据
+        systemEventStore.saveCurrentEvents()
+    }
+
+    /// 应用计时器设置变更
+    private func applyTimerSettingsChanges(_ serverSettings: ServerTimerSettings) async {
+        guard let timerModel = timerModel else { return }
+
+        DispatchQueue.main.async {
+            // 比较服务器设置和本地设置的更新时间
+            // 注意：这里我们需要一个方式来跟踪本地设置的更新时间
+            // 暂时直接应用服务器设置（可以根据需要添加更复杂的冲突解决逻辑）
+            timerModel.pomodoroTime = TimeInterval(serverSettings.pomodoroTime)
+            timerModel.shortBreakTime = TimeInterval(serverSettings.shortBreakTime)
+            timerModel.longBreakTime = TimeInterval(serverSettings.longBreakTime)
+        }
+    }
+
+    /// 从增量同步响应更新服务端数据预览
+    private func updateServerDataPreviewFromIncrementalResponse(_ responseData: IncrementalSyncResponse) async {
+        // 获取当前的服务端数据预览
+        let currentServerData = self.serverData
+
+        // 基于当前预览数据和增量变更构建新的预览
+        var updatedPomodoroEvents = currentServerData?.pomodoroEvents ?? []
+        var updatedSystemEvents = currentServerData?.systemEvents ?? []
+        var updatedTimerSettings = currentServerData?.timerSettings
+
+        // 应用番茄事件变更
+        for serverEvent in responseData.serverChanges.pomodoroEvents {
+            // 查找是否已存在
+            if let existingIndex = updatedPomodoroEvents.firstIndex(where: { $0.uuid == serverEvent.uuid }) {
+                // 更新现有事件
+                updatedPomodoroEvents[existingIndex] = serverEvent
+            } else {
+                // 添加新事件
+                updatedPomodoroEvents.append(serverEvent)
+            }
+        }
+
+        // 应用系统事件变更
+        for serverEvent in responseData.serverChanges.systemEvents {
+            // 查找是否已存在
+            if !updatedSystemEvents.contains(where: { $0.uuid == serverEvent.uuid }) {
+                // 添加新事件
+                updatedSystemEvents.append(serverEvent)
+            }
+        }
+
+        // 应用计时器设置变更
+        if let serverSettings = responseData.serverChanges.timerSettings {
+            updatedTimerSettings = serverSettings
+        }
+
+        // 创建新的服务端数据预览
+        let preview = ServerDataPreview(
+            pomodoroEvents: updatedPomodoroEvents,
+            systemEvents: updatedSystemEvents,
+            timerSettings: updatedTimerSettings,
+            lastUpdated: Date(timeIntervalSince1970: TimeInterval(responseData.serverTimestamp) / 1000)
+        )
+
+        DispatchQueue.main.async {
+            self.serverData = preview
+        }
     }
     
 
 
-    /// 增量同步
+    /// 增量同步 - 直接使用增量同步API
     private func performIncrementalSync(detailsCollector: inout SyncDetailsCollector) async throws {
-        // 增量同步就是智能合并的简化版本
-        try await performSmartMerge(detailsCollector: &detailsCollector)
+        // 获取当前的同步基准时间戳
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+
+        // 收集本地变更（基于当前的同步基准时间戳）
+        let localChanges = await collectLocalChanges(since: lastSyncTimestamp)
+
+        // 收集上传详情
+        collectUploadDetails(from: localChanges, to: &detailsCollector)
+
+        // 执行增量同步：同时发送本地变更并接收服务器变更
+        guard let authManager = authManager,
+              let token = authManager.sessionToken else {
+            throw SyncError.notAuthenticated
+        }
+
+        let request = IncrementalSyncRequest(
+            lastSyncTimestamp: lastSyncTimestamp,
+            changes: localChanges
+        )
+
+        let response = try await apiClient.incrementalSync(request, token: token)
+
+        // 收集下载详情（服务器返回的变更）
+        collectDownloadDetails(from: response.data.serverChanges, to: &detailsCollector)
+
+        // 收集冲突详情
+        collectConflictDetails(from: response.data.conflicts, to: &detailsCollector)
+
+        // 应用服务器端的变更到本地
+        await applyServerChanges(response.data.serverChanges)
+
+        // 最后统一更新同步时间戳
+        userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
+
+        // 更新服务端数据预览
+        await updateServerDataPreviewFromIncrementalResponse(response.data)
     }
 
     private func collectLocalChanges(since timestamp: Int64) async -> SyncChanges {
@@ -912,13 +1041,9 @@ class SyncManager: ObservableObject {
                     // 强制覆盖远程：保持本地数据不变（这个模式在这里不适用）
                     break
 
-                case .pullOnly, .smartMerge, .incremental, .autoIncremental:
-                    // 拉取模式或智能合并：智能合并数据
+                case .smartMerge, .incremental, .autoIncremental:
+                    // 智能合并数据
                     self.smartMergeServerData(data, into: eventManager)
-
-                case .pushOnly:
-                    // 推送模式：不应用服务端数据
-                    break
                 }
 
                 // 重置同步更新标志
@@ -961,13 +1086,9 @@ class SyncManager: ObservableObject {
                 // 强制覆盖远程：保持本地数据不变
                 break
 
-            case .pullOnly, .smartMerge, .incremental, .autoIncremental:
+            case .smartMerge, .incremental, .autoIncremental:
                 // 智能合并系统事件
                 self.smartMergeSystemEvents(serverSystemEvents, into: systemEventStore)
-
-            case .pushOnly:
-                // 推送模式：不应用服务端数据
-                break
             }
         }
     }
@@ -1081,61 +1202,6 @@ class SyncManager: ObservableObject {
         }
     }
     
-    private func applyServerChanges(_ changes: ServerChanges) async {
-        // 应用服务器端的番茄事件变更
-        if let eventManager = eventManager {
-            DispatchQueue.main.async {
-                // 设置同步更新标志，防止误跟踪删除
-                self.isPerformingSyncUpdate = true
-
-                // 处理服务器端的番茄事件变更
-                for serverEvent in changes.pomodoroEvents {
-                    // 检查本地是否已存在该事件
-                    if let existingEvent = eventManager.events.first(where: { $0.id.uuidString == serverEvent.uuid }) {
-                        // 先删除旧事件
-                        eventManager.removeEvent(existingEvent)
-
-                        // 添加更新后的事件（服务器版本优先）
-                        let updatedEvent = PomodoroEvent(
-                            title: serverEvent.title,
-                            startTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.startTime) / 1000),
-                            endTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.endTime) / 1000),
-                            type: self.mapServerEventTypeToLocal(serverEvent.eventType),
-                            isCompleted: serverEvent.isCompleted
-                        )
-                        eventManager.addEvent(updatedEvent)
-                    } else {
-                        // 添加新事件
-                        let newEvent = PomodoroEvent(
-                            title: serverEvent.title,
-                            startTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.startTime) / 1000),
-                            endTime: Date(timeIntervalSince1970: TimeInterval(serverEvent.endTime) / 1000),
-                            type: self.mapServerEventTypeToLocal(serverEvent.eventType),
-                            isCompleted: serverEvent.isCompleted
-                        )
-                        eventManager.addEvent(newEvent)
-                    }
-                }
-
-                // 重置同步更新标志
-                self.isPerformingSyncUpdate = false
-            }
-        }
-
-        // 应用服务器端的系统事件变更
-        // 系统事件通常只是添加，不需要更新现有事件
-        // 这里可以根据需要实现系统事件的处理逻辑
-
-        // 应用服务器端的计时器设置变更
-        if let settings = changes.timerSettings, let timerModel = timerModel {
-            DispatchQueue.main.async {
-                timerModel.pomodoroTime = TimeInterval(settings.pomodoroTime)
-                timerModel.shortBreakTime = TimeInterval(settings.shortBreakTime)
-                timerModel.longBreakTime = TimeInterval(settings.longBreakTime)
-            }
-        }
-    }
-    
     private func handleConflicts(_ conflicts: [SyncConflict]) async {
         // 处理同步冲突
         // 目前采用服务器优先策略
@@ -1168,7 +1234,7 @@ class SyncManager: ObservableObject {
         print("Handling timer settings conflict")
     }
 
-    /// 获取服务端数据预览
+    /// 获取服务端数据预览（优化版本 - 使用轻量级数据摘要）
     func loadServerDataPreview() async {
         // 如果正在同步，跳过服务端数据加载，避免冲突
         if isSyncing {
@@ -1176,7 +1242,20 @@ class SyncManager: ObservableObject {
             return
         }
 
-        print("🔄 开始加载服务端数据预览...")
+        // 检查缓存是否有效
+        if let cache = summaryCache,
+           Date().timeIntervalSince(cache.timestamp) < summaryCacheExpiry {
+            print("🎯 使用缓存的服务端数据摘要")
+            DispatchQueue.main.async {
+                self.serverDataSummary = cache.summary
+                self.isLoadingServerData = false
+                self.lastServerResponseStatus = "缓存 (已缓存)"
+                self.serverConnectionStatus = "已连接"
+            }
+            return
+        }
+
+        print("🔄 开始加载服务端数据摘要...")
         print("📱 设备UUID: \(deviceUUID)")
         print("🌐 服务器URL: \(serverURL)")
 
@@ -1185,15 +1264,77 @@ class SyncManager: ObservableObject {
         }
 
         do {
-            // 获取服务端数据
-            print("📡 请求服务端数据...")
+            // 使用轻量级数据摘要API
+            print("📡 请求服务端数据摘要...")
+            guard let authManager = authManager,
+                  let token = authManager.sessionToken else {
+                throw SyncError.notAuthenticated
+            }
+            let response = try await apiClient.dataSummary(token: token)
+
+            print("✅ 服务端摘要响应成功")
+            print("📊 番茄事件数量: \(response.data.summary.pomodoroEventCount)")
+            print("📊 系统事件数量: \(response.data.summary.systemEventCount)")
+            print("⚙️ 计时器设置: \(response.data.summary.hasTimerSettings ? "已设置" : "未设置")")
+
+            let summary = ServerDataSummary(
+                pomodoroEventCount: response.data.summary.pomodoroEventCount,
+                systemEventCount: response.data.summary.systemEventCount,
+                hasTimerSettings: response.data.summary.hasTimerSettings,
+                serverTimestamp: response.data.summary.serverTimestamp,
+                lastUpdated: Date(),
+                recentEvents: response.data.recentEvents
+            )
+
+            // 更新缓存
+            summaryCache = (summary: summary, timestamp: Date())
+
+            DispatchQueue.main.async {
+                self.serverDataSummary = summary
+                self.isLoadingServerData = false
+                self.lastServerResponseStatus = "成功 (HTTP 200)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "已连接"
+                print("🎯 服务端数据摘要已更新: \(summary.pomodoroEventCount)个番茄钟, \(summary.systemEventCount)个系统事件")
+            }
+        } catch {
+            print("❌ 加载服务端数据摘要失败: \(error)")
+            DispatchQueue.main.async {
+                self.serverDataSummary = nil
+                self.isLoadingServerData = false
+                self.lastServerResponseStatus = "失败: \(error.localizedDescription)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "连接失败"
+            }
+        }
+    }
+
+    /// 加载完整服务端数据预览（降级方案）
+    func loadFullServerDataPreview() async {
+        // 如果正在同步，跳过服务端数据加载，避免冲突
+        if isSyncing {
+            print("Skipping full server data preview load during sync operation")
+            return
+        }
+
+        print("🔄 开始加载完整服务端数据预览...")
+        print("📱 设备UUID: \(deviceUUID)")
+        print("🌐 服务器URL: \(serverURL)")
+
+        DispatchQueue.main.async {
+            self.isLoadingServerData = true
+        }
+
+        do {
+            // 获取完整服务端数据
+            print("📡 请求完整服务端数据...")
             guard let authManager = authManager,
                   let token = authManager.sessionToken else {
                 throw SyncError.notAuthenticated
             }
             let response = try await apiClient.fullSync(token: token)
 
-            print("✅ 服务端响应成功")
+            print("✅ 完整服务端响应成功")
             print("📊 番茄事件数量: \(response.data.pomodoroEvents.count)")
             print("📊 系统事件数量: \(response.data.systemEvents.count)")
             print("⚙️ 计时器设置: \(response.data.timerSettings != nil ? "已设置" : "未设置")")
@@ -1211,10 +1352,10 @@ class SyncManager: ObservableObject {
                 self.lastServerResponseStatus = "成功 (HTTP 200)"
                 self.lastServerResponseTime = Date()
                 self.serverConnectionStatus = "已连接"
-                print("🎯 服务端数据预览已更新: \(preview.eventCount)个番茄钟, \(preview.systemEventCount)个系统事件")
+                print("🎯 完整服务端数据预览已更新: \(preview.eventCount)个番茄钟, \(preview.systemEventCount)个系统事件")
             }
         } catch {
-            print("❌ 加载服务端数据预览失败: \(error)")
+            print("❌ 加载完整服务端数据预览失败: \(error)")
             DispatchQueue.main.async {
                 self.serverData = nil
                 self.isLoadingServerData = false
@@ -1258,6 +1399,18 @@ class SyncManager: ObservableObject {
         DispatchQueue.main.async {
             self.localData = preview
         }
+    }
+
+    /// 清除服务端数据摘要缓存
+    func clearServerDataSummaryCache() {
+        summaryCache = nil
+        print("🗑️ 服务端数据摘要缓存已清除")
+    }
+
+    /// 检查缓存是否有效
+    private func isSummaryCacheValid() -> Bool {
+        guard let cache = summaryCache else { return false }
+        return Date().timeIntervalSince(cache.timestamp) < summaryCacheExpiry
     }
 
     /// 生成Git风格的同步工作区状态
@@ -1723,6 +1876,7 @@ class SyncManager: ObservableObject {
     private func checkTimerSettingsChanged(timerModel: TimerModel, serverData: ServerDataPreview) -> Bool {
         // 如果服务端没有计时器设置，说明是首次同步，需要上传
         guard let serverSettings = serverData.timerSettings else {
+            print("🔄 Timer settings: No server settings found, need to upload local settings")
             return true
         }
 
@@ -1731,9 +1885,28 @@ class SyncManager: ObservableObject {
         let localShortBreakTime = Int(timerModel.shortBreakTime)
         let localLongBreakTime = Int(timerModel.longBreakTime)
 
-        return localPomodoroTime != serverSettings.pomodoroTime ||
-               localShortBreakTime != serverSettings.shortBreakTime ||
-               localLongBreakTime != serverSettings.longBreakTime
+        let pomodoroChanged = localPomodoroTime != serverSettings.pomodoroTime
+        let shortBreakChanged = localShortBreakTime != serverSettings.shortBreakTime
+        let longBreakChanged = localLongBreakTime != serverSettings.longBreakTime
+
+        let hasChanges = pomodoroChanged || shortBreakChanged || longBreakChanged
+
+        if hasChanges {
+            print("🔄 Timer settings changed:")
+            if pomodoroChanged {
+                print("   - Pomodoro: \(localPomodoroTime)s (local) vs \(serverSettings.pomodoroTime)s (server)")
+            }
+            if shortBreakChanged {
+                print("   - Short break: \(localShortBreakTime)s (local) vs \(serverSettings.shortBreakTime)s (server)")
+            }
+            if longBreakChanged {
+                print("   - Long break: \(localLongBreakTime)s (local) vs \(serverSettings.longBreakTime)s (server)")
+            }
+        } else {
+            print("🔄 Timer settings: No changes detected")
+        }
+
+        return hasChanges
     }
 
     /// 获取待同步数据列表
@@ -1958,6 +2131,26 @@ enum PendingSyncItemType {
 
 
 // MARK: - 服务端数据预览
+
+/// 轻量级服务端数据摘要
+struct ServerDataSummary {
+    let pomodoroEventCount: Int
+    let systemEventCount: Int
+    let hasTimerSettings: Bool
+    let serverTimestamp: Int64
+    let lastUpdated: Date
+    let recentEvents: [ServerPomodoroEvent] // 最近几个事件用于预览
+
+    var eventCount: Int {
+        return pomodoroEventCount
+    }
+
+    var completedEventCount: Int {
+        return recentEvents.filter { $0.isCompleted }.count
+    }
+}
+
+/// 完整的服务端数据预览（向后兼容）
 struct ServerDataPreview {
     let pomodoroEvents: [ServerPomodoroEvent]
     let systemEvents: [ServerSystemEvent]
