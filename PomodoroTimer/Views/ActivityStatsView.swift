@@ -104,7 +104,7 @@ struct ActivityStatsView: View {
                     Button(activityMonitor.isMonitoring ? "停止" : "开始") {
                         activityMonitor.toggleMonitoring()
                     }
-                    .buttonStyle(.borderedProminent)
+                    // .buttonStyle(.borderedProminent)
                     // .controlSize(.small)
                     // .font(.caption)
                 }
