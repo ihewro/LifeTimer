@@ -177,7 +177,7 @@ class SyncManager: ObservableObject {
     private weak var timerModel: TimerModel?
     
     // 同步配置
-    private let syncInterval: TimeInterval = 10 // 5分钟自动同步
+    private let syncInterval: TimeInterval = 5*60 // 5分钟自动同步
     private var syncTimer: Timer?
     
     // UserDefaults键
