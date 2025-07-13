@@ -17,6 +17,8 @@
 		1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */; };
 		SOUND001122334455667788 /* SoundEffectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SOUND001122334455667799 /* SoundEffectManager.swift */; };
 		MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBAR001122334455667799 /* MenuBarManager.swift */; };
+		SMART001122334455667788 /* SmartReminderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMART001122334455667799 /* SmartReminderManager.swift */; };
+		SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTD01122334455667799 /* SmartReminderDialog.swift */; };
 		1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1244 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */; };
 		1A2B3C4D5E6F7890ABCD1246 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */; };
@@ -48,6 +50,8 @@
 		1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		SOUND001122334455667799 /* SoundEffectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEffectManager.swift; sourceTree = "<group>"; };
 		MENUBAR001122334455667799 /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
+		SMART001122334455667799 /* SmartReminderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderManager.swift; sourceTree = "<group>"; };
+		SMARTD01122334455667799 /* SmartReminderDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderDialog.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -118,6 +122,7 @@
 				1A2B3C4D5E6F7890ABCD123B /* CalendarView.swift */,
 				1A2B3C4D5E6F7890ABCD123D /* SettingsView.swift */,
 				1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */,
+				SMARTD01122334455667799 /* SmartReminderDialog.swift */,
 
 				60283F027D8544698FF2E487 /* ActivityStatsView.swift */,
 				78FA65102F254A899C99BA8B /* ActivitySettingsView.swift */,
@@ -145,6 +150,7 @@
 				1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */,
 				SOUND001122334455667799 /* SoundEffectManager.swift */,
 				MENUBAR001122334455667799 /* MenuBarManager.swift */,
+				SMART001122334455667799 /* SmartReminderManager.swift */,
 
 				893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */,
 				458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */,
@@ -251,6 +257,8 @@
 				1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */,
 				SOUND001122334455667788 /* SoundEffectManager.swift in Sources */,
 				MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */,
+				SMART001122334455667788 /* SmartReminderManager.swift in Sources */,
+				SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1234 /* PomodoroTimerApp.swift in Sources */,
 			

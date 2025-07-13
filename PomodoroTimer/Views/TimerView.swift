@@ -11,6 +11,7 @@ struct TimerView: View {
     @EnvironmentObject var timerModel: TimerModel
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var eventManager: EventManager
+    @EnvironmentObject var smartReminderManager: SmartReminderManager
     @State private var showingModeSelector = false
     @State private var showingTimeEditor = false
     @State private var showingTaskSelector = false
@@ -19,7 +20,31 @@ struct TimerView: View {
     @State private var isHoveringTimeCircle = false
     @State private var showingCompletionDialog = false
     @State private var customMinutes: String = ""
-    
+
+    // MARK: - 智能提醒状态显示
+    private var smartReminderStatusView: some View {
+        Group {
+            if smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
+                HStack(spacing: 6) {
+                    Image(systemName: "bell")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+
+                    Text("将在\(smartReminderManager.formatRemainingTime())后开始提醒")
+                        .font(.caption.monospaced())
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(6)
+            } else {
+                // 空白占位，保持布局一致
+                Spacer()
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 30) {
             Spacer()
@@ -217,6 +242,7 @@ struct TimerView: View {
                     else if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .paused {
                         Button(action: {
                             timerModel.startTimer(with: selectedTask)
+                            smartReminderManager.onUserStartedTimer()
                         }) {
                             Text("继续")
                                 .frame(width: 180)
@@ -256,8 +282,10 @@ struct TimerView: View {
                             switch timerModel.timerState {
                             case .idle:
                                 timerModel.startTimer(with: selectedTask)
+                                smartReminderManager.onUserStartedTimer()
                             case .paused:
                                 timerModel.startTimer(with: selectedTask)
+                                smartReminderManager.onUserStartedTimer()
                                 // 恢复计时器时也恢复音乐播放
                                 audioManager.resumeTimerPlayback()
                             case .running:
@@ -301,6 +329,9 @@ struct TimerView: View {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
 
+            // 设置智能提醒管理器的依赖
+            smartReminderManager.setTimerModel(timerModel)
+
             // 只有在计时器空闲状态且用户未设置自定义任务时，才从最近事件设置默认任务
             if timerModel.timerState == .idle && !timerModel.hasUserSetCustomTask {
                 setDefaultTaskFromRecentEvent()
@@ -319,9 +350,9 @@ struct TimerView: View {
             timerModel.setUserCustomTask(newTask)
         }
         .toolbar {
-            // 左侧：占位符
+            // 左侧：智能提醒状态显示
             ToolbarItem(placement: .navigation) {
-                Spacer()
+                smartReminderStatusView
             }
 
             // 中间：模式选择 Picker
@@ -401,6 +432,16 @@ struct TimerView: View {
             PomodoroCompletionDialog(
                 isPresented: $showingCompletionDialog,
                 timerModel: timerModel,
+                smartReminderManager: smartReminderManager,
+                selectedTask: selectedTask
+            )
+        }
+        // 智能提醒弹窗
+        .sheet(isPresented: $smartReminderManager.showingReminderDialog) {
+            SmartReminderDialog(
+                isPresented: $smartReminderManager.showingReminderDialog,
+                timerModel: timerModel,
+                reminderManager: smartReminderManager,
                 selectedTask: selectedTask
             )
         }
@@ -926,6 +967,7 @@ struct NativeButtonStyle: ButtonStyle {
 struct PomodoroCompletionDialog: View {
     @Binding var isPresented: Bool
     @ObservedObject var timerModel: TimerModel
+    @ObservedObject var smartReminderManager: SmartReminderManager
     let selectedTask: String
 
     @State private var customMinutes: String = ""
@@ -1055,6 +1097,7 @@ struct PomodoroCompletionDialog: View {
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .singlePomodoro
         timerModel.startTimer(with: selectedTask)
+        smartReminderManager.onUserStartedTimer()
         isPresented = false
     }
 
@@ -1068,6 +1111,7 @@ struct PomodoroCompletionDialog: View {
         timerModel.currentMode = .pureRest
         timerModel.resetTimer()
         timerModel.startTimer()
+        smartReminderManager.onUserStartedTimer()
         isPresented = false
     }
 }
@@ -1077,4 +1121,5 @@ struct PomodoroCompletionDialog: View {
         .environmentObject(TimerModel())
         .environmentObject(AudioManager())
         .environmentObject(EventManager())
+        .environmentObject(SmartReminderManager())
 }

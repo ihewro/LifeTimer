@@ -85,6 +85,12 @@ struct ContentView: View {
         }
         .frame(minWidth: 800, minHeight: 600)
         .navigationTitle("")
+        .toolbar {
+            // 隐藏默认的标题视图
+            ToolbarItem(placement: .principal) {
+                EmptyView()
+            }
+        }
         // 添加快捷键支持
         .background(
             // 隐藏的按钮用于处理快捷键
