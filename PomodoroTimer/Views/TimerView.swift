@@ -20,17 +20,19 @@ struct TimerView: View {
     @State private var isHoveringTimeCircle = false
     @State private var showingCompletionDialog = false
     @State private var customMinutes: String = ""
+    @State private var windowWidth: CGFloat = 800 // 跟踪窗口宽度
 
     // MARK: - 智能提醒状态显示
     private var smartReminderStatusView: some View {
         Group {
-            if smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
+            // 当窗口宽度小于 900px 时隐藏智能提醒状态显示
+            if windowWidth >= 700 && smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
                 HStack(spacing: 6) {
                     Image(systemName: "bell")
                         .font(.caption)
                         .foregroundColor(.orange)
 
-                    Text("将在\(smartReminderManager.formatRemainingTime())后开始提醒")
+                    Text("\(smartReminderManager.formatRemainingTime())后提醒")
                         .font(.caption.monospaced())
                         .foregroundColor(.secondary)
                 }
@@ -46,7 +48,8 @@ struct TimerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 30) {
+        GeometryReader { geometry in
+            VStack(spacing: 30) {
             Spacer()
 
             // 任务标题
@@ -63,7 +66,7 @@ struct TimerView: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .padding(.bottom, 20)
+            .padding(.bottom, 0)
             .popover(isPresented: $showingTaskSelector, arrowEdge: .bottom) {
                 TaskSelectorPopoverView(selectedTask: $selectedTask, isPresented: $showingTaskSelector)
             }
@@ -197,7 +200,7 @@ struct TimerView: View {
                     }
                 }
                 
-                Spacer()
+                // Spacer()
 
                 // 控制按钮
                 VStack(spacing: 12) {
@@ -319,12 +322,21 @@ struct TimerView: View {
                             .tint(.gray)
                         }
                     }
-                }
+                }            .padding(.top, 20)
+
 
                 Spacer()
             }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.systemBackground)
+        .onAppear {
+            // 初始化窗口宽度
+            windowWidth = geometry.size.width
+        }
+        .onChange(of: geometry.size.width) { newWidth in
+            // 响应窗口宽度变化
+            windowWidth = newWidth
+        }
         .onAppear {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
@@ -351,12 +363,12 @@ struct TimerView: View {
         }
         .toolbar {
             // 左侧：智能提醒状态显示
-            ToolbarItem(placement: .navigation) {
+            ToolbarItemGroup(placement: .navigation) {
                 smartReminderStatusView
             }
 
             // 中间：模式选择 Picker
-            ToolbarItem(placement: .principal) {
+            ToolbarItemGroup(placement: .principal) {
                 Picker("模式", selection: Binding(
                     get: { timerModel.currentMode },
                     set: { timerModel.changeMode($0) }
@@ -371,7 +383,8 @@ struct TimerView: View {
             }
 
             // 右侧：音频控制菜单
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup() {
+                Spacer()
                 Menu {
                     // 静音选项
                     Button(action: {
@@ -445,7 +458,7 @@ struct TimerView: View {
                 selectedTask: selectedTask
             )
         }
-
+        } // GeometryReader 结束
     }
 
     private var buttonText: String {
