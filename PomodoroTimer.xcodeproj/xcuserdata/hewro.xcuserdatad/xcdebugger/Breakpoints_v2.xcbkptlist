@@ -96,8 +96,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "69"
             endingLineNumber = "69"
-            landmarkName = "initializeDevice()"
-            landmarkType = "7">
+            landmarkName = "AuthManager"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -160,8 +160,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "270"
             endingLineNumber = "270"
-            landmarkName = "saveCredentials()"
-            landmarkType = "7">
+            landmarkName = "AuthManager"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -176,7 +176,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1485"
             endingLineNumber = "1485"
-            landmarkName = "updateServerURL(_:)"
+            landmarkName = "formatError(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
