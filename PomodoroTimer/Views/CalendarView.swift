@@ -343,7 +343,7 @@ struct SearchResultsSidebar: View {
             }
         }
         .frame(width: 280)
-        .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+        .background(GlassEffectBackground())
     }
 }
 
@@ -729,7 +729,7 @@ struct DayView: View {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+                .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -1807,7 +1807,7 @@ struct WeekView: View {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+                .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
         }
@@ -2521,7 +2521,7 @@ struct MonthView: View {
                     }
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+                .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: displayMonth)
             }
         }
@@ -3562,7 +3562,31 @@ struct DateDisplayOnly: View {
 }
 
 
-// MARK: - VisualEffectView for cross-platform
+// MARK: - Modern Glass Effect for cross-platform
+struct GlassEffectBackground: View {
+    var body: some View {
+        #if os(macOS)
+        // macOS 使用材质效果，为未来的 glassEffect 做准备
+        if #available(macOS 26.0, *) {
+            // 未来版本可以使用 glassEffect (当 API 可用时)
+            // Color.clear.background(.regularMaterial).glassEffect()
+            Color.clear
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 0))
+        } else {
+            // 当前版本使用增强的材质效果，模拟玻璃效果
+            Color.clear
+            .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+        }
+        #else
+        // iOS 使用半透明材质效果
+        Color.systemBackground
+            .opacity(0.95)
+            .background(.ultraThinMaterial)
+        #endif
+    }
+}
+
+// MARK: - Legacy VisualEffectView (保持向后兼容)
 #if os(macOS)
 struct VisualEffectView: NSViewRepresentable {
     let material: String
