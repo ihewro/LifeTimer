@@ -48,6 +48,14 @@ struct ActivityStatsView: View {
         }
 #endif
         .toolbar {
+
+            ToolbarItem(placement: .navigation) {
+                    // 日期显示组件
+                    Text(formatSelectedDate(selectedDate))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+            }
             // 左侧：Tab选项卡 Picker
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $selectedTab) {
@@ -61,7 +69,7 @@ struct ActivityStatsView: View {
             }
 
             // 中间：日期导航
-            ToolbarItem(placement: .navigation) {
+            ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 8) {
                     Button(action: {
                         selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
@@ -73,11 +81,6 @@ struct ActivityStatsView: View {
                     }) {
                         Image(systemName: "chevron.right")
                     }
-                    // 日期显示组件
-                    Text(formatSelectedDate(selectedDate))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 8)
 
                     Button("今天") {
                         selectedDate = Date()

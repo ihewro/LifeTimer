@@ -16,6 +16,7 @@ struct PomodoroTimerApp: App {
     @StateObject private var audioManager = AudioManager()
     @StateObject private var eventManager = EventManager()
     @StateObject private var activityMonitor = ActivityMonitorManager()
+    @StateObject private var smartReminderManager = SmartReminderManager()
 
     // 用户认证系统
     @StateObject private var authManager: AuthManager
@@ -45,6 +46,7 @@ struct PomodoroTimerApp: App {
                 .environmentObject(audioManager)
                 .environmentObject(eventManager)
                 .environmentObject(activityMonitor)
+                .environmentObject(smartReminderManager)
                 .environmentObject(authManager)
                 .environmentObject(syncManager)
                 #if canImport(Cocoa)
@@ -57,6 +59,9 @@ struct PomodoroTimerApp: App {
                         activityMonitor: activityMonitor,
                         timerModel: timerModel
                     )
+
+                    // 设置智能提醒管理器的依赖
+                    smartReminderManager.setTimerModel(timerModel)
 
                     #if canImport(Cocoa)
                     // 延迟设置 MenuBarManager 的依赖，确保应用完全启动

@@ -81,6 +81,7 @@ struct SettingsView: View {
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
+    @EnvironmentObject var smartReminderManager: SmartReminderManager
 
     @StateObject private var soundEffectManager = SoundEffectManager.shared
 
@@ -201,6 +202,43 @@ struct SettingsView: View {
                                 get: { timerModel.autoStartBreak },
                                 set: { timerModel.autoStartBreak = $0 }
                             ))
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.systemBackground)
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 智能提醒设置
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("智能提醒")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("提醒间隔时间")
+                                Text("设置为0表示关闭智能提醒，支持小数（如0.1表示6秒）")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            HStack(spacing: 4) {
+                                TextField("5.0", value: Binding(
+                                    get: { smartReminderManager.reminderInterval },
+                                    set: { smartReminderManager.reminderInterval = max(0, $0) }
+                                ), format: .number.precision(.fractionLength(0...2)))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                                .multilineTextAlignment(.trailing)
+
+                                Text("分钟")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
                         }
                         .padding(.horizontal, 20)
                     }
