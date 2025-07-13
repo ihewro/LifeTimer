@@ -176,7 +176,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1485"
             endingLineNumber = "1485"
-            landmarkName = "formatError(_:)"
+            landmarkName = "generateSyncWorkspace()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -193,6 +193,22 @@
             startingLineNumber = "346"
             endingLineNumber = "346"
             landmarkName = "updateServerURL(_:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "A7735CAE-6ECC-4705-A7A5-E616C70A0945"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "PomodoroTimer/Managers/APIClient.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "68"
+            endingLineNumber = "68"
+            landmarkName = "fullSync(token:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

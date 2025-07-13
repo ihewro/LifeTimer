@@ -43,6 +43,8 @@ try {
     // 路由处理
     if ($method === 'GET' && $path === '/api/user/sync/full') {
         handleFullSync();
+    } elseif ($method === 'GET' && $path === '/api/user/sync/summary') {
+        handleDataSummary();
     } elseif ($method === 'POST' && $path === '/api/user/sync/incremental') {
         handleIncrementalSync();
     } elseif ($method === 'POST' && ($path === '/api/user/sync/migrate' || $path === '/api/sync/migrate')) {
@@ -67,26 +69,74 @@ try {
  */
 function handleFullSync() {
     $userInfo = requireAuth();
-    
+
     $db = getDB();
-    
+
     // 获取用户的所有数据
+    $pomodoroEvents = getUserPomodoroEvents($db, $userInfo['user_id']);
+    $systemEvents = getUserSystemEvents($db, $userInfo['user_id']);
+    $timerSettings = getUserTimerSettings($db, $userInfo['user_id']);
+
+    // 计算数据的实际最后修改时间戳
+    $serverTimestamp = calculateDataLastModifiedTimestamp($db, $userInfo['user_id'], $pomodoroEvents, $systemEvents, $timerSettings);
+
     $data = [
-        'pomodoro_events' => getUserPomodoroEvents($db, $userInfo['user_id']),
-        'system_events' => getUserSystemEvents($db, $userInfo['user_id']),
-        'timer_settings' => getUserTimerSettings($db, $userInfo['user_id']),
-        'server_timestamp' => getCurrentTimestamp(),
+        'pomodoro_events' => $pomodoroEvents,
+        'system_events' => $systemEvents,
+        'timer_settings' => $timerSettings,
+        'server_timestamp' => $serverTimestamp,
         'user_info' => [
             'user_uuid' => $userInfo['user_uuid'],
             'device_count' => getUserDeviceCount($db, $userInfo['user_id'])
         ]
     ];
-    
+
     // 更新设备最后同步时间
-    updateDeviceLastSync($db, $userInfo['device_id'], $data['server_timestamp']);
-    
+    updateDeviceLastSync($db, $userInfo['device_id'], $serverTimestamp);
+
     logMessage("Full sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
     sendSuccess($data, 'Full sync completed');
+}
+
+/**
+ * 数据摘要处理 - 轻量级数据预览
+ */
+function handleDataSummary() {
+    $userInfo = requireAuth();
+
+    $db = getDB();
+
+    // 获取数据统计信息，不传输具体数据
+    $pomodoroCount = getUserPomodoroEventCount($db, $userInfo['user_id']);
+    $systemEventCount = getUserSystemEventCount($db, $userInfo['user_id']);
+    $hasTimerSettings = hasUserTimerSettings($db, $userInfo['user_id']);
+
+    // 计算最后修改时间戳
+    $serverTimestamp = calculateDataLastModifiedTimestamp($db, $userInfo['user_id'], [], [], null);
+
+    // 获取最近的事件信息（用于预览）
+    $recentEvents = getRecentPomodoroEvents($db, $userInfo['user_id'], 5); // 最近5个事件
+
+    $data = [
+        'summary' => [
+            'pomodoro_event_count' => $pomodoroCount,
+            'system_event_count' => $systemEventCount,
+            'has_timer_settings' => $hasTimerSettings,
+            'server_timestamp' => $serverTimestamp,
+            'last_updated' => @date('Y-m-d H:i:s', @$serverTimestamp / 1000)
+        ],
+        'recent_events' => $recentEvents,
+        'user_info' => [
+            'user_uuid' => $userInfo['user_uuid'],
+            'device_count' => getUserDeviceCount($db, $userInfo['user_id'])
+        ]
+    ];
+
+    // 更新设备最后访问时间（不是同步时间）
+    updateDeviceLastAccess($db, $userInfo['device_id']);
+
+    logMessage("Data summary requested for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
+    sendSuccess($data, 'Data summary retrieved');
 }
 
 /**
@@ -95,27 +145,26 @@ function handleFullSync() {
 function handleIncrementalSync() {
     $userInfo = requireAuth();
     $data = getRequestData();
-    
+
     // 验证必需参数
     validateRequired($data, ['last_sync_timestamp', 'changes']);
-    
+
     $lastSyncTimestamp = $data['last_sync_timestamp'];
     $changes = $data['changes'];
-    $serverTimestamp = getCurrentTimestamp();
-    
+
     $db = getDB();
     $db->beginTransaction();
-    
+
     try {
         $conflicts = [];
-        
+
         // 检查是否为强制覆盖远程操作
         if ($lastSyncTimestamp == 0) {
             logMessage("Force overwrite remote detected for user: {$userInfo['user_uuid']}");
-            
+
             // 强制覆盖：清空现有数据并用客户端数据替换
-            performForceOverwriteRemote($db, $userInfo['user_id'], $userInfo['device_id'], $changes, $serverTimestamp);
-            
+            $serverTimestamp = performForceOverwriteRemote($db, $userInfo['user_id'], $userInfo['device_id'], $changes);
+
             $serverChanges = [
                 'pomodoro_events' => [],
                 'system_events' => [],
@@ -129,36 +178,39 @@ function handleIncrementalSync() {
                     processUserPomodoroEventChanges($db, $userInfo['user_id'], $userInfo['device_id'], $changes['pomodoro_events'], $lastSyncTimestamp)
                 );
             }
-            
+
             if (isset($changes['system_events'])) {
                 processUserSystemEventChanges($db, $userInfo['user_id'], $userInfo['device_id'], $changes['system_events']);
             }
-            
+
             if (isset($changes['timer_settings'])) {
                 processUserTimerSettingsChanges($db, $userInfo['user_id'], $userInfo['device_id'], $changes['timer_settings'], $lastSyncTimestamp);
             }
-            
+
             // 获取服务器端的变更
             $serverChanges = [
                 'pomodoro_events' => getUserPomodoroEventsAfter($db, $userInfo['user_id'], $lastSyncTimestamp),
                 'system_events' => getUserSystemEventsAfter($db, $userInfo['user_id'], $lastSyncTimestamp),
                 'timer_settings' => getUserTimerSettingsAfter($db, $userInfo['user_id'], $lastSyncTimestamp)
             ];
+
+            // 计算增量同步后的实际最后修改时间戳
+            $serverTimestamp = calculateIncrementalSyncTimestamp($db, $userInfo['user_id'], $changes, $serverChanges, $lastSyncTimestamp);
         }
-        
+
         // 更新设备最后同步时间
         updateDeviceLastSync($db, $userInfo['device_id'], $serverTimestamp);
-        
+
         $db->commit();
-        
+
         logMessage("Incremental sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
-        
+
         sendSuccess([
             'conflicts' => $conflicts,
             'server_changes' => $serverChanges,
             'server_timestamp' => $serverTimestamp
         ], 'Incremental sync completed');
-        
+
     } catch (Exception $e) {
         $db->rollback();
         throw $e;
@@ -215,13 +267,20 @@ function getUserTimerSettings($db, $userId) {
     // 优先获取全局设置，如果没有则返回null
     $stmt = $db->prepare('
         SELECT pomodoro_time, short_break_time, long_break_time, updated_at
-        FROM timer_settings 
+        FROM timer_settings
         WHERE user_id = ? AND is_global = 1
         ORDER BY updated_at DESC
         LIMIT 1
     ');
     $stmt->execute([$userId]);
-    return $stmt->fetch() ?: null;
+    $result = $stmt->fetch();
+
+    if ($result) {
+        // 将数据库时间格式转换为毫秒时间戳，以匹配客户端期望的格式
+        $result['updated_at'] = strtotime($result['updated_at']) * 1000;
+    }
+
+    return $result ?: null;
 }
 
 /**
@@ -242,18 +301,149 @@ function updateDeviceLastSync($db, $deviceId, $timestamp) {
 }
 
 /**
+ * 计算数据的实际最后修改时间戳
+ * 基于所有数据的最新修改时间来确定server_timestamp
+ */
+function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $systemEvents, $timerSettings) {
+    $maxTimestamp = 0;
+
+    // 检查番茄事件的最新修改时间
+    foreach ($pomodoroEvents as $event) {
+        $eventTimestamp = strtotime($event['updated_at']) * 1000; // 转换为毫秒
+        if ($eventTimestamp > $maxTimestamp) {
+            $maxTimestamp = $eventTimestamp;
+        }
+    }
+
+    // 检查系统事件的最新创建时间
+    foreach ($systemEvents as $event) {
+        $eventTimestamp = strtotime($event['created_at']) * 1000; // 转换为毫秒
+        if ($eventTimestamp > $maxTimestamp) {
+            $maxTimestamp = $eventTimestamp;
+        }
+    }
+
+    // 检查计时器设置的最新修改时间
+    if ($timerSettings && isset($timerSettings['updated_at'])) {
+        $settingsTimestamp = strtotime($timerSettings['updated_at']) * 1000; // 转换为毫秒
+        if ($settingsTimestamp > $maxTimestamp) {
+            $maxTimestamp = $settingsTimestamp;
+        }
+    }
+
+    // 如果没有任何数据，使用当前时间戳
+    if ($maxTimestamp == 0) {
+        $maxTimestamp = getCurrentTimestamp();
+    }
+
+    return $maxTimestamp;
+}
+
+/**
+ * 计算增量同步后的实际最后修改时间戳
+ * 考虑客户端推送的数据和服务器端变更的最新时间
+ */
+function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $serverChanges, $lastSyncTimestamp) {
+    $maxTimestamp = $lastSyncTimestamp;
+
+    // 检查客户端推送的番茄事件变更
+    if (isset($clientChanges['pomodoro_events'])) {
+        $pomodoroChanges = $clientChanges['pomodoro_events'];
+
+        // 检查新创建的事件
+        if (isset($pomodoroChanges['created'])) {
+            foreach ($pomodoroChanges['created'] as $event) {
+                if (isset($event['updated_at'])) {
+                    $eventTimestamp = $event['updated_at'];
+                    if ($eventTimestamp > $maxTimestamp) {
+                        $maxTimestamp = $eventTimestamp;
+                    }
+                }
+            }
+        }
+
+        // 检查更新的事件
+        if (isset($pomodoroChanges['updated'])) {
+            foreach ($pomodoroChanges['updated'] as $event) {
+                if (isset($event['updated_at'])) {
+                    $eventTimestamp = $event['updated_at'];
+                    if ($eventTimestamp > $maxTimestamp) {
+                        $maxTimestamp = $eventTimestamp;
+                    }
+                }
+            }
+        }
+    }
+
+    // 检查客户端推送的系统事件变更
+    if (isset($clientChanges['system_events']['created'])) {
+        foreach ($clientChanges['system_events']['created'] as $event) {
+            if (isset($event['created_at'])) {
+                $eventTimestamp = $event['created_at'];
+                if ($eventTimestamp > $maxTimestamp) {
+                    $maxTimestamp = $eventTimestamp;
+                }
+            }
+        }
+    }
+
+    // 检查客户端推送的计时器设置变更
+    if (isset($clientChanges['timer_settings']['updated_at'])) {
+        $settingsTimestamp = $clientChanges['timer_settings']['updated_at'];
+        if ($settingsTimestamp > $maxTimestamp) {
+            $maxTimestamp = $settingsTimestamp;
+        }
+    }
+
+    // 检查服务器端的番茄事件变更
+    foreach ($serverChanges['pomodoro_events'] as $event) {
+        $eventTimestamp = strtotime($event['updated_at']) * 1000;
+        if ($eventTimestamp > $maxTimestamp) {
+            $maxTimestamp = $eventTimestamp;
+        }
+    }
+
+    // 检查服务器端的系统事件变更
+    foreach ($serverChanges['system_events'] as $event) {
+        $eventTimestamp = strtotime($event['created_at']) * 1000;
+        if ($eventTimestamp > $maxTimestamp) {
+            $maxTimestamp = $eventTimestamp;
+        }
+    }
+
+    // 检查服务器端的计时器设置变更
+    if ($serverChanges['timer_settings'] && isset($serverChanges['timer_settings']['updated_at'])) {
+        // 服务器端的设置时间戳已经是毫秒格式，无需转换
+        $settingsTimestamp = $serverChanges['timer_settings']['updated_at'];
+        if ($settingsTimestamp > $maxTimestamp) {
+            $maxTimestamp = $settingsTimestamp;
+        }
+    }
+
+    // 如果没有任何变更，使用当前时间戳
+    if ($maxTimestamp == $lastSyncTimestamp) {
+        $maxTimestamp = getCurrentTimestamp();
+    }
+
+    return $maxTimestamp;
+}
+
+/**
  * 获取指定时间后的用户番茄事件
  */
 function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
+    // 将毫秒时间戳转换为数据库时间格式
+    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
+
     $stmt = $db->prepare('
-        SELECT 
-            uuid, title, start_time, end_time, event_type, 
+        SELECT
+            uuid, title, start_time, end_time, event_type,
             is_completed, created_at, updated_at
-        FROM pomodoro_events 
+        FROM pomodoro_events
         WHERE user_id = ? AND updated_at > ? AND deleted_at IS NULL
         ORDER BY updated_at ASC
     ');
-    $stmt->execute([$userId, $timestamp]);
+    $stmt->execute([$userId, $timestampDate]);
     return $stmt->fetchAll();
 }
 
@@ -261,6 +451,9 @@ function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
  * 获取指定时间后的用户系统事件
  */
 function getUserSystemEventsAfter($db, $userId, $timestamp) {
+    // 将毫秒时间戳转换为数据库时间格式
+    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
+
     $stmt = $db->prepare('
         SELECT
             uuid, event_type, timestamp, data, created_at
@@ -268,7 +461,7 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
         WHERE user_id = ? AND created_at > ? AND deleted_at IS NULL
         ORDER BY created_at ASC
     ');
-    $stmt->execute([$userId, $timestamp]);
+    $stmt->execute([$userId, $timestampDate]);
     $events = $stmt->fetchAll();
 
     // 解码JSON数据字段
@@ -288,15 +481,26 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
  * 获取指定时间后的用户计时器设置
  */
 function getUserTimerSettingsAfter($db, $userId, $timestamp) {
+    // 将毫秒时间戳转换为数据库时间格式
+    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
+
     $stmt = $db->prepare('
         SELECT pomodoro_time, short_break_time, long_break_time, updated_at
-        FROM timer_settings 
+        FROM timer_settings
         WHERE user_id = ? AND updated_at > ? AND is_global = 1
         ORDER BY updated_at DESC
         LIMIT 1
     ');
-    $stmt->execute([$userId, $timestamp]);
-    return $stmt->fetch() ?: null;
+    $stmt->execute([$userId, $timestampDate]);
+    $result = $stmt->fetch();
+
+    if ($result) {
+        // 将数据库时间格式转换为毫秒时间戳，以匹配客户端期望的格式
+        $result['updated_at'] = strtotime($result['updated_at']) * 1000;
+        logMessage("Found timer settings after $timestampDate for user: $userId, updated_at: {$result['updated_at']}");
+    }
+
+    return $result ?: null;
 }
 
 /**
@@ -430,19 +634,23 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
  * 处理用户计时器设置变更
  */
 function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $lastSyncTimestamp) {
+    // 将客户端的毫秒时间戳转换为数据库时间格式
+    $clientUpdatedAt = date('Y-m-d H:i:s', intval($settings['updated_at'] / 1000));
+    $lastSyncDate = date('Y-m-d H:i:s', intval($lastSyncTimestamp / 1000));
+
     // 检查是否有冲突
     $stmt = $db->prepare('SELECT updated_at FROM timer_settings WHERE user_id = ? AND is_global = 1');
     $stmt->execute([$userId]);
     $serverSettings = $stmt->fetch();
-    
-    if ($serverSettings && $serverSettings['updated_at'] > $lastSyncTimestamp) {
+
+    if ($serverSettings && $serverSettings['updated_at'] > $lastSyncDate) {
         // 有冲突，使用最新的设置（客户端优先）
-        logMessage("Timer settings conflict detected for user: $userId, using client version");
+        logMessage("Timer settings conflict detected for user: $userId, server: {$serverSettings['updated_at']}, client: $clientUpdatedAt, using client version");
     }
-    
+
     // 更新或插入设置
     $stmt = $db->prepare('
-        INSERT OR REPLACE INTO timer_settings 
+        INSERT OR REPLACE INTO timer_settings
         (user_id, device_id, pomodoro_time, short_break_time, long_break_time, updated_at, is_global)
         VALUES (?, NULL, ?, ?, ?, ?, 1)
     ');
@@ -451,31 +659,104 @@ function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $la
         $settings['pomodoro_time'],
         $settings['short_break_time'],
         $settings['long_break_time'],
-        $settings['updated_at']
+        $clientUpdatedAt  // 使用转换后的时间格式
     ]);
+
+    logMessage("Timer settings updated for user: $userId, pomodoro: {$settings['pomodoro_time']}s, short_break: {$settings['short_break_time']}s, long_break: {$settings['long_break_time']}s, updated_at: $clientUpdatedAt");
 }
 
 /**
  * 强制覆盖远程数据
  */
-function performForceOverwriteRemote($db, $userId, $deviceId, $changes, $timestamp) {
+function performForceOverwriteRemote($db, $userId, $deviceId, $changes) {
+    $currentTimestamp = getCurrentTimestamp();
+
     // 清空用户数据
-    clearUserData($db, $userId, $timestamp);
-    
+    clearUserData($db, $userId, $currentTimestamp);
+
     // 重新插入客户端数据
     if (isset($changes['pomodoro_events'])) {
         processUserPomodoroEventChanges($db, $userId, $deviceId, $changes['pomodoro_events'], 0);
     }
-    
+
     if (isset($changes['system_events'])) {
         processUserSystemEventChanges($db, $userId, $deviceId, $changes['system_events']);
     }
-    
+
     if (isset($changes['timer_settings'])) {
         processUserTimerSettingsChanges($db, $userId, $deviceId, $changes['timer_settings'], 0);
     }
-    
+
+    // 计算强制覆盖后的实际最后修改时间戳
+    $serverTimestamp = calculateForceOverwriteTimestamp($changes, $currentTimestamp);
+
     logMessage("Force overwrite completed for user: $userId");
+
+    return $serverTimestamp;
+}
+
+/**
+ * 计算强制覆盖后的实际最后修改时间戳
+ * 基于客户端推送的数据的最新修改时间
+ */
+function calculateForceOverwriteTimestamp($changes, $fallbackTimestamp) {
+    $maxTimestamp = 0;
+
+    // 检查番茄事件的最新修改时间
+    if (isset($changes['pomodoro_events'])) {
+        $pomodoroChanges = $changes['pomodoro_events'];
+
+        // 检查新创建的事件
+        if (isset($pomodoroChanges['created'])) {
+            foreach ($pomodoroChanges['created'] as $event) {
+                if (isset($event['updated_at'])) {
+                    $eventTimestamp = $event['updated_at'];
+                    if ($eventTimestamp > $maxTimestamp) {
+                        $maxTimestamp = $eventTimestamp;
+                    }
+                }
+            }
+        }
+
+        // 检查更新的事件
+        if (isset($pomodoroChanges['updated'])) {
+            foreach ($pomodoroChanges['updated'] as $event) {
+                if (isset($event['updated_at'])) {
+                    $eventTimestamp = $event['updated_at'];
+                    if ($eventTimestamp > $maxTimestamp) {
+                        $maxTimestamp = $eventTimestamp;
+                    }
+                }
+            }
+        }
+    }
+
+    // 检查系统事件的最新创建时间
+    if (isset($changes['system_events']['created'])) {
+        foreach ($changes['system_events']['created'] as $event) {
+            if (isset($event['created_at'])) {
+                $eventTimestamp = $event['created_at'];
+                if ($eventTimestamp > $maxTimestamp) {
+                    $maxTimestamp = $eventTimestamp;
+                }
+            }
+        }
+    }
+
+    // 检查计时器设置的最新修改时间
+    if (isset($changes['timer_settings']['updated_at'])) {
+        $settingsTimestamp = $changes['timer_settings']['updated_at'];
+        if ($settingsTimestamp > $maxTimestamp) {
+            $maxTimestamp = $settingsTimestamp;
+        }
+    }
+
+    // 如果没有任何数据，使用回退时间戳
+    if ($maxTimestamp == 0) {
+        $maxTimestamp = $fallbackTimestamp;
+    }
+
+    return $maxTimestamp;
 }
 
 /**
@@ -702,5 +983,57 @@ function migrateDeviceTimerSettings($db, $deviceUuid, $userId, $deviceId) {
         }
         return 0;
     }
+}
+
+/**
+ * 获取用户番茄事件数量
+ */
+function getUserPomodoroEventCount($db, $userId) {
+    $stmt = $db->prepare('SELECT COUNT(*) FROM pomodoro_events WHERE user_id = ? AND deleted_at IS NULL');
+    $stmt->execute([$userId]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * 获取用户系统事件数量
+ */
+function getUserSystemEventCount($db, $userId) {
+    $stmt = $db->prepare('SELECT COUNT(*) FROM system_events WHERE user_id = ? AND deleted_at IS NULL');
+    $stmt->execute([$userId]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * 检查用户是否有计时器设置
+ */
+function hasUserTimerSettings($db, $userId) {
+    $stmt = $db->prepare('SELECT COUNT(*) FROM timer_settings WHERE user_id = ? AND is_global = 1');
+    $stmt->execute([$userId]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+/**
+ * 获取用户最近的番茄事件（用于预览）
+ */
+function getRecentPomodoroEvents($db, $userId, $limit = 5) {
+    $stmt = $db->prepare('
+        SELECT
+            uuid, title, start_time, end_time, event_type,
+            is_completed, created_at, updated_at
+        FROM pomodoro_events
+        WHERE user_id = ? AND deleted_at IS NULL
+        ORDER BY start_time DESC
+        LIMIT ?
+    ');
+    $stmt->execute([$userId, $limit]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * 更新设备最后访问时间（不是同步时间）
+ */
+function updateDeviceLastAccess($db, $deviceId) {
+    $stmt = $db->prepare('UPDATE devices SET last_access_timestamp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+    $stmt->execute([getCurrentTimestamp(), $deviceId]);
 }
 ?>

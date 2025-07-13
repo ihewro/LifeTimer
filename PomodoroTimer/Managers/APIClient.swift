@@ -70,6 +70,12 @@ class APIClient {
         return try await performAuthenticatedRequest(url: url, method: "GET", token: token)
     }
 
+    /// 数据摘要（轻量级预览）
+    func dataSummary(token: String) async throws -> APIResponse<DataSummaryResponse> {
+        let url = URL(string: "\(baseURL)/api/user/sync/summary")!
+        return try await performAuthenticatedRequest(url: url, method: "GET", token: token)
+    }
+
     /// 增量同步（用户认证版本）
     func incrementalSync(_ request: IncrementalSyncRequest, token: String) async throws -> APIResponse<IncrementalSyncResponse> {
         let url = URL(string: "\(baseURL)/api/user/sync/incremental")!
@@ -542,6 +548,47 @@ struct DeviceUnbindResponse: Codable {
         case deviceUUID = "device_uuid"
         case remainingDeviceCount = "remaining_device_count"
         case unboundAt = "unbound_at"
+    }
+}
+
+/// 数据摘要响应
+struct DataSummaryResponse: Codable {
+    let summary: DataSummary
+    let recentEvents: [ServerPomodoroEvent]
+    let userInfo: UserInfo
+
+    private enum CodingKeys: String, CodingKey {
+        case summary
+        case recentEvents = "recent_events"
+        case userInfo = "user_info"
+    }
+}
+
+/// 数据摘要信息
+struct DataSummary: Codable {
+    let pomodoroEventCount: Int
+    let systemEventCount: Int
+    let hasTimerSettings: Bool
+    let serverTimestamp: Int64
+    let lastUpdated: String
+
+    private enum CodingKeys: String, CodingKey {
+        case pomodoroEventCount = "pomodoro_event_count"
+        case systemEventCount = "system_event_count"
+        case hasTimerSettings = "has_timer_settings"
+        case serverTimestamp = "server_timestamp"
+        case lastUpdated = "last_updated"
+    }
+}
+
+/// 用户信息
+struct UserInfo: Codable {
+    let userUUID: String
+    let deviceCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case userUUID = "user_uuid"
+        case deviceCount = "device_count"
     }
 }
 
