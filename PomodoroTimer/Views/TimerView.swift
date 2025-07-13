@@ -89,7 +89,7 @@ struct TimerView: View {
                         }) {
                             Text(timerModel.formattedTime())
                                 .font(.system(size: 58, weight: .light, design: .monospaced))
-                                .foregroundColor(Color(NSColor.labelColor)) // 强制使用系统标签颜色（黑色）
+                                .foregroundColor(Color.primary) // 强制使用系统标签颜色（黑色）
                                 .multilineTextAlignment(.center)
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -296,7 +296,7 @@ struct TimerView: View {
                 Spacer()
             }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .onAppear {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
@@ -853,7 +853,7 @@ struct UnifiedButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: NSFont.systemFontSize)) // 使用系统默认文字大小
+            .font(.system(size: 13)) // 使用系统默认文字大小
             .fontWeight(.medium)
             .padding(.vertical, 6) // 上下padding 12pt
             .padding(.horizontal, 24) // 左右padding 24pt
@@ -879,7 +879,7 @@ struct NativeButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: NSFont.systemFontSize))
+            .font(.system(size: 13))
             .fontWeight(.medium)
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
@@ -1044,7 +1044,7 @@ struct PomodoroCompletionDialog: View {
         }
         .padding(24)
         .frame(width: 480)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(16)
         .shadow(radius: 20)
     }

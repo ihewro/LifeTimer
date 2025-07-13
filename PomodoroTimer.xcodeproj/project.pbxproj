@@ -33,6 +33,7 @@
 		SYNC001122334455667788EE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNC001122334455667788FF /* APIClient.swift */; };
 		AUTH001122334455667788AA /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTH001122334455667788BB /* AuthManager.swift */; };
 		AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHV01122334455667788BB /* AuthenticationView.swift */; };
+		COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = COLEXT1122334455667788BB /* Color+CrossPlatform.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +65,7 @@
 		SYNC001122334455667788FF /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		AUTH001122334455667788BB /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		AUTHV01122334455667788BB /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
+		COLEXT1122334455667788BB /* Color+CrossPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+CrossPlatform.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +102,7 @@
 				1A2B3C4D5E6F7890ABCD124E /* Views */,
 				1A2B3C4D5E6F7890ABCD124F /* Models */,
 				1A2B3C4D5E6F7890ABCD1250 /* Managers */,
+				EXTENS1122334455667788CC /* Extensions */,
 				1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */,
 				1A2B3C4D5E6F7890ABCD1249 /* PomodoroTimer.entitlements */,
 				1A2B3C4D5E6F7890ABCD1251 /* Preview Content */,
@@ -151,6 +154,14 @@
 				AUTH001122334455667788BB /* AuthManager.swift */,
 			);
 			path = Managers;
+			sourceTree = "<group>";
+		};
+		EXTENS1122334455667788CC /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				COLEXT1122334455667788BB /* Color+CrossPlatform.swift */,
+			);
+			path = Extensions;
 			sourceTree = "<group>";
 		};
 		1A2B3C4D5E6F7890ABCD1251 /* Preview Content */ = {
@@ -255,6 +266,7 @@
 				SYNC001122334455667788EE /* APIClient.swift in Sources */,
 				AUTH001122334455667788AA /* AuthManager.swift in Sources */,
 				AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */,
+				COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

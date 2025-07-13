@@ -138,7 +138,7 @@ struct AuthenticationView: View {
             }
         }
         .padding()
-        .background(Color(.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -416,7 +416,7 @@ struct UserInfoCard: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color(.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
     

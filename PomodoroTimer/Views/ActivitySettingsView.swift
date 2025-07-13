@@ -40,7 +40,7 @@ struct ActivitySettingsView: View {
                         permissionStatusView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -55,7 +55,7 @@ struct ActivitySettingsView: View {
                         permissionManagementView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -70,7 +70,7 @@ struct ActivitySettingsView: View {
                         dataManagementView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -85,7 +85,7 @@ struct ActivitySettingsView: View {
                         appCategorySettingsView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -100,7 +100,7 @@ struct ActivitySettingsView: View {
                         privacySettingsView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -115,7 +115,7 @@ struct ActivitySettingsView: View {
                         aboutView
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }

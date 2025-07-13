@@ -41,10 +41,12 @@ struct ActivityStatsView: View {
             // 当监控状态改变时刷新数据
             refreshData()
         }
+#if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // 当应用重新激活时刷新数据
             refreshData()
         }
+#endif
         .toolbar {
             // 左侧：Tab选项卡 Picker
             ToolbarItem(placement: .principal) {
@@ -163,7 +165,7 @@ struct ActivityStatsView: View {
                     }
                 }
                 .padding()
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color.systemBackground)
                 .cornerRadius(12)
 
                 // 快速应用统计
@@ -266,7 +268,7 @@ struct ActivityStatsView: View {
                     }
                 }
                 .padding()
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color.systemBackground)
                 .cornerRadius(12)
 
                 // 时间分布
@@ -304,7 +306,7 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(12)
     }
 
@@ -331,7 +333,7 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(12)
     }
 
@@ -364,7 +366,7 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(12)
     }
 
@@ -398,7 +400,7 @@ struct ActivityStatsView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(12)
     }
 
@@ -863,7 +865,7 @@ struct AppStatRow: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 

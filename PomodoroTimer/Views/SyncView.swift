@@ -259,7 +259,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -303,7 +303,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -346,7 +346,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -726,7 +726,7 @@ struct SyncView: View {
                     }
                 }
                 .padding()
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                .background(Color.systemBackground.opacity(0.5))
                 .cornerRadius(6)
             } else {
                 Text("暂无同步记录")
@@ -737,7 +737,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
         .popover(isPresented: $showingSyncHistory) {
             syncHistoryDetailView
@@ -786,7 +786,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.separatorColor).opacity(0.1))
+        .background(Color.systemSeparator.opacity(0.1))
         .cornerRadius(8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -841,7 +841,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.separatorColor).opacity(0.1))
+        .background(Color.systemSeparator.opacity(0.1))
         .cornerRadius(8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -895,7 +895,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -970,7 +970,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -1048,7 +1048,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
@@ -1539,7 +1539,7 @@ struct SyncView: View {
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 8)
-                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                        .background(Color.systemBackground.opacity(0.5))
                         .cornerRadius(6)
                     }
                 }
@@ -1645,7 +1645,7 @@ struct SyncView: View {
             }
         }
         .padding()
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .background(Color.systemBackground.opacity(0.5))
         .cornerRadius(6)
         .onTapGesture {
             print("🖱️ 点击同步记录: ID=\(record.id), success=\(record.success)")
@@ -2115,7 +2115,7 @@ extension SyncView {
                 }
             }
             .padding()
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(Color.systemBackground)
             .cornerRadius(8)
 
             // 删除记录列表
@@ -2203,7 +2203,7 @@ extension SyncView {
                 .textSelection(.enabled)
         }
         .padding(8)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(6)
     }
 
@@ -2244,7 +2244,7 @@ extension SyncView {
                     }
                 }
                 .frame(maxHeight: 400)
-                .background(Color(NSColor.textBackgroundColor))
+                .background(Color.systemBackground)
                 .cornerRadius(8)
             } else {
                 Text("暂无日志记录")
@@ -2382,7 +2382,7 @@ extension SyncView {
             }
         }
         .padding()
-        .background(Color(.controlBackgroundColor))
+        .background(Color.systemBackground)
         .cornerRadius(8)
     }
 
