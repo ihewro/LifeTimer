@@ -9,6 +9,8 @@ import Foundation
 import Combine
 #if canImport(Cocoa)
 import Cocoa
+#elseif canImport(UIKit)
+import UIKit
 #endif
 
 /// 用户认证管理器

@@ -217,4 +217,16 @@ class MenuBarManager: ObservableObject {
         }
     }
 }
+#else
+import SwiftUI
+// iOS 版本的 MenuBarManager 空实现
+class MenuBarManager: ObservableObject {
+    init() {
+        // iOS 上不需要菜单栏管理
+    }
+
+    func setTimerModel(_ timerModel: TimerModel) {
+        // iOS 上不需要实现
+    }
+}
 #endif

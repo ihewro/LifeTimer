@@ -107,7 +107,7 @@ struct EventEditView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(Color.systemBackground)
     }
     
     private func saveEvent() {

@@ -6,9 +6,11 @@
 //
 
 import SwiftUI
-import AppKit
 import Foundation
 import Combine
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // 导入事件模型
 // 注意：确保EventModel.swift在同一个target中
@@ -307,7 +309,7 @@ struct SearchResultsSidebar: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(Color.systemBackground)
 
             Divider()
 
@@ -323,7 +325,7 @@ struct SearchResultsSidebar: View {
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color.systemBackground)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 1) {
@@ -337,11 +339,11 @@ struct SearchResultsSidebar: View {
                         }
                     }
                 }
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color.systemBackground)
             }
         }
         .frame(width: 280)
-        .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+        .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
     }
 }
 
@@ -409,7 +411,7 @@ struct SearchResultRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(isHovered ? Color(NSColor.controlAccentColor).opacity(0.1) : Color.clear)
+        .background(isHovered ? Color.accentColor.opacity(0.1) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap()
@@ -537,7 +539,7 @@ struct CalendarView: View {
                         )
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
-                        .background(Color(NSColor.controlBackgroundColor))
+                        .background(Color.systemBackground)
 
                     case .week:
                         WeekView(
@@ -546,7 +548,7 @@ struct CalendarView: View {
                         )
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
-                        .background(Color(NSColor.controlBackgroundColor))
+                        .background(Color.systemBackground)
 
                     case .month:
                         MonthView(
@@ -556,7 +558,7 @@ struct CalendarView: View {
                         )
                         .environmentObject(eventManager)
                         .environmentObject(activityMonitor)
-                        .background(Color(NSColor.controlBackgroundColor))
+                        .background(Color.systemBackground)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -709,7 +711,7 @@ struct DayView: View {
                 )
                 .environmentObject(eventManager)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color.systemBackground)
 
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
@@ -727,7 +729,7 @@ struct DayView: View {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -1805,7 +1807,7 @@ struct WeekView: View {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
         }
@@ -2490,7 +2492,7 @@ struct MonthView: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(NSColor.controlBackgroundColor))
+                                    .fill(Color.systemBackground)
                                     .shadow(radius: 4)
                             )
                             .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -2519,7 +2521,7 @@ struct MonthView: View {
                     }
                 }
                 .frame(width: 300)
-                .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+                .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
                 .animation(.easeInOut(duration: 0.3), value: displayMonth)
             }
         }
@@ -3560,23 +3562,50 @@ struct DateDisplayOnly: View {
 }
 
 
-// MARK: - VisualEffectView for macOS
+// MARK: - VisualEffectView for cross-platform
 #if os(macOS)
 struct VisualEffectView: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
-    let blendingMode: NSVisualEffectView.BlendingMode
+    let material: String
+    let blendingMode: String
+
+    private var nsMaterial: NSVisualEffectView.Material {
+        switch material {
+        case "sidebar": return .sidebar
+        default: return .sidebar
+        }
+    }
+
+    private var nsBlendingMode: NSVisualEffectView.BlendingMode {
+        switch blendingMode {
+        case "behindWindow": return .behindWindow
+        default: return .behindWindow
+        }
+    }
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let visualEffectView = NSVisualEffectView()
-        visualEffectView.material = material
-        visualEffectView.blendingMode = blendingMode
+        visualEffectView.material = nsMaterial
+        visualEffectView.blendingMode = nsBlendingMode
         visualEffectView.state = .active
         return visualEffectView
     }
 
     func updateNSView(_ visualEffectView: NSVisualEffectView, context: Context) {
-        visualEffectView.material = material
-        visualEffectView.blendingMode = blendingMode
+        visualEffectView.material = nsMaterial
+        visualEffectView.blendingMode = nsBlendingMode
+    }
+}
+#else
+// iOS 版本的 VisualEffectView 替代实现
+struct VisualEffectView: View {
+    let material: String // 在 iOS 上忽略 material 参数
+    let blendingMode: String // 在 iOS 上忽略 blendingMode 参数
+
+    var body: some View {
+        // 在 iOS 上使用半透明背景替代毛玻璃效果
+        Color.systemBackground
+            .opacity(0.95)
+            .background(.ultraThinMaterial)
     }
 }
 #endif

@@ -2,7 +2,9 @@ import Foundation
 import AVFoundation
 import AudioToolbox
 import UserNotifications
+#if canImport(AppKit)
 import AppKit
+#endif
 
 // 音效类型枚举
 enum SoundEffectType: String, CaseIterable {
@@ -244,6 +246,7 @@ class SoundEffectManager: ObservableObject {
     // MARK: - 自定义音效管理
 
     func selectCustomSoundFolder() {
+        #if os(macOS)
         let openPanel = NSOpenPanel()
         openPanel.title = "选择音效文件夹"
         openPanel.canChooseFiles = false
@@ -255,6 +258,10 @@ class SoundEffectManager: ObservableObject {
                 customSoundFolderPath = url.path
             }
         }
+        #else
+        // iOS 上不支持文件夹选择，可以考虑使用文档选择器或其他方式
+        print("Custom sound folder selection not supported on iOS")
+        #endif
     }
 
     private func loadCustomSounds() {
@@ -415,8 +422,9 @@ class SoundEffectManager: ObservableObject {
         currentPreviewPlayer = nil
     }
 
-    // 使用NSSound播放系统音效
+    // 使用NSSound播放系统音效 (仅限 macOS)
     private func playSystemSoundByName(_ soundName: String) {
+        #if os(macOS)
         // 首先尝试使用正确的NSSound名称
         let nsSoundName: String
         switch soundName {
@@ -474,6 +482,25 @@ class SoundEffectManager: ObservableObject {
             }
             AudioServicesPlaySystemSound(fallbackSoundID)
         }
+        #else
+        // iOS 上使用 AudioServicesPlaySystemSound 播放系统音效
+        let fallbackSoundID: SystemSoundID
+        switch soundName {
+        case "glass":
+            fallbackSoundID = 1054
+        case "tink":
+            fallbackSoundID = 1057
+        case "purr":
+            fallbackSoundID = 1103
+        case "ping":
+            fallbackSoundID = 1027
+        case "pop":
+            fallbackSoundID = 1028
+        default:
+            fallbackSoundID = 1000 // 默认系统音效
+        }
+        AudioServicesPlaySystemSound(fallbackSoundID)
+        #endif
     }
     
     // MARK: - 便捷方法

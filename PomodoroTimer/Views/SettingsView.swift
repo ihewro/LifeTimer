@@ -20,14 +20,18 @@ struct DataFileRow: View {
                 Spacer()
                 Button("在Finder中显示") {
                     let url = URL(fileURLWithPath: path)
+#if os(macOS)
                     NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+#endif
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
                 Button("复制路径") {
+#if os(macOS)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(path, forType: .string)
+#endif
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -201,7 +205,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -263,7 +267,7 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -333,7 +337,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -364,7 +368,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -406,7 +410,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -443,7 +447,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -511,7 +515,7 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -548,7 +552,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }
@@ -586,7 +590,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
-                    .background(Color(NSColor.controlBackgroundColor))
+                    .background(Color.systemBackground)
                     .cornerRadius(8)
                     .padding(.horizontal, 20)
                 }

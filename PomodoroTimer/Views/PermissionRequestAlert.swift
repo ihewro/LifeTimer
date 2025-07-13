@@ -84,7 +84,7 @@ struct PermissionRequestAlert: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color.systemBackground)
         .navigationTitle("需要辅助功能权限")
     }
 }
