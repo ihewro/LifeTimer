@@ -69,6 +69,7 @@ enum SyncMode: String, Codable {
     case pushOnly = "pushOnly"              // 仅推送 (类似 git push)
     case smartMerge = "smartMerge"            // 智能同步 (类似 git pull + git push)
     case incremental = "incremental"          // 增量同步
+    case autoIncremental = "autoIncremental"  // 自动增量同步
 
     var displayName: String {
         switch self {
@@ -84,6 +85,8 @@ enum SyncMode: String, Codable {
             return "智能同步"
         case .incremental:
             return "增量同步"
+        case .autoIncremental:
+            return "自动同步"
         }
     }
 
@@ -101,6 +104,8 @@ enum SyncMode: String, Codable {
             return "双向同步：拉取并推送数据"
         case .incremental:
             return "增量同步：仅同步变更的数据"
+        case .autoIncremental:
+            return "自动增量同步：定时同步变更的数据"
         }
     }
 
@@ -118,6 +123,8 @@ enum SyncMode: String, Codable {
             return "arrow.up.arrow.down"
         case .incremental:
             return "arrow.triangle.2.circlepath"
+        case .autoIncremental:
+            return "clock.arrow.2.circlepath"
         }
     }
 
@@ -178,7 +185,7 @@ class SyncManager: ObservableObject {
     private weak var timerModel: TimerModel?
     
     // 同步配置
-    private let syncInterval: TimeInterval = 300 // 5分钟自动同步
+    private let syncInterval: TimeInterval = 10 // 5分钟自动同步
     private var syncTimer: Timer?
     
     // UserDefaults键
@@ -360,23 +367,50 @@ class SyncManager: ObservableObject {
     }
     
     // MARK: - Private Methods
-    
+
     private func performSync(isFullSync: Bool) async {
         guard !isSyncing else { return }
-        
+
+        let startTime = Date()
+
         DispatchQueue.main.async {
             self.isSyncing = true
             self.syncStatus = .syncing
         }
-        
+
         do {
+            var uploadedCount = 0
+            var downloadedCount = 0
+            var conflictCount = 0
+            var syncDetails: SyncDetails? = nil
+
             if isFullSync {
-                try await performFullSyncInternal()
+                let result = try await performSyncInternal(mode: .smartMerge)
+                uploadedCount = result.uploadedCount
+                downloadedCount = result.downloadedCount
+                conflictCount = result.conflictCount
+                syncDetails = result.syncDetails
             } else {
-                try await performIncrementalSyncInternal()
+                let result = try await performSyncInternal(mode: .autoIncremental)
+                uploadedCount = result.uploadedCount
+                downloadedCount = result.downloadedCount
+                conflictCount = result.conflictCount
+                syncDetails = result.syncDetails
             }
 
-            // 刷新数据预览和工作区状态（如果不是通过performSync调用的）
+            let duration = Date().timeIntervalSince(startTime)
+            let syncMode: SyncMode = isFullSync ? .smartMerge : .autoIncremental
+            let record = SyncRecord(
+                syncMode: syncMode,
+                success: true,
+                uploadedCount: uploadedCount,
+                downloadedCount: downloadedCount,
+                conflictCount: conflictCount,
+                duration: duration,
+                syncDetails: syncDetails
+            )
+
+            // 刷新数据预览和工作区状态
             await loadServerDataPreview()
             loadLocalDataPreview()
             await generateSyncWorkspace()
@@ -387,13 +421,47 @@ class SyncManager: ObservableObject {
                 self.lastSyncTime = Date()
                 self.userDefaults.set(self.lastSyncTime, forKey: self.lastSyncTimeKey)
                 self.isSyncing = false
+
+                // 更新服务器响应状态
+                self.lastServerResponseStatus = "同步成功 (HTTP 200)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "已连接"
+
+                // 清除已同步的删除记录
+                self.clearSyncedDeletions()
+
+                // 记录同步历史
+                self.addSyncRecord(record)
+
+                // 发送同步完成通知，用于UI刷新
+                NotificationCenter.default.post(
+                    name: Notification.Name("SyncCompleted"),
+                    object: self
+                )
             }
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            let syncMode: SyncMode = isFullSync ? .smartMerge : .autoIncremental
+            let record = SyncRecord(
+                syncMode: syncMode,
+                success: false,
+                errorMessage: error.localizedDescription,
+                duration: duration
+            )
+
             let errorMessage = self.formatError(error)
             print("Sync failed: \(errorMessage)")
             DispatchQueue.main.async {
                 self.syncStatus = .error(errorMessage)
                 self.isSyncing = false
+
+                // 更新服务器响应状态
+                self.lastServerResponseStatus = "同步失败: \(error.localizedDescription)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "连接失败"
+
+                // 记录同步历史（包括失败的同步）
+                self.addSyncRecord(record)
             }
         }
     }
@@ -522,6 +590,11 @@ class SyncManager: ObservableObject {
             return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
 
         case .incremental:
+            try await performIncrementalSync(detailsCollector: &syncDetailsCollector)
+            let details = syncDetailsCollector.build()
+            return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
+
+        case .autoIncremental:
             try await performIncrementalSync(detailsCollector: &syncDetailsCollector)
             let details = syncDetailsCollector.build()
             return (details.uploadedItems.count, details.downloadedItems.count, details.conflictItems.count, details)
@@ -681,41 +754,7 @@ class SyncManager: ObservableObject {
         try await performPushOnly(detailsCollector: &detailsCollector)
     }
     
-    private func performIncrementalSyncInternal() async throws {
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
 
-        // 收集本地变更
-        let changes = await collectLocalChanges(since: lastSyncTimestamp)
-
-        guard let authManager = authManager,
-              let token = authManager.sessionToken else {
-            throw SyncError.notAuthenticated
-        }
-
-        let request = IncrementalSyncRequest(
-            lastSyncTimestamp: lastSyncTimestamp,
-            changes: changes
-        )
-
-        let response = try await apiClient.incrementalSync(request, token: token)
-        
-        // 处理冲突
-        if !response.data.conflicts.isEmpty {
-            await handleConflicts(response.data.conflicts)
-        }
-        
-        // 应用服务器变更
-        await applyServerChanges(response.data.serverChanges)
-
-        // 更新最后同步时间戳
-        userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
-
-        // 刷新数据预览和工作区状态
-        await loadServerDataPreview()
-        loadLocalDataPreview()
-        await generateSyncWorkspace()
-        updatePendingSyncCount()
-    }
 
     /// 增量同步
     private func performIncrementalSync(detailsCollector: inout SyncDetailsCollector) async throws {
@@ -873,7 +912,7 @@ class SyncManager: ObservableObject {
                     // 强制覆盖远程：保持本地数据不变（这个模式在这里不适用）
                     break
 
-                case .pullOnly, .smartMerge, .incremental:
+                case .pullOnly, .smartMerge, .incremental, .autoIncremental:
                     // 拉取模式或智能合并：智能合并数据
                     self.smartMergeServerData(data, into: eventManager)
 
@@ -922,7 +961,7 @@ class SyncManager: ObservableObject {
                 // 强制覆盖远程：保持本地数据不变
                 break
 
-            case .pullOnly, .smartMerge, .incremental:
+            case .pullOnly, .smartMerge, .incremental, .autoIncremental:
                 // 智能合并系统事件
                 self.smartMergeSystemEvents(serverSystemEvents, into: systemEventStore)
 
