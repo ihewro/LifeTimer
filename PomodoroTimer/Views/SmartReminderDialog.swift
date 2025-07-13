@@ -52,15 +52,15 @@ struct SmartReminderDialog: View {
                 snoozeSection
             }
 
-            // 底部按钮
-            HStack(spacing: 12) {
-                Button("关闭提醒") {
-                    isPresented = false
-                }
-                .buttonStyle(.bordered)
+            // // 底部按钮
+            // HStack(spacing: 12) {
+            //     Button("关闭提醒") {
+            //         isPresented = false
+            //     }
+            //     .buttonStyle(.bordered)
 
-                Spacer()
-            }
+            //     Spacer()
+            // }
         }
         .padding(24)
         .frame(width: 480)
