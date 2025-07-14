@@ -192,6 +192,11 @@ class SyncManager: ObservableObject {
 
     // 同步设置
     @Published var syncSystemEvents: Bool = true
+
+    /// 本地服务端最后时间戳（基准时间戳）
+    var lastSyncTimestamp: Int64 {
+        return userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+    }
     
     init(serverURL: String, authManager: AuthManager? = nil) {
         self.serverURL = serverURL

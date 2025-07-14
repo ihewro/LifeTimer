@@ -1046,6 +1046,14 @@ struct SyncView: View {
                     debugInfoRow("最后同步时间戳", formatDateWithTimestamp(lastSync))
                 }
 
+                // 本地服务端最后时间戳（基准时间戳）
+                let localSyncTimestamp = syncManager.lastSyncTimestamp
+                if localSyncTimestamp > 0 {
+                    debugInfoRow("本地服务端最后时间戳", formatTimestampWithDate(localSyncTimestamp))
+                } else {
+                    debugInfoRow("本地服务端最后时间戳", "未设置")
+                }
+
                 // 服务端数据最后时间戳
                 if let serverData = syncManager.serverData {
                     let serverTimestamp = Int64(serverData.lastUpdated.timeIntervalSince1970 * 1000)
