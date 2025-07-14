@@ -135,7 +135,7 @@ function handleDataSummary() {
     // 更新设备最后访问时间（不是同步时间）
     updateDeviceLastAccess($db, $userInfo['device_id']);
 
-    logMessage("Data summary requested for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
+    error_log("Data summary requested for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}, server_timestamp: $serverTimestamp");
     sendSuccess($data, 'Data summary retrieved');
 }
 
@@ -276,8 +276,8 @@ function getUserTimerSettings($db, $userId) {
     $result = $stmt->fetch();
 
     if ($result) {
-        // 将数据库时间格式转换为毫秒时间戳，以匹配客户端期望的格式
-        $result['updated_at'] = strtotime($result['updated_at']) * 1000;
+        // 数据库中的 updated_at 已经是毫秒时间戳，直接转换为整数
+        $result['updated_at'] = (int)$result['updated_at'];
     }
 
     return $result ?: null;
@@ -325,7 +325,7 @@ function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $syst
 
     // 检查计时器设置的最新修改时间
     if ($timerSettings && isset($timerSettings['updated_at'])) {
-        $settingsTimestamp = strtotime($timerSettings['updated_at']) * 1000; // 转换为毫秒
+        $settingsTimestamp = (int)$timerSettings['updated_at']; // 已经是毫秒时间戳
         if ($settingsTimestamp > $maxTimestamp) {
             $maxTimestamp = $settingsTimestamp;
         }
@@ -333,7 +333,7 @@ function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $syst
 
     // 如果没有任何数据，使用当前时间戳
     if ($maxTimestamp == 0) {
-        $maxTimestamp = getCurrentTimestamp();
+        $maxTimestamp = getServerDataMaxTimestamp($db, $userId);
     }
 
     return $maxTimestamp;
@@ -481,9 +481,7 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
  * 获取指定时间后的用户计时器设置
  */
 function getUserTimerSettingsAfter($db, $userId, $timestamp) {
-    // 将毫秒时间戳转换为数据库时间格式
-    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
-
+    // 直接使用毫秒时间戳进行比较
     $stmt = $db->prepare('
         SELECT pomodoro_time, short_break_time, long_break_time, updated_at
         FROM timer_settings
@@ -491,13 +489,13 @@ function getUserTimerSettingsAfter($db, $userId, $timestamp) {
         ORDER BY updated_at DESC
         LIMIT 1
     ');
-    $stmt->execute([$userId, $timestampDate]);
+    $stmt->execute([$userId, $timestamp]);
     $result = $stmt->fetch();
 
     if ($result) {
-        // 将数据库时间格式转换为毫秒时间戳，以匹配客户端期望的格式
-        $result['updated_at'] = strtotime($result['updated_at']) * 1000;
-        logMessage("Found timer settings after $timestampDate for user: $userId, updated_at: {$result['updated_at']}");
+        // 数据库中的 updated_at 已经是毫秒时间戳，直接转换为整数
+        $result['updated_at'] = (int)$result['updated_at'];
+        error_log("Found timer settings after $timestamp for user: $userId, updated_at: {$result['updated_at']}");
     }
 
     return $result ?: null;
@@ -634,18 +632,17 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
  * 处理用户计时器设置变更
  */
 function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $lastSyncTimestamp) {
-    // 将客户端的毫秒时间戳转换为数据库时间格式
-    $clientUpdatedAt = date('Y-m-d H:i:s', intval($settings['updated_at'] / 1000));
-    $lastSyncDate = date('Y-m-d H:i:s', intval($lastSyncTimestamp / 1000));
+    // 直接使用客户端的毫秒时间戳
+    $clientUpdatedAt = $settings['updated_at'];
 
     // 检查是否有冲突
     $stmt = $db->prepare('SELECT updated_at FROM timer_settings WHERE user_id = ? AND is_global = 1');
     $stmt->execute([$userId]);
     $serverSettings = $stmt->fetch();
 
-    if ($serverSettings && $serverSettings['updated_at'] > $lastSyncDate) {
+    if ($serverSettings && $serverSettings['updated_at'] > $lastSyncTimestamp) {
         // 有冲突，使用最新的设置（客户端优先）
-        logMessage("Timer settings conflict detected for user: $userId, server: {$serverSettings['updated_at']}, client: $clientUpdatedAt, using client version");
+        error_log("Timer settings conflict detected for user: $userId, server: {$serverSettings['updated_at']}, client: $clientUpdatedAt, using client version");
     }
 
     // 更新或插入设置
@@ -659,10 +656,10 @@ function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $la
         $settings['pomodoro_time'],
         $settings['short_break_time'],
         $settings['long_break_time'],
-        $clientUpdatedAt  // 使用转换后的时间格式
+        $clientUpdatedAt  // 直接使用毫秒时间戳
     ]);
 
-    logMessage("Timer settings updated for user: $userId, pomodoro: {$settings['pomodoro_time']}s, short_break: {$settings['short_break_time']}s, long_break: {$settings['long_break_time']}s, updated_at: $clientUpdatedAt");
+    error_log("Timer settings updated for user: $userId, pomodoro: {$settings['pomodoro_time']}s, short_break: {$settings['short_break_time']}s, long_break: {$settings['long_break_time']}s, updated_at: $clientUpdatedAt");
 }
 
 /**

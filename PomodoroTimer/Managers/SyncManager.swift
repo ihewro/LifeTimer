@@ -344,7 +344,7 @@ class SyncManager: ObservableObject {
     
     /// 启用自动同步
     func enableAutoSync() {
-        setupAutoSync()
+//        setupAutoSync()
     }
     
     /// 禁用自动同步
@@ -1575,9 +1575,11 @@ class SyncManager: ObservableObject {
             var hasTimerSettingsChanged = false
 
             // 优先使用增量变更数据检测设置变更
-            if let incrementalChanges = serverIncrementalChanges,
-               let serverSettings = incrementalChanges.serverChanges.timerSettings {
-                hasTimerSettingsChanged = checkTimerSettingsChangedWithServerSettings(timerModel: timerModel, serverSettings: serverSettings)
+            if let incrementalChanges = serverIncrementalChanges {
+                // 如果服务端有设置变更，直接与服务端设置比较
+                if let serverSettings = incrementalChanges.serverChanges.timerSettings {
+                    hasTimerSettingsChanged = checkTimerSettingsChangedWithServerSettings(timerModel: timerModel, serverSettings: serverSettings)
+                } 
             } else if let serverData = serverData {
                 // 回退到使用完整服务端数据
                 hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
