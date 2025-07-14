@@ -900,21 +900,24 @@ class SyncManager: ObservableObject {
     }
 
     private func collectLocalChanges(since timestamp: Int64) async -> SyncChanges {
-        let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
         var createdEvents: [ServerPomodoroEvent] = []
         var updatedEvents: [ServerPomodoroEvent] = []
 
         // 收集番茄事件变更
         if let eventManager = eventManager {
             for event in eventManager.events {
+                // 将本地Date转换为毫秒时间戳进行比较
+                let eventCreatedAtMs = Int64(event.createdAt.timeIntervalSince1970 * 1000)
+                let eventUpdatedAtMs = Int64(event.updatedAt.timeIntervalSince1970 * 1000)
+
                 // 创建一个临时的ServerPomodoroEvent来发送到服务器
                 // 注意：这里我们需要创建一个符合服务器期望格式的事件
                 let serverEvent = createServerEventFromLocal(event)
 
-                if event.createdAt > lastSyncDate {
+                if eventCreatedAtMs > timestamp {
                     // 新创建的事件
                     createdEvents.append(serverEvent)
-                } else if event.updatedAt > lastSyncDate {
+                } else if eventUpdatedAtMs > timestamp {
                     // 更新的事件
                     updatedEvents.append(serverEvent)
                 }
@@ -926,7 +929,9 @@ class SyncManager: ObservableObject {
         if syncSystemEvents {
             let systemEvents = SystemEventStore.shared.events
             for systemEvent in systemEvents {
-                if systemEvent.timestamp > lastSyncDate {
+                // 将本地Date转换为毫秒时间戳进行比较
+                let systemEventTimestampMs = Int64(systemEvent.timestamp.timeIntervalSince1970 * 1000)
+                if systemEventTimestampMs > timestamp {
                     let serverSystemEvent = createServerSystemEventFromLocal(systemEvent)
                     createdSystemEvents.append(serverSystemEvent)
                 }
@@ -1125,9 +1130,10 @@ class SyncManager: ObservableObject {
             if let existingIndex = existingEvents.firstIndex(where: { $0.id.uuidString == serverEvent.uuid }) {
                 // 事件已存在：比较时间戳，使用较新的版本
                 let localEvent = existingEvents[existingIndex]
-                let serverTimestamp = Date(timeIntervalSince1970: TimeInterval(serverEvent.timestamp) / 1000)
+                let serverTimestampMs = serverEvent.timestamp
+                let localTimestampMs = Int64(localEvent.timestamp.timeIntervalSince1970 * 1000)
 
-                if serverTimestamp > localEvent.timestamp {
+                if serverTimestampMs > localTimestampMs {
                     // 服务端版本更新，使用服务端数据
                     mergedEvents.append(self.createSystemEventFromServer(serverEvent))
                 } else {
@@ -1498,7 +1504,6 @@ class SyncManager: ObservableObject {
     /// 生成Git风格的同步工作区状态
     func generateSyncWorkspace() async {
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
-        let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(lastSyncTimestamp) / 1000)
 
         var staged: [WorkspaceItem] = []
         let unstaged: [WorkspaceItem] = []
@@ -1509,11 +1514,15 @@ class SyncManager: ObservableObject {
         // 1. 分析番茄钟事件变更
         if let eventManager = eventManager {
             for event in eventManager.events {
-                if event.updatedAt > lastSyncDate {
+                // 将本地Date转换为毫秒时间戳进行比较
+                let eventCreatedAtMs = Int64(event.createdAt.timeIntervalSince1970 * 1000)
+                let eventUpdatedAtMs = Int64(event.updatedAt.timeIntervalSince1970 * 1000)
+
+                if eventUpdatedAtMs > lastSyncTimestamp {
                     let item = WorkspaceItem(
                         id: event.id.uuidString,
                         type: .pomodoroEvent,
-                        status: event.createdAt > lastSyncDate ? .added : .modified,
+                        status: eventCreatedAtMs > lastSyncTimestamp ? .added : .modified,
                         title: event.title,
                         description: "\(event.type.displayName) - \(formatDuration(event.duration))",
                         timestamp: event.updatedAt
@@ -1528,7 +1537,9 @@ class SyncManager: ObservableObject {
         if syncSystemEvents {
             let systemEvents = SystemEventStore.shared.events
             for systemEvent in systemEvents {
-                if systemEvent.timestamp > lastSyncDate {
+                // 将本地Date转换为毫秒时间戳进行比较
+                let systemEventTimestampMs = Int64(systemEvent.timestamp.timeIntervalSince1970 * 1000)
+                if systemEventTimestampMs > lastSyncTimestamp {
                     let item = WorkspaceItem(
                         id: systemEvent.id.uuidString,
                         type: .systemEvent,
@@ -1616,10 +1627,12 @@ class SyncManager: ObservableObject {
                 // 使用增量变更数据分析远程变更
                 for serverEvent in incrementalChanges.serverChanges.pomodoroEvents {
                     let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
+                    let serverUpdatedAtMs = serverEvent.updatedAt
 
                     if let localUpdatedAt = localEventMap[serverEvent.uuid] {
                         // 本地存在该事件，检查是否有远程更新
-                        if serverUpdatedAt > localUpdatedAt && serverUpdatedAt > lastSyncDate {
+                        let localUpdatedAtMs = Int64(localUpdatedAt.timeIntervalSince1970 * 1000)
+                        if serverUpdatedAtMs > localUpdatedAtMs && serverUpdatedAtMs > lastSyncTimestamp {
                             let item = WorkspaceItem(
                             id: serverEvent.uuid,
                             type: .pomodoroEvent,
@@ -1632,7 +1645,7 @@ class SyncManager: ObservableObject {
                     }
                 } else {
                     // 本地不存在该事件，检查是否是远程新增
-                    if serverUpdatedAt > lastSyncDate {
+                    if serverUpdatedAtMs > lastSyncTimestamp {
                         let item = WorkspaceItem(
                             id: serverEvent.uuid,
                             type: .pomodoroEvent,
@@ -1649,10 +1662,12 @@ class SyncManager: ObservableObject {
                 // 回退到使用完整服务端数据
                 for serverEvent in serverData.pomodoroEvents {
                     let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
+                    let serverUpdatedAtMs = serverEvent.updatedAt
 
                     if let localUpdatedAt = localEventMap[serverEvent.uuid] {
                         // 本地存在该事件，检查是否有远程更新
-                        if serverUpdatedAt > localUpdatedAt && serverUpdatedAt > lastSyncDate {
+                        let localUpdatedAtMs = Int64(localUpdatedAt.timeIntervalSince1970 * 1000)
+                        if serverUpdatedAtMs > localUpdatedAtMs && serverUpdatedAtMs > lastSyncTimestamp {
                             let item = WorkspaceItem(
                                 id: serverEvent.uuid,
                                 type: .pomodoroEvent,
@@ -1665,7 +1680,7 @@ class SyncManager: ObservableObject {
                         }
                     } else {
                         // 本地不存在该事件，检查是否是远程新增
-                        if serverUpdatedAt > lastSyncDate {
+                        if serverUpdatedAtMs > lastSyncTimestamp {
                             let item = WorkspaceItem(
                                 id: serverEvent.uuid,
                                 type: .pomodoroEvent,
@@ -1836,14 +1851,14 @@ class SyncManager: ObservableObject {
     /// 计算待同步数据数量
     private func calculatePendingSyncCount() async -> Int {
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
-        let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(lastSyncTimestamp) / 1000)
 
         var count = 0
 
         // 计算待同步的番茄事件（使用updatedAt而不是startTime）
         if let eventManager = eventManager {
             count += eventManager.events.filter { event in
-                return event.updatedAt > lastSyncDate
+                let eventUpdatedAtMs = Int64(event.updatedAt.timeIntervalSince1970 * 1000)
+                return eventUpdatedAtMs > lastSyncTimestamp
             }.count
         }
 
@@ -1851,7 +1866,8 @@ class SyncManager: ObservableObject {
         if syncSystemEvents {
             let systemEvents = SystemEventStore.shared.events
             count += systemEvents.filter { event in
-                return event.timestamp > lastSyncDate
+                let systemEventTimestampMs = Int64(event.timestamp.timeIntervalSince1970 * 1000)
+                return systemEventTimestampMs > lastSyncTimestamp
             }.count
         }
 
@@ -2074,18 +2090,19 @@ class SyncManager: ObservableObject {
     /// 获取待同步数据列表
     func getPendingSyncData() async -> [PendingSyncItem] {
         let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
-        let lastSyncDate = Date(timeIntervalSince1970: TimeInterval(lastSyncTimestamp) / 1000)
         var items: [PendingSyncItem] = []
 
         // 获取待同步的番茄事件
         if let eventManager = eventManager {
             let events = eventManager.events.filter { event in
                 // 使用更新时间来判断是否需要同步
-                return event.updatedAt > lastSyncDate
+                let eventUpdatedAtMs = Int64(event.updatedAt.timeIntervalSince1970 * 1000)
+                return eventUpdatedAtMs > lastSyncTimestamp
             }
 
             for event in events {
-                let isNew = event.createdAt > lastSyncDate
+                let eventCreatedAtMs = Int64(event.createdAt.timeIntervalSince1970 * 1000)
+                let isNew = eventCreatedAtMs > lastSyncTimestamp
                 let actionType = isNew ? "新增" : "更新"
 
                 items.append(PendingSyncItem(
