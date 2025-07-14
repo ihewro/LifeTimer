@@ -203,7 +203,7 @@ function handleIncrementalSync() {
 
         $db->commit();
 
-        logMessage("Incremental sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
+        error_log("Incremental sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}, server_timestamp:$serverTimestamp");
 
         sendSuccess([
             'conflicts' => $conflicts,
@@ -420,9 +420,9 @@ function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $server
         }
     }
 
-    // 如果没有任何变更，使用当前时间戳
+    // 如果没有任何变更，查询服务端数据的实际最大时间戳
     if ($maxTimestamp == $lastSyncTimestamp) {
-        $maxTimestamp = getCurrentTimestamp();
+        $maxTimestamp = getServerDataMaxTimestamp($db, $userId);
     }
 
     return $maxTimestamp;
@@ -1035,5 +1035,41 @@ function getRecentPomodoroEvents($db, $userId, $limit = 5) {
 function updateDeviceLastAccess($db, $deviceId) {
     $stmt = $db->prepare('UPDATE devices SET last_access_timestamp = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     $stmt->execute([getCurrentTimestamp(), $deviceId]);
+}
+
+/**
+ * 获取服务端数据的实际最大时间戳
+ * 查询用户所有数据的最新修改时间
+ */
+function getServerDataMaxTimestamp($db, $userId) {
+    $maxTimestamp = 0;
+
+    // 查询番茄事件的最大时间戳
+    $stmt = $db->prepare('SELECT MAX(updated_at) as max_timestamp FROM pomodoro_events WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($result && $result['max_timestamp']) {
+        $maxTimestamp = max($maxTimestamp, $result['max_timestamp']);
+    }
+
+    // 查询系统事件的最大时间戳
+    $stmt = $db->prepare('SELECT MAX(created_at) as max_timestamp FROM system_events WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($result && $result['max_timestamp']) {
+        $maxTimestamp = max($maxTimestamp, $result['max_timestamp']);
+    }
+
+    // 查询计时器设置的最大时间戳
+    $stmt = $db->prepare('SELECT MAX(updated_at) as max_timestamp FROM timer_settings WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($result && $result['max_timestamp']) {
+        $maxTimestamp = max($maxTimestamp, $result['max_timestamp']);
+    }
+
+    error_log("maxTimestamp: $maxTimestamp");
+    // 如果没有任何数据，返回0
+    return $maxTimestamp;
 }
 ?>
