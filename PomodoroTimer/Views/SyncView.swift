@@ -151,15 +151,16 @@ struct SyncView: View {
             syncManager.loadLocalDataPreview()
             if !syncManager.isSyncing {
                 Task {
+                    // 页面初始加载时使用完整的服务端数据预览
                     await syncManager.loadServerDataPreview()
                     await syncManager.generateSyncWorkspace()
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SyncCompleted"))) { _ in
-            // 同步完成后自动刷新数据对比区域
+            // 同步完成后自动刷新数据对比区域，使用增量拉取以保持本地数据原始状态
             Task {
-                await syncManager.loadServerDataPreview()
+                await syncManager.loadServerChangesPreview()
                 await syncManager.generateSyncWorkspace()
             }
         }
@@ -1042,7 +1043,15 @@ struct SyncView: View {
                 }
 
                 if let lastSync = syncManager.lastSyncTime {
-                    debugInfoRow("最后同步时间戳", "\(Int64(lastSync.timeIntervalSince1970 * 1000))")
+                    debugInfoRow("最后同步时间戳", formatDateWithTimestamp(lastSync))
+                }
+
+                // 服务端数据最后时间戳
+                if let serverData = syncManager.serverData {
+                    let serverTimestamp = Int64(serverData.lastUpdated.timeIntervalSince1970 * 1000)
+                    debugInfoRow("服务端数据最后时间戳1", formatTimestampWithDate(serverTimestamp))
+                } else if let serverSummary = syncManager.serverDataSummary {
+                    debugInfoRow("服务端数据最后时间戳2", formatTimestampWithDate(serverSummary.serverTimestamp))
                 }
 
                 // 删除记录统计
@@ -1269,6 +1278,22 @@ struct SyncView: View {
         }
     }
 
+    /// 格式化时间戳为：时间戳（具体时间）
+    private func formatTimestampWithDate(_ timestamp: Int64) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "\(timestamp)（\(formatter.string(from: date))）"
+    }
+
+    /// 格式化Date为：时间戳（具体时间）
+    private func formatDateWithTimestamp(_ date: Date) -> String {
+        let timestamp = Int64(date.timeIntervalSince1970 * 1000)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "\(timestamp)（\(formatter.string(from: date))）"
+    }
+
     // MARK: - 辅助方法
 
     /// 根据设置过滤系统事件
@@ -1285,7 +1310,9 @@ struct SyncView: View {
         syncManager.loadLocalDataPreview()
         if !syncManager.isSyncing {
             Task {
-                await syncManager.loadServerDataPreview()
+                // 使用增量拉取远端变更数据，而不是完整的服务端数据预览
+                // 这样可以确保本地数据保持原始状态，便于后续的差异计算
+                await syncManager.loadServerChangesPreview()
                 await syncManager.generateSyncWorkspace()
             }
         }

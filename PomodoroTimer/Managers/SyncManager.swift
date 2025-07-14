@@ -142,6 +142,9 @@ class SyncManager: ObservableObject {
     @Published var serverDataSummary: ServerDataSummary? = nil // 轻量级数据摘要
     @Published var isLoadingServerData = false
     @Published var localData: LocalDataPreview? = nil
+
+    // MARK: - 增量变更数据存储
+    @Published var serverIncrementalChanges: IncrementalSyncResponse? = nil
     @Published var syncWorkspace: SyncWorkspace? = nil
     @Published var lastSyncRecord: SyncRecord? = nil
     @Published var syncHistory: [SyncRecord] = []
@@ -1235,6 +1238,7 @@ class SyncManager: ObservableObject {
     }
 
     /// 获取服务端数据预览（优化版本 - 使用轻量级数据摘要）
+    /// 用于初始加载和同步后的完整数据预览
     func loadServerDataPreview() async {
         // 如果正在同步，跳过服务端数据加载，避免冲突
         if isSyncing {
@@ -1242,18 +1246,18 @@ class SyncManager: ObservableObject {
             return
         }
 
-        // 检查缓存是否有效
-        if let cache = summaryCache,
-           Date().timeIntervalSince(cache.timestamp) < summaryCacheExpiry {
-            print("🎯 使用缓存的服务端数据摘要")
-            DispatchQueue.main.async {
-                self.serverDataSummary = cache.summary
-                self.isLoadingServerData = false
-                self.lastServerResponseStatus = "缓存 (已缓存)"
-                self.serverConnectionStatus = "已连接"
-            }
-            return
-        }
+        // // 检查缓存是否有效
+        // if let cache = summaryCache,
+        //    Date().timeIntervalSince(cache.timestamp) < summaryCacheExpiry {
+        //     print("🎯 使用缓存的服务端数据摘要")
+        //     DispatchQueue.main.async {
+        //         self.serverDataSummary = cache.summary
+        //         self.isLoadingServerData = false
+        //         self.lastServerResponseStatus = "缓存 (已缓存)"
+        //         self.serverConnectionStatus = "已连接"
+        //     }
+        //     return
+        // }
 
         print("🔄 开始加载服务端数据摘要...")
         print("📱 设备UUID: \(deviceUUID)")
@@ -1303,6 +1307,79 @@ class SyncManager: ObservableObject {
                 self.serverDataSummary = nil
                 self.isLoadingServerData = false
                 self.lastServerResponseStatus = "失败: \(error.localizedDescription)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "连接失败"
+            }
+        }
+    }
+
+    /// 增量拉取远端变更数据（仅用于预览，不应用到本地数据库）
+    func loadServerChangesPreview() async {
+        // 如果正在同步，跳过服务端变更加载，避免冲突
+        if isSyncing {
+            print("Skipping server changes preview load during sync operation")
+            return
+        }
+
+        await loadServerDataPreview()
+
+        print("🔄 开始增量拉取远端变更数据...")
+        print("📱 设备UUID: \(deviceUUID)")
+        print("🌐 服务器URL: \(serverURL)")
+
+        DispatchQueue.main.async {
+            self.isLoadingServerData = true
+        }
+
+        do {
+            // 获取当前的同步基准时间戳
+            let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+
+            // 创建一个空的本地变更请求，只是为了获取服务端变更
+            let emptyChanges = SyncChanges(
+                pomodoroEvents: PomodoroEventChanges(created: [], updated: [], deleted: []),
+                systemEvents: SystemEventChanges(created: []),
+                timerSettings: nil
+            )
+
+            let request = IncrementalSyncRequest(
+                lastSyncTimestamp: lastSyncTimestamp,
+                changes: emptyChanges
+            )
+
+            guard let authManager = authManager,
+                  let token = authManager.sessionToken else {
+                throw SyncError.notAuthenticated
+            }
+
+            print("📡 请求增量服务端变更数据...")
+            let response = try await apiClient.incrementalSync(request, token: token)
+
+            print("✅ 增量服务端变更响应成功")
+            print("📊 服务端番茄事件变更: \(response.data.serverChanges.pomodoroEvents.count)")
+            print("📊 服务端系统事件变更: \(response.data.serverChanges.systemEvents.count)")
+            print("⚙️ 服务端计时器设置变更: \(response.data.serverChanges.timerSettings != nil ? "有变更" : "无变更")")
+
+            // 存储增量变更数据供 generateSyncWorkspace() 使用
+            DispatchQueue.main.async {
+                self.serverIncrementalChanges = response.data
+            }
+
+            // 更新服务端数据预览（基于增量变更）
+            await updateServerDataPreviewFromIncrementalResponse(response.data)
+
+            DispatchQueue.main.async {
+                self.isLoadingServerData = false
+                self.lastServerResponseStatus = "增量拉取成功 (HTTP 200)"
+                self.lastServerResponseTime = Date()
+                self.serverConnectionStatus = "已连接"
+                print("🎯 服务端变更数据预览已更新")
+            }
+        } catch {
+            print("❌ 增量拉取远端变更数据失败: \(error)")
+            DispatchQueue.main.async {
+                self.isLoadingServerData = false
+                self.lastServerResponseStatus = "增量拉取失败: \(error.localizedDescription)"
                 self.lastServerResponseTime = Date()
                 self.serverConnectionStatus = "连接失败"
             }
@@ -1493,9 +1570,19 @@ class SyncManager: ObservableObject {
             staged.append(item)
         }
 
-        // 4. 分析设置变更（真正的变更检测）
-        if let timerModel = timerModel, let serverData = serverData {
-            let hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
+        // 4. 分析设置变更（优先使用增量变更数据，回退到完整服务端数据）
+        if let timerModel = timerModel {
+            var hasTimerSettingsChanged = false
+
+            // 优先使用增量变更数据检测设置变更
+            if let incrementalChanges = serverIncrementalChanges,
+               let serverSettings = incrementalChanges.serverChanges.timerSettings {
+                hasTimerSettingsChanged = checkTimerSettingsChangedWithServerSettings(timerModel: timerModel, serverSettings: serverSettings)
+            } else if let serverData = serverData {
+                // 回退到使用完整服务端数据
+                hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
+            }
+
             if hasTimerSettingsChanged {
                 let item = WorkspaceItem(
                     id: "timer-settings",
@@ -1509,21 +1596,24 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 分析远程变更（需要先获取服务端数据）
-        if let serverData = serverData, let eventManager = eventManager {
+        // 分析远程变更（优先使用增量变更数据，回退到完整服务端数据）
+        if let eventManager = eventManager {
             // 创建本地事件的映射表，包含UUID和更新时间
             var localEventMap: [String: Date] = [:]
             for event in eventManager.events {
                 localEventMap[event.id.uuidString] = event.updatedAt
             }
 
-            for serverEvent in serverData.pomodoroEvents {
-                let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
+            // 优先使用增量变更数据
+            if let incrementalChanges = serverIncrementalChanges {
+                // 使用增量变更数据分析远程变更
+                for serverEvent in incrementalChanges.serverChanges.pomodoroEvents {
+                    let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
 
-                if let localUpdatedAt = localEventMap[serverEvent.uuid] {
-                    // 本地存在该事件，检查是否有远程更新
-                    if serverUpdatedAt > localUpdatedAt && serverUpdatedAt > lastSyncDate {
-                        let item = WorkspaceItem(
+                    if let localUpdatedAt = localEventMap[serverEvent.uuid] {
+                        // 本地存在该事件，检查是否有远程更新
+                        if serverUpdatedAt > localUpdatedAt && serverUpdatedAt > lastSyncDate {
+                            let item = WorkspaceItem(
                             id: serverEvent.uuid,
                             type: .pomodoroEvent,
                             status: .modified,
@@ -1545,6 +1635,40 @@ class SyncManager: ObservableObject {
                             timestamp: serverUpdatedAt
                         )
                         remoteChanges.append(item)
+                    }
+                }
+            }
+            } else if let serverData = serverData {
+                // 回退到使用完整服务端数据
+                for serverEvent in serverData.pomodoroEvents {
+                    let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
+
+                    if let localUpdatedAt = localEventMap[serverEvent.uuid] {
+                        // 本地存在该事件，检查是否有远程更新
+                        if serverUpdatedAt > localUpdatedAt && serverUpdatedAt > lastSyncDate {
+                            let item = WorkspaceItem(
+                                id: serverEvent.uuid,
+                                type: .pomodoroEvent,
+                                status: .modified,
+                                title: serverEvent.title,
+                                description: "远程修改 - \(serverEvent.eventType) - \(formatServerDuration(serverEvent))",
+                                timestamp: serverUpdatedAt
+                            )
+                            remoteChanges.append(item)
+                        }
+                    } else {
+                        // 本地不存在该事件，检查是否是远程新增
+                        if serverUpdatedAt > lastSyncDate {
+                            let item = WorkspaceItem(
+                                id: serverEvent.uuid,
+                                type: .pomodoroEvent,
+                                status: .added,
+                                title: serverEvent.title,
+                                description: "远程新增 - \(serverEvent.eventType) - \(formatServerDuration(serverEvent))",
+                                timestamp: serverUpdatedAt
+                            )
+                            remoteChanges.append(item)
+                        }
                     }
                 }
             }
@@ -1904,6 +2028,37 @@ class SyncManager: ObservableObject {
             }
         } else {
             print("🔄 Timer settings: No changes detected")
+        }
+
+        return hasChanges
+    }
+
+    /// 检查计时器设置是否有变更（使用服务端设置对象）
+    private func checkTimerSettingsChangedWithServerSettings(timerModel: TimerModel, serverSettings: ServerTimerSettings) -> Bool {
+        // 比较本地和服务端的计时器设置
+        let localPomodoroTime = Int(timerModel.pomodoroTime)
+        let localShortBreakTime = Int(timerModel.shortBreakTime)
+        let localLongBreakTime = Int(timerModel.longBreakTime)
+
+        let pomodoroChanged = localPomodoroTime != serverSettings.pomodoroTime
+        let shortBreakChanged = localShortBreakTime != serverSettings.shortBreakTime
+        let longBreakChanged = localLongBreakTime != serverSettings.longBreakTime
+
+        let hasChanges = pomodoroChanged || shortBreakChanged || longBreakChanged
+
+        if hasChanges {
+            print("🔄 Timer settings changed (from incremental data):")
+            if pomodoroChanged {
+                print("   - Pomodoro: \(localPomodoroTime)s (local) vs \(serverSettings.pomodoroTime)s (server)")
+            }
+            if shortBreakChanged {
+                print("   - Short break: \(localShortBreakTime)s (local) vs \(serverSettings.shortBreakTime)s (server)")
+            }
+            if longBreakChanged {
+                print("   - Long break: \(localLongBreakTime)s (local) vs \(serverSettings.longBreakTime)s (server)")
+            }
+        } else {
+            print("🔄 Timer settings: No changes detected (from incremental data)")
         }
 
         return hasChanges
