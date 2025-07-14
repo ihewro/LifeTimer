@@ -1701,7 +1701,7 @@ class SyncManager: ObservableObject {
             unstaged: unstaged,
             conflicts: [], // 暂时不处理冲突
             remoteChanges: remoteChanges,
-            lastSyncTime: lastSyncTimestamp > 0 ? lastSyncDate : nil
+            lastSyncTime: lastSyncTimestamp > 0 ? Date(timeIntervalSince1970: TimeInterval(lastSyncTimestamp) / 1000) : nil
         )
 
         DispatchQueue.main.async {
