@@ -94,7 +94,7 @@ function handleFullSync() {
     // 更新设备最后同步时间
     updateDeviceLastSync($db, $userInfo['device_id'], $serverTimestamp);
 
-    logMessage("Full sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}");
+    error_log("Full sync completed for user: {$userInfo['user_uuid']}, device: {$userInfo['device_uuid']}, server_timestamp:$serverTimestamp");
     sendSuccess($data, 'Full sync completed');
 }
 
@@ -309,7 +309,7 @@ function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $syst
 
     // 检查番茄事件的最新修改时间
     foreach ($pomodoroEvents as $event) {
-        $eventTimestamp = strtotime($event['updated_at']) * 1000; // 转换为毫秒
+        $eventTimestamp = $event['updated_at'];
         if ($eventTimestamp > $maxTimestamp) {
             $maxTimestamp = $eventTimestamp;
         }
@@ -317,24 +317,30 @@ function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $syst
 
     // 检查系统事件的最新创建时间
     foreach ($systemEvents as $event) {
-        $eventTimestamp = strtotime($event['created_at']) * 1000; // 转换为毫秒
+        $eventTimestamp = $event['created_at'];
         if ($eventTimestamp > $maxTimestamp) {
             $maxTimestamp = $eventTimestamp;
         }
     }
+    error_log("calculateDataLastModifiedTimestamp222 maxTimestamp:$maxTimestamp");
+
 
     // 检查计时器设置的最新修改时间
     if ($timerSettings && isset($timerSettings['updated_at'])) {
-        $settingsTimestamp = (int)$timerSettings['updated_at']; // 已经是毫秒时间戳
+        $settingsTimestamp = $timerSettings['updated_at']; // 已经是毫秒时间戳
         if ($settingsTimestamp > $maxTimestamp) {
             $maxTimestamp = $settingsTimestamp;
         }
     }
+    error_log("calculateDataLastModifiedTimestamp333 maxTimestamp:$maxTimestamp");
 
     // 如果没有任何数据，使用当前时间戳
     if ($maxTimestamp == 0) {
         $maxTimestamp = getServerDataMaxTimestamp($db, $userId);
     }
+
+    error_log("calculateDataLastModifiedTimestamp maxTimestamp2:$maxTimestamp");
+
 
     return $maxTimestamp;
 }
@@ -397,7 +403,7 @@ function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $server
 
     // 检查服务器端的番茄事件变更
     foreach ($serverChanges['pomodoro_events'] as $event) {
-        $eventTimestamp = strtotime($event['updated_at']) * 1000;
+        $eventTimestamp = $event['updated_at'];
         if ($eventTimestamp > $maxTimestamp) {
             $maxTimestamp = $eventTimestamp;
         }
@@ -405,7 +411,7 @@ function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $server
 
     // 检查服务器端的系统事件变更
     foreach ($serverChanges['system_events'] as $event) {
-        $eventTimestamp = strtotime($event['created_at']) * 1000;
+        $eventTimestamp = $event['created_at'];
         if ($eventTimestamp > $maxTimestamp) {
             $maxTimestamp = $eventTimestamp;
         }
@@ -432,8 +438,8 @@ function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $server
  * 获取指定时间后的用户番茄事件
  */
 function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
-    // 将毫秒时间戳转换为数据库时间格式
-    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
+    error_log("getUserPomodoroEventsAfter timestamp: $timestamp, userId:$userId");
+    // 数据库中的updated_at字段存储的就是毫秒时间戳，直接比较
 
     $stmt = $db->prepare('
         SELECT
@@ -443,7 +449,7 @@ function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
         WHERE user_id = ? AND updated_at > ? AND deleted_at IS NULL
         ORDER BY updated_at ASC
     ');
-    $stmt->execute([$userId, $timestampDate]);
+    $stmt->execute([$userId, $timestamp]);
     return $stmt->fetchAll();
 }
 
@@ -451,8 +457,7 @@ function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
  * 获取指定时间后的用户系统事件
  */
 function getUserSystemEventsAfter($db, $userId, $timestamp) {
-    // 将毫秒时间戳转换为数据库时间格式
-    $timestampDate = date('Y-m-d H:i:s', intval($timestamp / 1000));
+    // 数据库中的created_at字段存储的就是毫秒时间戳，直接比较
 
     $stmt = $db->prepare('
         SELECT
@@ -461,7 +466,7 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
         WHERE user_id = ? AND created_at > ? AND deleted_at IS NULL
         ORDER BY created_at ASC
     ');
-    $stmt->execute([$userId, $timestampDate]);
+    $stmt->execute([$userId, $timestamp]);
     $events = $stmt->fetchAll();
 
     // 解码JSON数据字段

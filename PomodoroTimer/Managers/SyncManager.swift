@@ -1345,6 +1345,7 @@ class SyncManager: ObservableObject {
         do {
             // 获取当前的同步基准时间戳
             let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+            print("🌐 lastSyncTimestamp: \(lastSyncTimestamp)")
 
             // 创建一个空的本地变更请求，只是为了获取服务端变更
             let emptyChanges = SyncChanges(
