@@ -152,7 +152,7 @@ struct SyncView: View {
             if !syncManager.isSyncing {
                 Task {
                     // 页面初始加载时使用完整的服务端数据预览
-                    await syncManager.loadServerDataPreview()
+                    await syncManager.loadServerChangesPreview()
                     await syncManager.generateSyncWorkspace()
                 }
             }

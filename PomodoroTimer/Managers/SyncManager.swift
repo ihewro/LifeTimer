@@ -387,12 +387,14 @@ class SyncManager: ObservableObject {
 
             // 同步成功后刷新所有数据预览和工作区状态
             clearServerDataSummaryCache() // 清除缓存，确保获取最新数据
-            await loadServerDataPreview() // 总是刷新服务端数据
-            loadLocalDataPreview()
+            await loadServerChangesPreview() // 总是刷新服务端数据
             await generateSyncWorkspace()
             updatePendingSyncCount() // 重新计算待同步数据数量
 
             DispatchQueue.main.async {
+                // 在主线程上更新本地数据预览，确保UI立即刷新
+                self.loadLocalDataPreview()
+
                 self.syncStatus = .success
                 self.lastSyncTime = Date()
                 self.userDefaults.set(self.lastSyncTime, forKey: self.lastSyncTimeKey)
@@ -1008,7 +1010,6 @@ class SyncManager: ObservableObject {
                 eventManager.events = activeEvents.map { self.createEventFromServer($0) }
                 // 立即保存到持久化存储
                 eventManager.saveEvents()
-
                 print("🔄 强制覆盖本地数据: 从服务端 \(data.pomodoroEvents.count) 个事件中过滤出 \(activeEvents.count) 个未删除事件")
 
                 // 重置同步更新标志
@@ -1278,6 +1279,7 @@ class SyncManager: ObservableObject {
             return
         }
 
+        // 获取服务端摘要数据
         await loadServerDataPreview()
 
         print("🔄 开始增量拉取远端变更数据...")
@@ -1530,7 +1532,7 @@ class SyncManager: ObservableObject {
             staged.append(item)
         }
 
-        // 4. 分析设置变更（优先使用增量变更数据，回退到完整服务端数据）
+        // 4. 分析设置变更（使用增量变更数据）
         if let timerModel = timerModel {
             var hasTimerSettingsChanged = false
 
@@ -1540,9 +1542,8 @@ class SyncManager: ObservableObject {
                 if let serverSettings = incrementalChanges.serverChanges.timerSettings {
                     hasTimerSettingsChanged = checkTimerSettingsChangedWithServerSettings(timerModel: timerModel, serverSettings: serverSettings)
                 } 
-            } else if let serverData = serverData {
-                // 回退到使用完整服务端数据
-                hasTimerSettingsChanged = checkTimerSettingsChanged(timerModel: timerModel, serverData: serverData)
+            } else  {
+               // 弹窗提示错误
             }
 
             if hasTimerSettingsChanged {
@@ -1558,7 +1559,7 @@ class SyncManager: ObservableObject {
             }
         }
 
-        // 分析远程变更（优先使用增量变更数据，回退到完整服务端数据）
+        // 分析远程变更（使用增量变更数据）
         if let eventManager = eventManager {
             // 创建本地事件的映射表，包含UUID和更新时间
             var localEventMap: [String: Date] = [:]
@@ -1572,6 +1573,23 @@ class SyncManager: ObservableObject {
                 for serverEvent in incrementalChanges.serverChanges.pomodoroEvents {
                     let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
                     let serverUpdatedAtMs = serverEvent.updatedAt
+
+                    // 检查事件是否被删除
+                    if let deletedAt = serverEvent.deletedAt, deletedAt > 0 {
+                        // 远程删除事件：如果本地存在该事件，标记为删除
+                        if localEventMap[serverEvent.uuid] != nil {
+                            let item = WorkspaceItem(
+                                id: serverEvent.uuid,
+                                type: .pomodoroEvent,
+                                status: .deleted,
+                                title: serverEvent.title,
+                                description: "远程删除 - \(serverEvent.eventType) - \(formatServerDuration(serverEvent))",
+                                timestamp: serverUpdatedAt
+                            )
+                            remoteChanges.append(item)
+                        }
+                        continue
+                    }
 
                     if let localUpdatedAt = localEventMap[serverEvent.uuid] {
                         // 本地存在该事件，检查是否有远程更新
@@ -1602,41 +1620,8 @@ class SyncManager: ObservableObject {
                     }
                 }
             }
-            } else if let serverData = serverData {
-                // 回退到使用完整服务端数据
-                for serverEvent in serverData.pomodoroEvents {
-                    let serverUpdatedAt = Date(timeIntervalSince1970: TimeInterval(serverEvent.updatedAt) / 1000)
-                    let serverUpdatedAtMs = serverEvent.updatedAt
-
-                    if let localUpdatedAt = localEventMap[serverEvent.uuid] {
-                        // 本地存在该事件，检查是否有远程更新
-                        let localUpdatedAtMs = Int64(localUpdatedAt.timeIntervalSince1970 * 1000)
-                        if serverUpdatedAtMs > localUpdatedAtMs && serverUpdatedAtMs > lastSyncTimestamp {
-                            let item = WorkspaceItem(
-                                id: serverEvent.uuid,
-                                type: .pomodoroEvent,
-                                status: .modified,
-                                title: serverEvent.title,
-                                description: "远程修改 - \(serverEvent.eventType) - \(formatServerDuration(serverEvent))",
-                                timestamp: serverUpdatedAt
-                            )
-                            remoteChanges.append(item)
-                        }
-                    } else {
-                        // 本地不存在该事件，检查是否是远程新增
-                        if serverUpdatedAtMs > lastSyncTimestamp {
-                            let item = WorkspaceItem(
-                                id: serverEvent.uuid,
-                                type: .pomodoroEvent,
-                                status: .added,
-                                title: serverEvent.title,
-                                description: "远程新增 - \(serverEvent.eventType) - \(formatServerDuration(serverEvent))",
-                                timestamp: serverUpdatedAt
-                            )
-                            remoteChanges.append(item)
-                        }
-                    }
-                }
+            } else {
+                // 弹窗提示错误
             }
         }
 

@@ -295,6 +295,11 @@ class EventManager: ObservableObject {
         )
     }
 
+    /// 公开方法：手动触发事件数据变更通知（用于同步等场景）
+    func triggerDataChangeNotification() {
+        notifyEventDataChanged()
+    }
+
     /// 清除所有事件数据
     func clearAllEvents() {
         events.removeAll()
