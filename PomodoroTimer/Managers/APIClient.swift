@@ -467,6 +467,7 @@ struct ServerPomodoroEvent: Codable {
     let isCompleted: Bool
     let createdAt: Int64
     let updatedAt: Int64
+    let deletedAt: Int64?  // 删除时间戳，可选字段
 
     private enum CodingKeys: String, CodingKey {
         case uuid
@@ -477,10 +478,11 @@ struct ServerPomodoroEvent: Codable {
         case isCompleted = "is_completed"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case deletedAt = "deleted_at"
     }
 
     // 普通初始化方法
-    init(uuid: String, title: String, startTime: Int64, endTime: Int64, eventType: String, isCompleted: Bool, createdAt: Int64, updatedAt: Int64) {
+    init(uuid: String, title: String, startTime: Int64, endTime: Int64, eventType: String, isCompleted: Bool, createdAt: Int64, updatedAt: Int64, deletedAt: Int64? = nil) {
         self.uuid = uuid
         self.title = title
         self.startTime = startTime
@@ -489,6 +491,7 @@ struct ServerPomodoroEvent: Codable {
         self.isCompleted = isCompleted
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
     }
 
     // 自定义解码，处理服务端返回的整数布尔值
@@ -502,6 +505,9 @@ struct ServerPomodoroEvent: Codable {
         eventType = try container.decode(String.self, forKey: .eventType)
         createdAt = try container.decode(Int64.self, forKey: .createdAt)
         updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+
+        // 处理可选的 deleted_at 字段
+        deletedAt = try container.decodeIfPresent(Int64.self, forKey: .deletedAt)
 
         // 处理 is_completed 字段，支持整数和布尔值
         if let boolValue = try? container.decode(Bool.self, forKey: .isCompleted) {

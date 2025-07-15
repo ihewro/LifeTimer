@@ -440,13 +440,14 @@ function calculateIncrementalSyncTimestamp($db, $userId, $clientChanges, $server
 function getUserPomodoroEventsAfter($db, $userId, $timestamp) {
     error_log("getUserPomodoroEventsAfter timestamp: $timestamp, userId:$userId");
     // 数据库中的updated_at字段存储的就是毫秒时间戳，直接比较
+    // 返回所有在指定时间戳之后更新的事件，包括已删除的事件
 
     $stmt = $db->prepare('
         SELECT
             uuid, title, start_time, end_time, event_type,
-            is_completed, created_at, updated_at
+            is_completed, created_at, updated_at, deleted_at
         FROM pomodoro_events
-        WHERE user_id = ? AND updated_at > ? AND deleted_at IS NULL
+        WHERE user_id = ? AND updated_at > ?
         ORDER BY updated_at ASC
     ');
     $stmt->execute([$userId, $timestamp]);
@@ -591,12 +592,13 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
     // 处理删除的事件
     if (isset($changes['deleted'])) {
         foreach ($changes['deleted'] as $uuid) {
+            $currentTimestamp = getCurrentTimestamp();
             $stmt = $db->prepare('
-                UPDATE pomodoro_events 
-                SET deleted_at = ?, last_modified_device_id = ?
+                UPDATE pomodoro_events
+                SET deleted_at = ?, updated_at = ?, last_modified_device_id = ?
                 WHERE uuid = ? AND user_id = ? AND deleted_at IS NULL
             ');
-            $stmt->execute([getCurrentTimestamp(), $deviceId, $uuid, $userId]);
+            $stmt->execute([$currentTimestamp, $currentTimestamp, $deviceId, $uuid, $userId]);
         }
     }
     
