@@ -3,4 +3,52 @@
    uuid = "0B8CA87A-2916-4CD9-9680-459BEC75366F"
    type = "1"
    version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "6FD6A477-F297-4ABA-B73E-EADB3D1E55ED"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "PomodoroTimer/Managers/SyncManager.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1003"
+            endingLineNumber = "1003"
+            landmarkName = "applyFullServerData(_:mode:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "6FD6A477-F297-4ABA-B73E-EADB3D1E55ED - 92a04e85d1de725f"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 @Swift.MainActor @Sendable () -&gt; () in PomodoroTimer.SyncManager.applyFullServerData(_: PomodoroTimer.FullSyncData, mode: PomodoroTimer.SyncMode) async -&gt; ()"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "1003"
+                  endingLineNumber = "1003">
+               </Location>
+               <Location
+                  uuid = "6FD6A477-F297-4ABA-B73E-EADB3D1E55ED - 73289a3d5a46105e"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 (PomodoroTimer.ServerPomodoroEvent) -&gt; Swift.Bool in closure #1 @Swift.MainActor @Sendable () -&gt; () in PomodoroTimer.SyncManager.applyFullServerData(_: PomodoroTimer.FullSyncData, mode: PomodoroTimer.SyncMode) async -&gt; ()"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Managers/SyncManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "1004"
+                  endingLineNumber = "1004">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
 </Bucket>

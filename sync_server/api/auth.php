@@ -65,7 +65,7 @@ try {
             }
             break;
             
-        case '/logout':
+        case 'logout':
             if ($method === 'POST') {
                 handleLogout();
             } else {
