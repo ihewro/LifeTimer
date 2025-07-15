@@ -223,7 +223,7 @@ class SyncManager: ObservableObject {
         // 加载同步系统事件设置（默认为true）
         self.syncSystemEvents = userDefaults.object(forKey: syncSystemEventsKey) as? Bool ?? false
 
-        setupAutoSync()
+        // setupAutoSync()
 
         // 初始化时计算待同步数据数量
         updatePendingSyncCount()
@@ -738,6 +738,16 @@ class SyncManager: ObservableObject {
         var mergedEvents = existingEvents
 
         for serverEvent in serverEvents {
+            // 检查事件是否被删除
+            if let deletedAt = serverEvent.deletedAt, deletedAt > 0 {
+                // 事件已被删除：从本地移除对应的事件
+                if let existingIndex = mergedEvents.firstIndex(where: { $0.id.uuidString == serverEvent.uuid }) {
+                    mergedEvents.remove(at: existingIndex)
+                    print("🗑️ Removed deleted event: \(serverEvent.uuid)")
+                }
+                continue
+            }
+
             // 查找本地是否已存在该事件
             if let existingIndex = existingEvents.firstIndex(where: { $0.id.uuidString == serverEvent.uuid }) {
                 // 事件已存在：比较更新时间，使用较新的版本
@@ -987,7 +997,8 @@ class SyncManager: ObservableObject {
             eventType: mapEventTypeToServer(event.type),
             isCompleted: event.isCompleted,
             createdAt: Int64(event.createdAt.timeIntervalSince1970 * 1000),
-            updatedAt: Int64(event.updatedAt.timeIntervalSince1970 * 1000)
+            updatedAt: Int64(event.updatedAt.timeIntervalSince1970 * 1000),
+            deletedAt: nil  // 本地事件不会有删除时间戳
         )
     }
 
