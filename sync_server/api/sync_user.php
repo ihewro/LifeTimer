@@ -47,8 +47,6 @@ try {
         handleDataSummary();
     } elseif ($method === 'POST' && $path === '/api/user/sync/incremental') {
         handleIncrementalSync();
-    } elseif ($method === 'POST' && ($path === '/api/user/sync/migrate' || $path === '/api/sync/migrate')) {
-        handleDataMigration();
     } else {
         throw new Exception('Endpoint not found', 404);
     }
@@ -221,12 +219,14 @@ function handleIncrementalSync() {
  * 获取用户的番茄事件
  */
 function getUserPomodoroEvents($db, $userId) {
+    // 这里如果过滤了deleted_at IS NULL，则服务端的最后的时间戳有问题
+    // TODO: 获取最大时间戳逻辑独立出来
     $stmt = $db->prepare('
         SELECT 
             uuid, title, start_time, end_time, event_type, 
-            is_completed, created_at, updated_at
+            is_completed, created_at, updated_at, deleted_at
         FROM pomodoro_events 
-        WHERE user_id = ? AND deleted_at IS NULL
+        WHERE user_id = ?
         ORDER BY start_time DESC
     ');
     $stmt->execute([$userId]);
@@ -314,6 +314,8 @@ function calculateDataLastModifiedTimestamp($db, $userId, $pomodoroEvents, $syst
             $maxTimestamp = $eventTimestamp;
         }
     }
+    error_log("calculateDataLastModifiedTimestamp111 maxTimestamp:$maxTimestamp");
+
 
     // 检查系统事件的最新创建时间
     foreach ($systemEvents as $event) {
@@ -464,7 +466,7 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
         SELECT
             uuid, event_type, timestamp, data, created_at
         FROM system_events
-        WHERE user_id = ? AND created_at > ? AND deleted_at IS NULL
+        WHERE user_id = ? AND created_at > ?
         ORDER BY created_at ASC
     ');
     $stmt->execute([$userId, $timestamp]);
@@ -780,213 +782,6 @@ function clearUserData($db, $userId, $timestamp) {
     $stmt->execute([$userId]);
     
     logMessage("Hard deleted all existing data for user: $userId (force overwrite)");
-}
-
-/**
- * 处理数据迁移请求
- */
-function handleDataMigration() {
-    $data = getRequestData();
-
-    // 验证必需参数
-    validateRequired($data, ['device_uuid']);
-
-    $deviceUuid = $data['device_uuid'];
-    $targetUserUuid = $data['target_user_uuid'] ?? null;
-
-    // 验证UUID格式
-    if (!validateUUID($deviceUuid)) {
-        throw new Exception('Invalid device UUID format');
-    }
-
-    if ($targetUserUuid && !validateUUID($targetUserUuid)) {
-        throw new Exception('Invalid target user UUID format');
-    }
-
-    $db = getDB();
-
-    // 检查数据库版本
-    $dbVersion = Database::getInstance()->getDatabaseVersion();
-    if ($dbVersion['type'] !== 'device_isolation') {
-        throw new Exception('Migration is only available for legacy device-based systems');
-    }
-
-    $db->beginTransaction();
-
-    try {
-        // 检查设备是否存在（在旧表中）
-        $stmt = $db->prepare('SELECT * FROM devices_backup WHERE device_uuid = ?');
-        $stmt->execute([$deviceUuid]);
-        $legacyDevice = $stmt->fetch();
-
-        if (!$legacyDevice) {
-            throw new Exception('Legacy device not found');
-        }
-
-        // 创建或获取目标用户
-        if ($targetUserUuid) {
-            $user = getOrCreateUser($targetUserUuid);
-        } else {
-            // 自动创建新用户
-            $userUuid = generateUserUUID();
-            $user = getOrCreateUser($userUuid, $legacyDevice['device_name']);
-        }
-
-        // 创建设备记录
-        $device = getOrCreateDevice($deviceUuid, $user['id'], $legacyDevice['device_name'], $legacyDevice['platform']);
-
-        // 迁移番茄事件数据
-        $migratedEvents = migrateDevicePomodoroEvents($db, $deviceUuid, $user['id'], $device['id']);
-
-        // 迁移系统事件数据
-        $migratedSystemEvents = migrateDeviceSystemEvents($db, $deviceUuid, $user['id'], $device['id']);
-
-        // 迁移计时器设置
-        $migratedSettings = migrateDeviceTimerSettings($db, $deviceUuid, $user['id'], $device['id']);
-
-        // 创建会话token
-        $session = createUserSession($user['id'], $device['id']);
-
-        $db->commit();
-
-        logMessage("Data migration completed: device $deviceUuid -> user {$user['user_uuid']}");
-
-        sendSuccess([
-            'user_uuid' => $user['user_uuid'],
-            'session_token' => $session['session_token'],
-            'expires_at' => $session['expires_at'],
-            'migration_summary' => [
-                'migrated_events' => $migratedEvents,
-                'migrated_system_events' => $migratedSystemEvents,
-                'migrated_settings' => $migratedSettings
-            ]
-        ], 'Data migration completed successfully');
-
-    } catch (Exception $e) {
-        $db->rollback();
-        throw $e;
-    }
-}
-
-/**
- * 迁移设备的番茄事件数据
- */
-function migrateDevicePomodoroEvents($db, $deviceUuid, $userId, $deviceId) {
-    $stmt = $db->prepare('
-        SELECT * FROM pomodoro_events_backup
-        WHERE device_uuid = ? AND deleted_at IS NULL
-    ');
-    $stmt->execute([$deviceUuid]);
-    $events = $stmt->fetchAll();
-
-    $migratedCount = 0;
-    foreach ($events as $event) {
-        try {
-            $stmt = $db->prepare('
-                INSERT INTO pomodoro_events
-                (uuid, user_id, device_id, title, start_time, end_time, event_type, is_completed, created_at, updated_at, last_modified_device_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ');
-            $stmt->execute([
-                $event['uuid'],
-                $userId,
-                $deviceId,
-                $event['title'],
-                $event['start_time'],
-                $event['end_time'],
-                $event['event_type'],
-                $event['is_completed'],
-                $event['created_at'],
-                $event['updated_at'],
-                $deviceId
-            ]);
-            $migratedCount++;
-        } catch (PDOException $e) {
-            if ($e->getCode() != 23000) { // 忽略重复UUID错误
-                throw $e;
-            }
-        }
-    }
-
-    return $migratedCount;
-}
-
-/**
- * 迁移设备的系统事件数据
- */
-function migrateDeviceSystemEvents($db, $deviceUuid, $userId, $deviceId) {
-    $stmt = $db->prepare('
-        SELECT * FROM system_events_backup
-        WHERE device_uuid = ? AND deleted_at IS NULL
-    ');
-    $stmt->execute([$deviceUuid]);
-    $events = $stmt->fetchAll();
-
-    $migratedCount = 0;
-    foreach ($events as $event) {
-        try {
-            $stmt = $db->prepare('
-                INSERT INTO system_events
-                (uuid, user_id, device_id, event_type, timestamp, data, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ');
-            $stmt->execute([
-                $event['uuid'],
-                $userId,
-                $deviceId,
-                $event['event_type'],
-                $event['timestamp'],
-                is_array($event['data']) ? json_encode($event['data']) : $event['data'],
-                $event['created_at']
-            ]);
-            $migratedCount++;
-        } catch (PDOException $e) {
-            if ($e->getCode() != 23000) { // 忽略重复UUID错误
-                throw $e;
-            }
-        }
-    }
-
-    return $migratedCount;
-}
-
-/**
- * 迁移设备的计时器设置
- */
-function migrateDeviceTimerSettings($db, $deviceUuid, $userId, $deviceId) {
-    $stmt = $db->prepare('
-        SELECT * FROM timer_settings_backup
-        WHERE device_uuid = ?
-        ORDER BY updated_at DESC
-        LIMIT 1
-    ');
-    $stmt->execute([$deviceUuid]);
-    $settings = $stmt->fetch();
-
-    if (!$settings) {
-        return 0;
-    }
-
-    try {
-        $stmt = $db->prepare('
-            INSERT INTO timer_settings
-            (user_id, device_id, pomodoro_time, short_break_time, long_break_time, updated_at, is_global)
-            VALUES (?, NULL, ?, ?, ?, ?, 1)
-        ');
-        $stmt->execute([
-            $userId,
-            $settings['pomodoro_time'],
-            $settings['short_break_time'],
-            $settings['long_break_time'],
-            $settings['updated_at']
-        ]);
-        return 1;
-    } catch (PDOException $e) {
-        if ($e->getCode() != 23000) { // 忽略重复错误
-            throw $e;
-        }
-        return 0;
-    }
 }
 
 /**

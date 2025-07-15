@@ -873,7 +873,7 @@ struct SyncView: View {
 
                             Button("加载完整数据") {
                                 Task {
-                                    await syncManager.loadFullServerDataPreview()
+                                    await syncManager.loadFullServerData()
                                 }
                             }
                             .font(.caption2)
@@ -1902,7 +1902,7 @@ struct SyncView: View {
 
                         Button("加载完整数据") {
                             Task {
-                                await syncManager.loadFullServerDataPreview()
+                                await syncManager.loadFullServerData()
                             }
                         }
                         .font(.caption2)
@@ -1985,7 +1985,7 @@ struct SyncView: View {
                             .font(.caption)
                         Button("查看详情") {
                             Task {
-                                await syncManager.loadFullServerDataPreview()
+                                await syncManager.loadFullServerData()
                             }
                         }
                         .font(.caption2)
