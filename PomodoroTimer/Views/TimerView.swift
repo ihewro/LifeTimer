@@ -337,6 +337,14 @@ struct TimerView: View {
             // 响应窗口宽度变化
             windowWidth = newWidth
         }
+        // 添加空格键支持
+        .background(
+            Button("Toggle Timer") {
+                handleSpaceKeyPress()
+            }
+            .keyboardShortcut(.space, modifiers: [])
+            .hidden()
+        )
         .onAppear {
             // 设置TimerModel对AudioManager的引用
             timerModel.audioManager = audioManager
@@ -522,6 +530,31 @@ struct TimerView: View {
         // 如果有最近的事件，使用其标题作为默认任务
         if let mostRecentEvent = recentEvents.first {
             selectedTask = mostRecentEvent.title
+        }
+    }
+    
+    /// 处理空格键按下事件
+    private func handleSpaceKeyPress() {
+        switch timerModel.timerState {
+        case .idle:
+            // 空闲状态：开始计时器
+            timerModel.startTimer(with: selectedTask)
+            smartReminderManager.onUserStartedTimer()
+            
+        case .running:
+            // 运行状态：暂停计时器
+            timerModel.pauseTimer()
+            
+        case .paused:
+            // 暂停状态：继续计时器
+            timerModel.startTimer(with: selectedTask)
+            smartReminderManager.onUserStartedTimer()
+            // 恢复计时器时也恢复音乐播放
+            audioManager.resumeTimerPlayback()
+            
+        case .completed:
+            // 完成状态：重置计时器（为下一次做准备）
+            timerModel.resetTimer()
         }
     }
 }

@@ -53,11 +53,12 @@ struct ContentView: View {
     @EnvironmentObject var syncManager: SyncManager
 
     @State private var selectedView: SidebarItem = .timer
+    @State private var isSidebarVisible: NavigationSplitViewVisibility = .all
     
     var body: some View {
         #if canImport(Cocoa)
         // macOS 版本使用 NavigationSplitView
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $isSidebarVisible) {
             // 左侧边栏
             List(SidebarItem.allCases, id: \.self, selection: $selectedView) { item in
                 NavigationLink(value: item) {
@@ -118,6 +119,22 @@ struct ContentView: View {
                 Button("Settings2") { selectedView = .settings }
                     .keyboardShortcut("5", modifiers: .command)
                     .hidden()
+
+                // 添加侧边栏切换快捷键 Cmd+S
+                Button("Toggle Sidebar") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        switch isSidebarVisible {
+                        case .all:
+                            isSidebarVisible = .detailOnly
+                        case .detailOnly:
+                            isSidebarVisible = .all
+                        default:
+                            isSidebarVisible = .all
+                        }
+                    }
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .hidden()
             }
         )
         // 权限请求弹窗 - 使用sheet模态表单方式显示
