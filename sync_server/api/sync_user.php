@@ -850,6 +850,7 @@ function getServerDataMaxTimestamp($db, $userId) {
     if ($result && $result['max_timestamp']) {
         $maxTimestamp = max($maxTimestamp, $result['max_timestamp']);
     }
+    error_log("maxTimestamp1: $maxTimestamp");
 
     // 查询系统事件的最大时间戳
     $stmt = $db->prepare('SELECT MAX(created_at) as max_timestamp FROM system_events WHERE user_id = ?');
@@ -858,6 +859,7 @@ function getServerDataMaxTimestamp($db, $userId) {
     if ($result && $result['max_timestamp']) {
         $maxTimestamp = max($maxTimestamp, $result['max_timestamp']);
     }
+    error_log("maxTimestamp2: $maxTimestamp");
 
     // 查询计时器设置的最大时间戳
     $stmt = $db->prepare('SELECT MAX(updated_at) as max_timestamp FROM timer_settings WHERE user_id = ?');
