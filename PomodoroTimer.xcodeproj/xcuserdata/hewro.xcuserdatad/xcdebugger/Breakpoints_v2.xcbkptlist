@@ -210,36 +210,6 @@
             endingLineNumber = "189"
             landmarkName = "completedPomodorosToday()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "06F39B7D-ACBE-4AA1-8493-60A8F9991A8D - 58bed5d829a37748"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "PomodoroTimer.EventManager.completedPomodorosToday() -&gt; Swift.Int"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Models/EventModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "189"
-                  endingLineNumber = "189">
-               </Location>
-               <Location
-                  uuid = "06F39B7D-ACBE-4AA1-8493-60A8F9991A8D - c4420426b5403561"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (PomodoroTimer.PomodoroEvent) -&gt; Swift.Bool in PomodoroTimer.EventManager.completedPomodorosToday() -&gt; Swift.Int"
-                  moduleName = "PomodoroTimer"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Models/EventModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "189"
-                  endingLineNumber = "189">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
