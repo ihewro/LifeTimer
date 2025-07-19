@@ -225,6 +225,7 @@ class EventManager: ObservableObject {
         }
 
         let task = userInfo["task"] as? String ?? ""
+        let isPartial = userInfo["isPartial"] as? Bool ?? false
 
         // 根据计时器模式确定事件类型和标题
         let (eventType, title) = getEventTypeAndTitle(for: mode, task: task)
@@ -237,6 +238,11 @@ class EventManager: ObservableObject {
             isCompleted: true
         )
         addEvent(event)
+
+        // 如果是任务切换产生的事件，添加调试日志（仅用于开发调试）
+        if isPartial {
+            print("📝 创建任务切换事件: \(title), 时长: \(event.formattedDuration)")
+        }
     }
 
     private func addLegacyCompletedSession() {

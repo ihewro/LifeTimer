@@ -28,7 +28,7 @@ struct PomodoroTimerApp: App {
 
     init() {
         // 从UserDefaults读取服务器地址，默认为localhost
-        let serverURL = UserDefaults.standard.string(forKey: "ServerURL") ?? "http://localhost:8080"
+        let serverURL = UserDefaults.standard.string(forKey: "ServerURL") ?? ""
 
         // 创建共享的AuthManager实例
         let authManager = AuthManager(serverURL: serverURL)
