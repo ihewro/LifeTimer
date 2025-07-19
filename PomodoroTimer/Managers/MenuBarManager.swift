@@ -286,26 +286,26 @@ class MenuBarManager: ObservableObject {
             }
         }
 
-        // 策略2: 发送Cmd+N键盘事件
-        NSLog("MenuBarManager: Trying Cmd+N keyboard event")
-        if sendNewWindowKeyboardEvent() {
-            success = true
-            NSLog("MenuBarManager: Keyboard event sent successfully")
-        }
+        // // 策略2: 发送Cmd+N键盘事件
+        // NSLog("MenuBarManager: Trying Cmd+N keyboard event")
+        // if sendNewWindowKeyboardEvent() {
+        //     success = true
+        //     NSLog("MenuBarManager: Keyboard event sent successfully")
+        // }
 
-        // 策略3: 尝试通过菜单项创建新窗口
-        if !success {
-            NSLog("MenuBarManager: Trying menu item method")
-            success = tryMenuItemNewWindow()
-        }
+        // // 策略3: 尝试通过菜单项创建新窗口
+        // if !success {
+        //     NSLog("MenuBarManager: Trying menu item method")
+        //     success = tryMenuItemNewWindow()
+        // }
 
-        // 策略4: 最后的备用方案 - 延迟重试
-        if !success {
-            NSLog("MenuBarManager: All methods failed, scheduling retry")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.retryWindowCreation()
-            }
-        }
+        // // 策略4: 最后的备用方案 - 延迟重试
+        // if !success {
+        //     NSLog("MenuBarManager: All methods failed, scheduling retry")
+        //     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        //         self.retryWindowCreation()
+        //     }
+        // }
     }
 
     /// 发送Cmd+N键盘事件

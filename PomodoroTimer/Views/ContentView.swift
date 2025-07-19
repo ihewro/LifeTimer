@@ -51,11 +51,14 @@ struct ContentView: View {
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @EnvironmentObject var syncManager: SyncManager
+    @EnvironmentObject var smartReminderManager: SmartReminderManager
 
     @State private var selectedView: SidebarItem = .timer
     @State private var isSidebarVisible: NavigationSplitViewVisibility = .all
+    @State private var selectedTask = "无标题"
     
     var body: some View {
+        Group {
         #if canImport(Cocoa)
         // macOS 版本使用 NavigationSplitView
         NavigationSplitView(columnVisibility: $isSidebarVisible) {
@@ -71,7 +74,7 @@ struct ContentView: View {
             Group {
                 switch selectedView {
                 case .timer:
-                    TimerView()
+                    TimerView(selectedTask: $selectedTask)
                 case .calendar:
                     CalendarView()
                 case .activityStats:
@@ -144,10 +147,19 @@ struct ContentView: View {
                 // .frame(minWidth: 500, minHeight: 300)
                 // .interactiveDismissDisabled(true) // 禁止通过手势关闭，确保用户必须做出选择
         }
+        // 智能提醒弹窗 - 全局显示，无论在哪个页面都能弹出
+        .sheet(isPresented: $smartReminderManager.showingReminderDialog) {
+            SmartReminderDialog(
+                isPresented: $smartReminderManager.showingReminderDialog,
+                timerModel: timerModel,
+                reminderManager: smartReminderManager,
+                selectedTask: selectedTask
+            )
+        }
         #else
         // iOS 版本使用 TabView
         TabView(selection: $selectedView) {
-            TimerView()
+            TimerView(selectedTask: $selectedTask)
                 .tabItem {
                     Label("计时器", systemImage: "timer")
                 }
@@ -177,7 +189,34 @@ struct ContentView: View {
                 }
                 .tag(SidebarItem.settings)
         }
+        // 智能提醒弹窗 - iOS版本也需要全局显示
+        .sheet(isPresented: $smartReminderManager.showingReminderDialog) {
+            SmartReminderDialog(
+                isPresented: $smartReminderManager.showingReminderDialog,
+                timerModel: timerModel,
+                reminderManager: smartReminderManager,
+                selectedTask: selectedTask
+            )
+        }
         #endif
+        }
+        .onAppear {
+            // 初始化selectedTask - 从最近的事件中设置默认任务
+            setDefaultTaskFromRecentEvent()
+        }
+    }
+
+    /// 从最近的事件中设置默认任务
+    private func setDefaultTaskFromRecentEvent() {
+        // 获取最近的已完成事件
+        let recentEvents = eventManager.events
+            .filter { $0.isCompleted }
+            .sorted { $0.startTime > $1.startTime }
+
+        // 如果有最近的事件，使用其标题作为默认任务
+        if let mostRecentEvent = recentEvents.first {
+            selectedTask = mostRecentEvent.title
+        }
     }
 }
 
