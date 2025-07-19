@@ -15,7 +15,7 @@ struct TimerView: View {
     @State private var showingModeSelector = false
     @State private var showingTimeEditor = false
     @State private var showingTaskSelector = false
-    @State private var selectedTask = "无标题"
+    @Binding var selectedTask: String
     @State private var editingMinutes = 30
     @State private var isHoveringTimeCircle = false
     @State private var showingCompletionDialog = false
@@ -478,15 +478,6 @@ struct TimerView: View {
                 isPresented: $showingCompletionDialog,
                 timerModel: timerModel,
                 smartReminderManager: smartReminderManager,
-                selectedTask: selectedTask
-            )
-        }
-        // 智能提醒弹窗
-        .sheet(isPresented: $smartReminderManager.showingReminderDialog) {
-            SmartReminderDialog(
-                isPresented: $smartReminderManager.showingReminderDialog,
-                timerModel: timerModel,
-                reminderManager: smartReminderManager,
                 selectedTask: selectedTask
             )
         }
@@ -1191,7 +1182,7 @@ struct PomodoroCompletionDialog: View {
 }
 
 #Preview {
-    TimerView()
+    TimerView(selectedTask: .constant("预览任务"))
         .environmentObject(TimerModel())
         .environmentObject(AudioManager())
         .environmentObject(EventManager())
