@@ -17,7 +17,14 @@ enum PlaybackMode {
 class AudioManager: NSObject, ObservableObject {
     @Published var isPlaying = false
     @Published var currentTrack: AudioTrack?
-    @Published var selectedTrack: AudioTrack?  // 当前选中的音乐（用于计时器播放）
+    @Published var selectedTrack: AudioTrack? {  // 当前选中的音乐（用于计时器播放）
+        didSet {
+            // 只在初始化完成后才保存设置
+            if isInitialized {
+                saveSettings()
+            }
+        }
+    }
     @Published var tracks: [AudioTrack] = []
     @Published var bgmFolderPath: String = ""
     @Published var volume: Float = 0.5
@@ -26,11 +33,13 @@ class AudioManager: NSObject, ObservableObject {
     private var currentTrackIndex = 0
     private var previewTimer: Timer?
     private var currentPlaybackMode: PlaybackMode = .timer
+    private var isInitialized = false
     
     override init() {
         super.init()
         setupAudioSession()
         loadSettings()
+        isInitialized = true
     }
     
     private func setupAudioSession() {
@@ -89,8 +98,7 @@ class AudioManager: NSObject, ObservableObject {
     // 试听播放（10秒）
     func previewTrack(_ track: AudioTrack) {
         stopPlayback() // 停止当前播放
-        selectedTrack = track // 设置为选中状态
-        saveSettings() // 保存选中状态
+        selectedTrack = track // 设置为选中状态（会自动保存设置）
 
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: track.url)
@@ -183,8 +191,7 @@ class AudioManager: NSObject, ObservableObject {
     // 清除选中状态（静音）
     func clearSelection() {
         stopPlayback()
-        selectedTrack = nil
-        saveSettings() // 保存选中状态
+        selectedTrack = nil // 会自动保存设置
     }
 
     // 计时器开始时播放选中的音乐

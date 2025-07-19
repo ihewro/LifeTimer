@@ -248,11 +248,32 @@ class TimerModel: ObservableObject {
     func stopTimer() {
         // 手动停止计时器
         if currentMode == .countUp && timerState == .running {
+            // 正计时模式下手动结束时，需要创建事件记录
             completeTimer()
-        } else if currentMode == .pureRest && timerState == .running && isBreakFromPomodoro {
+
+            // 正计时模式下，直接回到idle状态，方便用户重新开始
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.timerState = .idle
+                self.currentTime = 0 // 重置正计时时间
+                self.setupTimer()
+            }
+        } else if currentMode == .pureRest && timerState == .running {
+            // 纯休息模式下手动结束时，需要创建事件记录
+            completeTimer()
+
             // 如果是从番茄模式进入的休息，结束后返回番茄模式
-            isBreakFromPomodoro = false
-            returnToPomodoroMode()
+            if isBreakFromPomodoro {
+                isBreakFromPomodoro = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.returnToPomodoroMode()
+                }
+            } else {
+                // 纯休息模式下，直接回到idle状态，方便用户重新开始
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.timerState = .idle
+                    self.setupTimer()
+                }
+            }
         } else {
             resetTimer()
         }
@@ -368,8 +389,67 @@ class TimerModel: ObservableObject {
     
     // 设置用户自定义任务标题
     func setUserCustomTask(_ task: String) {
-        userCustomTaskTitle = task
+        // 如果计时器正在运行且任务发生了变化，需要进行任务切换
+        if timerState == .running && hasUserSetCustomTask && userCustomTaskTitle != task && !sessionTask.isEmpty {
+            switchTaskDuringTimer(to: task)
+        } else {
+            userCustomTaskTitle = task
+            hasUserSetCustomTask = true
+
+            // 如果计时器正在运行但还没有设置过任务，直接更新sessionTask
+            if timerState == .running && sessionTask.isEmpty {
+                sessionTask = task
+            }
+        }
+    }
+
+    // 计时过程中切换任务
+    private func switchTaskDuringTimer(to newTask: String) {
+        guard timerState == .running,
+              let startTime = sessionStartTime else { return }
+
+        let currentTime = Date()
+        let oldTask = sessionTask
+
+        // 为原任务创建部分完成的事件记录
+        createPartialEvent(
+            title: oldTask,
+            startTime: startTime,
+            endTime: currentTime,
+            mode: currentMode
+        )
+
+        // 更新会话信息为新任务
+        sessionTask = newTask
+        userCustomTaskTitle = newTask
         hasUserSetCustomTask = true
+        sessionStartTime = currentTime // 重新开始计时记录
+
+        print("🔄 任务切换: '\(oldTask)' → '\(newTask)'")
+    }
+
+    // 创建部分完成的事件记录
+    private func createPartialEvent(title: String, startTime: Date, endTime: Date, mode: TimerMode) {
+        let duration = endTime.timeIntervalSince(startTime)
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+
+        let userInfo: [String: Any] = [
+            "mode": mode,
+            "startTime": startTime,
+            "endTime": endTime,
+            "task": title,
+            "isPartial": true // 标记为部分完成的事件
+        ]
+
+        // 发送事件创建通知
+        NotificationCenter.default.post(
+            name: .timerCompleted,
+            object: self,
+            userInfo: userInfo
+        )
+
+        print("📝 创建部分事件: '\(title)', 时长: \(String(format: "%02d:%02d", minutes, seconds))")
     }
 
     // 获取当前应该显示的任务标题

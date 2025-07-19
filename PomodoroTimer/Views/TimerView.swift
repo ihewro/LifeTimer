@@ -280,46 +280,61 @@ struct TimerView: View {
                     }
                     // 其他情况的按钮布局
                     else {
-                        // 主控制按钮
-                        Button(action: {
-                            switch timerModel.timerState {
-                            case .idle:
-                                timerModel.startTimer(with: selectedTask)
-                                smartReminderManager.onUserStartedTimer()
-                            case .paused:
-                                timerModel.startTimer(with: selectedTask)
-                                smartReminderManager.onUserStartedTimer()
-                                // 恢复计时器时也恢复音乐播放
-                                audioManager.resumeTimerPlayback()
-                            case .running:
-                                // 休息模式下运行时直接结束，其他模式暂停
-                                if timerModel.currentMode == .pureRest {
-                                    timerModel.stopTimer()
-                                } else {
-                                    timerModel.pauseTimer()
-                                }
-                            case .completed:
-                                timerModel.resetTimer()
-                            }
-                        }) {
-                            Text(buttonText)
-                                .frame(width: 180)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(buttonColor)
-
-                        // 结束按钮（在正计时运行时显示）
+                        // 正计时模式运行时的双按钮布局
                         if timerModel.currentMode == .countUp && timerModel.timerState == .running {
+                            HStack(spacing: 12) {
+                                // 暂停按钮
+                                Button(action: {
+                                    timerModel.pauseTimer()
+                                }) {
+                                    Text("暂停")
+                                        .frame(width: 80)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .tint(.yellow)
+
+                                // 结束按钮
+                                Button(action: {
+                                    timerModel.stopTimer()
+                                }) {
+                                    Text("结束")
+                                        .frame(width: 80)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .tint(.secondary)
+                            }
+                        }
+                        // 其他情况的单按钮布局
+                        else {
                             Button(action: {
-                                timerModel.stopTimer()
+                                switch timerModel.timerState {
+                                case .idle:
+                                    timerModel.startTimer(with: selectedTask)
+                                    smartReminderManager.onUserStartedTimer()
+                                case .paused:
+                                    timerModel.startTimer(with: selectedTask)
+                                    smartReminderManager.onUserStartedTimer()
+                                    // 恢复计时器时也恢复音乐播放
+                                    audioManager.resumeTimerPlayback()
+                                case .running:
+                                    // 休息模式下运行时直接结束，其他模式暂停
+                                    if timerModel.currentMode == .pureRest {
+                                        timerModel.stopTimer()
+                                    } else {
+                                        timerModel.pauseTimer()
+                                    }
+                                case .completed:
+                                    timerModel.resetTimer()
+                                }
                             }) {
-                                Text("结束")
+                                Text(buttonText)
                                     .frame(width: 180)
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
-                            .tint(.gray)
+                            .tint(buttonColor)
                         }
                     }
                 }            .padding(.top, 20)
@@ -367,6 +382,7 @@ struct TimerView: View {
         }
         .onChange(of: selectedTask) { newTask in
             // 用户修改任务时，设置自定义任务到TimerModel
+            // TimerModel会自动处理运行时的任务切换逻辑
             timerModel.setUserCustomTask(newTask)
         }
         .toolbar {
@@ -414,8 +430,16 @@ struct TimerView: View {
                         // 音乐列表
                         ForEach(audioManager.tracks) { track in
                             Button(action: {
-                                // 试听功能：点击音乐进行10秒试听
-                                audioManager.previewTrack(track)
+                                // 根据计时器状态决定行为
+                                if timerModel.timerState == .running &&
+                                   (timerModel.currentMode == .singlePomodoro || timerModel.currentMode == .countUp) {
+                                    // 计时器运行中：立即切换音乐并开始播放
+                                    audioManager.selectedTrack = track
+                                    audioManager.startTimerPlayback()
+                                } else {
+                                    // 计时器未运行：试听功能
+                                    audioManager.previewTrack(track)
+                                }
                             }) {
                                 HStack {
                                     Image(systemName: getTrackIcon(for: track))
@@ -506,12 +530,12 @@ struct TimerView: View {
     private var buttonColor: Color {
         switch timerModel.timerState {
         case .idle, .completed:
-            return .green // 开始按钮是绿色
+            return .accentColor // 开始按钮使用系统强调色
         case .running:
             // 休息模式下显示"结束"，其他模式显示"暂停"
             return timerModel.currentMode == .pureRest ? .secondary : .yellow
         case .paused:
-            return .blue // 继续按钮是蓝色
+            return .green // 继续按钮是绿色
         }
     }
     
@@ -540,18 +564,22 @@ struct TimerView: View {
             // 空闲状态：开始计时器
             timerModel.startTimer(with: selectedTask)
             smartReminderManager.onUserStartedTimer()
-            
+
         case .running:
-            // 运行状态：暂停计时器
-            timerModel.pauseTimer()
-            
+            // 运行状态：纯休息模式直接结束，其他模式暂停
+            if timerModel.currentMode == .pureRest {
+                timerModel.stopTimer()
+            } else {
+                timerModel.pauseTimer()
+            }
+
         case .paused:
             // 暂停状态：继续计时器
             timerModel.startTimer(with: selectedTask)
             smartReminderManager.onUserStartedTimer()
             // 恢复计时器时也恢复音乐播放
             audioManager.resumeTimerPlayback()
-            
+
         case .completed:
             // 完成状态：重置计时器（为下一次做准备）
             timerModel.resetTimer()

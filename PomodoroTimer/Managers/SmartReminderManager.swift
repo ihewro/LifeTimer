@@ -127,8 +127,8 @@ class SmartReminderManager: ObservableObject {
             forName: .timerCompleted,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            self?.onTimerCompleted()
+        ) { [weak self] notification in
+            self?.onTimerCompleted(notification)
         }
 
         // 监听计时器状态变化（通过定时检查）
@@ -204,8 +204,19 @@ class SmartReminderManager: ObservableObject {
     }
     
     /// 计时器完成时的处理
-    private func onTimerCompleted() {
+    private func onTimerCompleted(_ notification: Notification) {
         guard isEnabled else { return }
+
+        // 检查是否是任务切换产生的部分事件
+        if let userInfo = notification.userInfo,
+           let isPartial = userInfo["isPartial"] as? Bool,
+           isPartial {
+            // 如果是任务切换产生的部分事件，不启动智能提醒
+            print("🔔 智能提醒: 检测到任务切换事件，不启动提醒倒计时")
+            return
+        }
+
+        // 只有真正的计时完成才启动提醒倒计时
         startReminderCountdown()
     }
 
