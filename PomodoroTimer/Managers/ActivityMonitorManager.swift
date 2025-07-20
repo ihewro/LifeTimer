@@ -145,6 +145,15 @@ class ActivityMonitorManager: ObservableObject {
         }
     }
 
+    // 启动时提示权限设置
+    @Published var showPermissionReminderOnStartup: Bool = true {
+        didSet {
+            if showPermissionReminderOnStartup != oldValue {
+                saveSettings()
+            }
+        }
+    }
+
     #if canImport(Cocoa)
     private let systemEventMonitor = SystemEventMonitor()
     #endif
@@ -153,6 +162,7 @@ class ActivityMonitorManager: ObservableObject {
 
     // UserDefaults 键
     private let autoStartMonitoringKey = "AutoStartMonitoring"
+    private let showPermissionReminderOnStartupKey = "ShowPermissionReminderOnStartup"
 
     enum PermissionStatus {
         case unknown
@@ -506,9 +516,11 @@ class ActivityMonitorManager: ObservableObject {
                     self.startMonitoring()
                 }
             } else {
-                // 没有权限，显示权限请求提示
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.showPermissionAlert = true
+                // 没有权限，检查是否需要显示权限请求提示
+                if showPermissionReminderOnStartup {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.showPermissionAlert = true
+                    }
                 }
             }
         }
@@ -529,16 +541,28 @@ class ActivityMonitorManager: ObservableObject {
         }
     }
 
+    /// 用户选择不再提醒权限
+    func disablePermissionReminder() {
+        showPermissionReminderOnStartup = false
+        showPermissionAlert = false
+    }
+
     // MARK: - 设置持久化
 
     private func saveSettings() {
         userDefaults.set(autoStartMonitoring, forKey: autoStartMonitoringKey)
+        userDefaults.set(showPermissionReminderOnStartup, forKey: showPermissionReminderOnStartupKey)
     }
 
     private func loadSettings() {
         // 加载自动启动设置，默认为true
         if userDefaults.object(forKey: autoStartMonitoringKey) != nil {
             autoStartMonitoring = userDefaults.bool(forKey: autoStartMonitoringKey)
+        }
+
+        // 加载权限提醒设置，默认为true
+        if userDefaults.object(forKey: showPermissionReminderOnStartupKey) != nil {
+            showPermissionReminderOnStartup = userDefaults.bool(forKey: showPermissionReminderOnStartupKey)
         }
     }
 

@@ -93,25 +93,49 @@ struct SettingsView: View {
     @State private var importResult: String = ""
     @State private var showingImportResult = false
 
-    var body: some View {
-        // 内容区域
-        contentView
-            .frame(minWidth: 600, minHeight: 500)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .toolbar {
-                // 左侧：设置标签 Picker
-                ToolbarItem(placement: .principal) {
-                    Picker("", selection: $selectedTab) {
-                        Label("计时", systemImage: "timer").tag(0)
-                        Label("活动", systemImage: "chart.bar").tag(1)
-                        Label("关于", systemImage: "info.circle").tag(2)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 300)
-                    .frame(width: 210)
-                }
+    // 右侧侧边栏状态
+    @State private var showingRightSidebar = false
+    @State private var rightSidebarContent: RightSidebarContent = .musicList
 
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // 主内容区域
+                contentView
+                    .frame(
+                        minWidth: showingRightSidebar ?
+                            max(400, geometry.size.width - sidebarWidth(for: geometry.size.width)) : 600,
+                        minHeight: 500,
+                        maxHeight: .infinity
+                    )
+                    .frame(
+                        width: showingRightSidebar ?
+                            max(400, geometry.size.width - sidebarWidth(for: geometry.size.width)) : nil
+                    )
+
+                // 右侧侧边栏
+                if showingRightSidebar {
+                    rightSidebarView
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.3), value: showingRightSidebar)
+                }
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .toolbar {
+            // 左侧：设置标签 Picker
+            ToolbarItem(placement: .principal) {
+                Picker("", selection: $selectedTab) {
+                    Label("计时", systemImage: "timer").tag(0)
+                    Label("活动", systemImage: "chart.bar").tag(1)
+                    Label("关于", systemImage: "info.circle").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 300)
+                .frame(width: 210)
+            }
+
+        }
             .alert("清除所有数据", isPresented: $showingClearAllDataAlert) {
                 Button("取消", role: .cancel) { }
                 Button("确认清除", role: .destructive) {
@@ -297,10 +321,12 @@ struct SettingsView: View {
 
                         // 音乐列表
                         if !audioManager.tracks.isEmpty {
-                            NavigationLink("音乐列表 (\(audioManager.tracks.count)首)") {
-                                MusicListView()
-                                    .environmentObject(audioManager)
+                            Button("音乐列表 (\(audioManager.tracks.count)首)") {
+                                rightSidebarContent = .musicList
+                                showingRightSidebar = true
                             }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.accentColor)
                             .padding(.horizontal, 20)
                         }
                     }
@@ -399,10 +425,12 @@ struct SettingsView: View {
                         )
                         .padding(.horizontal, 20)
 
-                        NavigationLink("查看详细统计") {
-                            StatisticsView()
-                                .environmentObject(eventManager)
+                        Button("查看详细统计") {
+                            rightSidebarContent = .statistics
+                            showingRightSidebar = true
                         }
+                        .buttonStyle(.borderless)
+                        .foregroundColor(.accentColor)
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
@@ -583,11 +611,11 @@ struct SettingsView: View {
                         )
                         .padding(.horizontal, 20)
 
-                        NavigationLink("查看详细统计") {
-                            StatisticsView()
-                                .environmentObject(eventManager)
-                        }
-                        .padding(.horizontal, 20)
+//                        NavigationLink("查看详细统计") {
+//                            StatisticsView()
+//                                .environmentObject(eventManager)
+//                        }
+//                        .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
                     .background(Color.systemBackground)
@@ -1102,5 +1130,380 @@ struct ExportDocument: FileDocument {
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         return FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - 右侧侧边栏相关
+
+/// 右侧侧边栏内容类型
+enum RightSidebarContent {
+    case musicList
+    case statistics
+}
+
+extension SettingsView {
+    /// 右侧侧边栏视图
+    private var rightSidebarView: some View {
+        GeometryReader { parentGeometry in
+            let sidebarWidth = sidebarWidth(for: parentGeometry.size.width)
+
+            VStack(spacing: 0) {
+                // 侧边栏标题栏
+                HStack {
+                    Text(rightSidebarTitle)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Button(action: {
+                        showingRightSidebar = false
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.systemBackground)
+
+                Divider()
+
+                // 侧边栏内容
+                Group {
+                    switch rightSidebarContent {
+                    case .musicList:
+                        MusicListSidebarView()
+                            .environmentObject(audioManager)
+                    case .statistics:
+                        StatisticsSidebarView()
+                            .environmentObject(eventManager)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: sidebarWidth, height: parentGeometry.size.height)
+        }
+        .background(GlassEffectBackground())
+    }
+
+    /// 右侧侧边栏标题
+    private var rightSidebarTitle: String {
+        switch rightSidebarContent {
+        case .musicList:
+            return "音乐列表"
+        case .statistics:
+            return "详细统计"
+        }
+    }
+
+    /// 计算侧边栏宽度
+    private func sidebarWidth(for totalWidth: CGFloat) -> CGFloat {
+        // 根据总宽度动态计算侧边栏宽度
+        let minSidebarWidth: CGFloat = 300
+        let idealSidebarWidth: CGFloat = 300
+        let maxSidebarWidth: CGFloat = 400
+        let minMainContentWidth: CGFloat = 400
+
+        // 如果总宽度足够，使用理想宽度
+        if totalWidth >= minMainContentWidth + idealSidebarWidth {
+            return idealSidebarWidth
+        }
+        // 如果总宽度不够理想宽度，但能容纳最小宽度
+        else if totalWidth >= minMainContentWidth + minSidebarWidth {
+            return max(minSidebarWidth, totalWidth - minMainContentWidth)
+        }
+        // 如果总宽度太小，使用最小宽度
+        else {
+            return minSidebarWidth
+        }
+    }
+}
+
+// MARK: - 音乐列表侧边栏视图
+
+struct MusicListSidebarView: View {
+    @EnvironmentObject var audioManager: AudioManager
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 1) {
+                ForEach(audioManager.tracks) { track in
+                    MusicTrackSidebarRow(track: track)
+                        .environmentObject(audioManager)
+                }
+            }
+        }
+        .background(Color.systemBackground)
+    }
+}
+
+// MARK: - 统计信息侧边栏组件
+
+struct StatisticSidebarRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct RecentEventSidebarRow: View {
+    let event: PomodoroEvent
+
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd HH:mm"
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: event.type.icon)
+                    .foregroundColor(event.type.color)
+                    .frame(width: 16)
+
+                Text(event.title)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if event.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            }
+
+            Text("\(dateFormatter.string(from: event.startTime)) · \(event.formattedDuration)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.systemBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
+
+
+struct MusicTrackSidebarRow: View {
+    let track: AudioTrack
+    @EnvironmentObject var audioManager: AudioManager
+
+    var isCurrentTrack: Bool {
+        audioManager.currentTrack?.id == track.id
+    }
+
+    var body: some View {
+        Button(action: {
+            if isCurrentTrack && audioManager.isPlaying {
+                audioManager.pausePlayback()
+            } else {
+                audioManager.previewTrack(track)
+            }
+        }) {
+            HStack(spacing: 12) {
+                // 播放状态图标
+                Image(systemName: playButtonIcon)
+                    .font(.title2)
+                    .foregroundColor(isCurrentTrack ? .blue : .secondary)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.name)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    Text(track.formattedDuration)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if isCurrentTrack {
+                    Image(systemName: "speaker.wave.2")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .background(
+            Rectangle()
+                .fill(isCurrentTrack ? Color.accentColor.opacity(0.1) : Color.clear)
+        )
+    }
+
+    private var playButtonIcon: String {
+        if isCurrentTrack {
+            return audioManager.isPlaying ? "pause.circle.fill" : "play.circle.fill"
+        } else {
+            return "play.circle"
+        }
+    }
+}
+
+// MARK: - 统计信息侧边栏视图
+
+struct StatisticsSidebarView: View {
+    @EnvironmentObject var eventManager: EventManager
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // 今日统计
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("今日统计")
+                        .font(.headline)
+                        .padding(.horizontal, 16)
+
+                    VStack(spacing: 8) {
+                        StatisticSidebarRow(
+                            title: "完成番茄",
+                            value: "\(eventManager.completedPomodorosToday())个"
+                        )
+
+                        StatisticSidebarRow(
+                            title: "专注时间",
+                            value: formatTime(eventManager.totalFocusTimeToday())
+                        )
+
+                        StatisticSidebarRow(
+                            title: "平均专注时长",
+                            value: averageFocusTime()
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                Divider()
+                    .padding(.horizontal, 16)
+
+                // 本周统计
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("本周统计")
+                        .font(.headline)
+                        .padding(.horizontal, 16)
+
+                    VStack(spacing: 8) {
+                        StatisticSidebarRow(
+                            title: "完成番茄",
+                            value: "\(weeklyCompletedPomodoros())个"
+                        )
+
+                        StatisticSidebarRow(
+                            title: "专注时间",
+                            value: formatTime(weeklyFocusTime())
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                Divider()
+                    .padding(.horizontal, 16)
+
+                // 最近记录
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("最近记录")
+                        .font(.headline)
+                        .padding(.horizontal, 16)
+
+                    LazyVStack(spacing: 4) {
+                        ForEach(recentEvents(), id: \.id) { event in
+                            RecentEventSidebarRow(event: event)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.vertical, 16)
+        }
+        .background(Color.systemBackground)
+    }
+
+    // MARK: - 统计计算方法
+
+    private func formatTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = Int(timeInterval) % 3600 / 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+
+    private func averageFocusTime() -> String {
+        let completedPomodoros = eventManager.completedPomodorosToday()
+        guard completedPomodoros > 0 else { return "0m" }
+
+        let totalTime = eventManager.totalFocusTimeToday()
+        let average = totalTime / Double(completedPomodoros)
+        return formatTime(average)
+    }
+
+    private func weeklyCompletedPomodoros() -> Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+
+        return eventManager.events.filter { event in
+            event.type == .pomodoro &&
+            event.isCompleted &&
+            event.startTime >= weekAgo
+        }.count
+    }
+
+    private func weeklyFocusTime() -> TimeInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+
+        return eventManager.events
+            .filter { event in
+                event.type == .pomodoro &&
+                event.isCompleted &&
+                event.startTime >= weekAgo
+            }
+            .reduce(0) { $0 + $1.duration }
+    }
+
+    private func recentEvents() -> [PomodoroEvent] {
+        eventManager.events
+//            .filter { $0.isCompleted }
+            .sorted { $0.startTime > $1.startTime }
+            .prefix(10)
+            .map { $0 }
     }
 }

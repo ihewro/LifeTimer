@@ -229,6 +229,24 @@ struct ActivitySettingsView: View {
                 }
             )
 
+            Divider()
+
+            // 权限提醒设置
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("启动时提示权限")
+                        .font(.body)
+
+                    Text("控制应用启动时是否显示权限检查弹窗")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $activityMonitor.showPermissionReminderOnStartup)
+            }
+
             Button("刷新权限状态") {
                 activityMonitor.checkPermissions()
             }
