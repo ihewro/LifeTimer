@@ -91,8 +91,8 @@ class MigrationVerifier {
                 'timestamp', 'data', 'created_at', 'deleted_at'
             ],
             'timer_settings' => [
-                'id', 'user_id', 'device_id', 'pomodoro_time',
-                'short_break_time', 'long_break_time', 'updated_at', 'is_global'
+                'id', 'user_id', 'device_id', 'setting_key',
+                'setting_value', 'updated_at', 'is_global'
             ],
             'user_sessions' => [
                 'id', 'user_id', 'device_id', 'session_token',
