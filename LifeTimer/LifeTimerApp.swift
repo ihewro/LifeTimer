@@ -1,6 +1,6 @@
 //
-//  PomodoroTimerApp.swift
-//  PomodoroTimer
+//  LifeTimerApp.swift
+//  LifeTimer
 //
 //  Created by Developer on 2024.
 //
@@ -11,7 +11,7 @@ import Cocoa
 #endif
 
 @main
-struct PomodoroTimerApp: App {
+struct LifeTimerApp: App {
     @StateObject private var timerModel = TimerModel()
     @StateObject private var audioManager = AudioManager()
     @StateObject private var eventManager = EventManager()
@@ -79,6 +79,11 @@ struct PomodoroTimerApp: App {
 
                     // 处理应用启动时的自动监控逻辑
                     activityMonitor.handleAppLaunch()
+
+                    // 初始化应用图标管理器
+                    #if canImport(Cocoa)
+                    _ = AppIconManager.shared
+                    #endif
                 }
         }
         #if os(macOS)

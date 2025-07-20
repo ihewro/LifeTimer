@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1A2B3C4D5E6F7890ABCD1234 /* PomodoroTimerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1235 /* PomodoroTimerApp.swift */; };
+		1A2B3C4D5E6F7890ABCD1234 /* LifeTimerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1235 /* LifeTimerApp.swift */; };
 		1A2B3C4D5E6F7890ABCD1236 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1237 /* ContentView.swift */; };
 		1A2B3C4D5E6F7890ABCD1238 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1239 /* TimerView.swift */; };
 		1A2B3C4D5E6F7890ABCD123A /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123B /* CalendarView.swift */; };
@@ -16,6 +16,7 @@
 		1A2B3C4D5E6F7890ABCD123E /* TimerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */; };
 		SOUND001122334455667788 /* SoundEffectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SOUND001122334455667799 /* SoundEffectManager.swift */; };
+		APPICON001122334455667788 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPICON001122334455667799 /* AppIconManager.swift */; };
 		MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBAR001122334455667799 /* MenuBarManager.swift */; };
 		SMART001122334455667788 /* SmartReminderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMART001122334455667799 /* SmartReminderManager.swift */; };
 		SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTD01122334455667799 /* SmartReminderDialog.swift */; };
@@ -39,8 +40,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		1A2B3C4D5E6F7890ABCD1248 /* PomodoroTimer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PomodoroTimer.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1A2B3C4D5E6F7890ABCD1235 /* PomodoroTimerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroTimerApp.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeTimer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A2B3C4D5E6F7890ABCD1235 /* LifeTimerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeTimerApp.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1237 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1239 /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD123B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
@@ -49,13 +50,14 @@
 		1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		SOUND001122334455667799 /* SoundEffectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEffectManager.swift; sourceTree = "<group>"; };
+		APPICON001122334455667799 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		MENUBAR001122334455667799 /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
 		SMART001122334455667799 /* SmartReminderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderManager.swift; sourceTree = "<group>"; };
 		SMARTD01122334455667799 /* SmartReminderDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderDialog.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		1A2B3C4D5E6F7890ABCD1249 /* PomodoroTimer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PomodoroTimer.entitlements; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCD1249 /* LifeTimer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LifeTimer.entitlements; sourceTree = "<group>"; };
 
 		004107185AAF4BDA9CCB5836 /* SystemEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEvent.swift; sourceTree = "<group>"; };
 		893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventStore.swift; sourceTree = "<group>"; };
@@ -94,7 +96,7 @@
 		1A2B3C4D5E6F7890ABCD124D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1A2B3C4D5E6F7890ABCD1248 /* PomodoroTimer.app */,
+				1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,10 +110,10 @@
 				1A2B3C4D5E6F7890ABCD1250 /* Managers */,
 				EXTENS1122334455667788CC /* Extensions */,
 				1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */,
-				1A2B3C4D5E6F7890ABCD1249 /* PomodoroTimer.entitlements */,
+				1A2B3C4D5E6F7890ABCD1249 /* LifeTimer.entitlements */,
 				1A2B3C4D5E6F7890ABCD1251 /* Preview Content */,
 			);
-			path = PomodoroTimer;
+			path = LifeTimer;
 			sourceTree = "<group>";
 		};
 		1A2B3C4D5E6F7890ABCD124E /* Views */ = {
@@ -149,6 +151,7 @@
 			children = (
 				1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */,
 				SOUND001122334455667799 /* SoundEffectManager.swift */,
+				APPICON001122334455667799 /* AppIconManager.swift */,
 				MENUBAR001122334455667799 /* MenuBarManager.swift */,
 				SMART001122334455667799 /* SmartReminderManager.swift */,
 
@@ -181,9 +184,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1A2B3C4D5E6F7890ABCD1252 /* PomodoroTimer */ = {
+		1A2B3C4D5E6F7890ABCD1252 /* LifeTimer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1A2B3C4D5E6F7890ABCD1253 /* Build configuration list for PBXNativeTarget "PomodoroTimer" */;
+			buildConfigurationList = 1A2B3C4D5E6F7890ABCD1253 /* Build configuration list for PBXNativeTarget "LifeTimer" */;
 			buildPhases = (
 				1A2B3C4D5E6F7890ABCD1254 /* Sources */,
 				1A2B3C4D5E6F7890ABCD124A /* Frameworks */,
@@ -193,9 +196,9 @@
 			);
 			dependencies = (
 			);
-			name = PomodoroTimer;
-			productName = PomodoroTimer;
-			productReference = 1A2B3C4D5E6F7890ABCD1248 /* PomodoroTimer.app */;
+			name = LifeTimer;
+			productName = LifeTimer;
+			productReference = 1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -213,7 +216,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "PomodoroTimer" */;
+			buildConfigurationList = 1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "LifeTimer" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -226,7 +229,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1A2B3C4D5E6F7890ABCD1252 /* PomodoroTimer */,
+				1A2B3C4D5E6F7890ABCD1252 /* LifeTimer */,
 			);
 		};
 /* End PBXProject section */
@@ -256,6 +259,7 @@
 				1A2B3C4D5E6F7890ABCD123E /* TimerModel.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */,
 				SOUND001122334455667788 /* SoundEffectManager.swift in Sources */,
+				APPICON001122334455667788 /* AppIconManager.swift in Sources */,
 				MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */,
 				SMART001122334455667788 /* SmartReminderManager.swift in Sources */,
 				SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */,
@@ -399,15 +403,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PomodoroTimer/PomodoroTimer.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LifeTimer/LifeTimer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"PomodoroTimer/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"LifeTimer/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "番茄钟";
+				INFOPLIST_KEY_CFBundleDisplayName = "LifeTimer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = YES;
@@ -421,7 +425,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.PomodoroTimer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.LifeTimer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -437,15 +441,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = PomodoroTimer/PomodoroTimer.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LifeTimer/LifeTimer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"PomodoroTimer/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"LifeTimer/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "番茄钟";
+				INFOPLIST_KEY_CFBundleDisplayName = "LifeTimer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = YES;
@@ -459,7 +463,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.PomodoroTimer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.LifeTimer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -473,7 +477,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "PomodoroTimer" */ = {
+		1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "LifeTimer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A2B3C4D5E6F7890ABCD1258 /* Debug */,
@@ -482,7 +486,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1A2B3C4D5E6F7890ABCD1253 /* Build configuration list for PBXNativeTarget "PomodoroTimer" */ = {
+		1A2B3C4D5E6F7890ABCD1253 /* Build configuration list for PBXNativeTarget "LifeTimer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A2B3C4D5E6F7890ABCD125A /* Debug */,

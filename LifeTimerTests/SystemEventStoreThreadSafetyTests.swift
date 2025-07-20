@@ -1,12 +1,12 @@
 //
 //  SystemEventStoreThreadSafetyTests.swift
-//  PomodoroTimerTests
+//  LifeTimerTests
 //
 //  Created by Assistant on 2024
 //
 
 import XCTest
-@testable import PomodoroTimer
+@testable import LifeTimer
 
 /// 测试 SystemEventStore 的线程安全性，特别是在月视图日期切换时的稳定性
 class SystemEventStoreThreadSafetyTests: XCTestCase {
