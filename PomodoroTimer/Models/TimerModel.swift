@@ -17,9 +17,9 @@ enum TimerMode: Equatable, Hashable, CaseIterable {
     var rawValue: String {
         switch self {
         case .singlePomodoro:
-            return "单次番茄"
+            return "番茄"
         case .pureRest:
-            return "纯休息"
+            return "休息"
         case .countUp:
             return "正计时"
         case .custom(let minutes):

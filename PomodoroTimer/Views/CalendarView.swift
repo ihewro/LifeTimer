@@ -716,7 +716,6 @@ struct DayView: View {
                 // 右侧面板 - 恢复日历模块和事件详情
                 VStack(spacing: 0) {
                     MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
-                        .frame(height: 200)
                         .padding()
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
 
@@ -728,7 +727,7 @@ struct DayView: View {
                         .frame(maxHeight: .infinity)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-                .frame(width: 300)
+                .frame(width: 240)
                 .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
@@ -1286,7 +1285,7 @@ struct MiniCalendarView: View {
             }
 
             // 日历网格
-            LazyVGrid(columns: columns, spacing: 2) {
+            LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(monthDays, id: \.self) { date in
                     MiniDayCell(
                         date: date,
@@ -1422,7 +1421,7 @@ struct MiniDayCell: View {
                             return .secondary
                         }
                     }())
-                    .frame(width: 24, height: 24)
+                    .frame(width: 20, height: 20)
                     .background(
                         Group {
                             if isSelected {
@@ -1520,7 +1519,7 @@ struct DayStatsPanel: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.blue)
-                    Text("活跃时间")
+                    Text("专注时间")
                     Spacer()
                     Text(formatTime(dayStats.totalActiveTime))
                         .fontWeight(.medium)
@@ -1529,7 +1528,7 @@ struct DayStatsPanel: View {
                 HStack {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundColor(.green)
-                    Text("番茄时钟")
+                    Text("番茄个数")
                     Spacer()
                     Text("\(dayStats.pomodoroSessions)")
                         .fontWeight(.medium)
@@ -1795,7 +1794,6 @@ struct WeekView: View {
                 VStack(spacing: 0) {
                     // 小日历
                     MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
-                        .frame(height: 200)
                         .padding()
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
 
@@ -1806,7 +1804,7 @@ struct WeekView: View {
                         .frame(maxHeight: .infinity)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-                .frame(width: 300)
+                .frame(width: 240)
                 .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
@@ -2004,7 +2002,7 @@ struct WeekView: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.blue)
-                    Text("总活跃时间")
+                    Text("总专注时间")
                     Spacer()
                     Text(formatTime(weekStats.totalActiveTime))
                         .fontWeight(.medium)
@@ -2022,7 +2020,7 @@ struct WeekView: View {
                 HStack {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundColor(.green)
-                    Text("番茄时钟")
+                    Text("番茄个数")
                     Spacer()
                     Text("\(weekStats.pomodoroSessions)")
                         .fontWeight(.medium)
@@ -2511,7 +2509,6 @@ struct MonthView: View {
                             selectedDate: $selectedDate
                         )
                         .padding()
-                        .padding(.top, 2)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
 
                         // 月度统计
@@ -2520,7 +2517,7 @@ struct MonthView: View {
                             .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
-                .frame(width: 300)
+                .frame(width: 240)
                 .background(GlassEffectBackground())
                 .animation(.easeInOut(duration: 0.3), value: displayMonth)
             }
@@ -2683,7 +2680,7 @@ struct MonthView: View {
                 HStack {
                     Image(systemName: "calendar")
                         .foregroundColor(.blue)
-                    Text("活跃天数")
+                    Text("专注天数")
                     Spacer()
                     Text("\(monthStats.activeDays)")
                         .fontWeight(.medium)
@@ -2692,7 +2689,7 @@ struct MonthView: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.orange)
-                    Text("总活跃时间")
+                    Text("总专注时间")
                     Spacer()
                     Text(formatTime(monthStats.totalActiveTime))
                         .fontWeight(.medium)
@@ -2701,7 +2698,7 @@ struct MonthView: View {
                 HStack {
                     Image(systemName: "target")
                         .foregroundColor(.green)
-                    Text("番茄时钟")
+                    Text("番茄个数")
                     Spacer()
                     Text("\(monthStats.pomodoroSessions)")
                         .fontWeight(.medium)

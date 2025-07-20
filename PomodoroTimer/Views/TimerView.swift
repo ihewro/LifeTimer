@@ -26,7 +26,7 @@ struct TimerView: View {
     private var smartReminderStatusView: some View {
         Group {
             // 当窗口宽度小于 900px 时隐藏智能提醒状态显示
-            if windowWidth >= 700 && smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
+            if windowWidth >= 650 && smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
                 HStack(spacing: 6) {
                     Image(systemName: "bell")
                         .font(.caption)
