@@ -1,12 +1,12 @@
 //
 //  UserSyncTests.swift
-//  PomodoroTimerTests
+//  LifeTimerTests
 //
 //  Created by Assistant on 2024
 //
 
 import XCTest
-@testable import PomodoroTimer
+@testable import LifeTimer
 
 /// 用户账户同步系统测试
 class UserSyncTests: XCTestCase {

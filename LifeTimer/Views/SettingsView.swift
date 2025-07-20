@@ -85,6 +85,7 @@ struct SettingsView: View {
     @EnvironmentObject var syncManager: SyncManager
 
     @StateObject private var soundEffectManager = SoundEffectManager.shared
+    @StateObject private var appIconManager = AppIconManager.shared
 
     @State private var selectedTab = 0
     @State private var showingClearAllDataAlert = false
@@ -263,6 +264,51 @@ struct SettingsView: View {
                                 Text("分钟")
                                     .foregroundColor(.secondary)
                                     .font(.caption)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.systemBackground)
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // 应用图标设置
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("应用图标")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("自定义图标")
+                                if !appIconManager.currentIconPath.isEmpty {
+                                    Text("当前: \(URL(fileURLWithPath: appIconManager.currentIconPath).lastPathComponent)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("使用默认图标")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                            HStack(spacing: 8) {
+                                Button("选择图标") {
+                                    appIconManager.selectIcon()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                if !appIconManager.currentIconPath.isEmpty {
+                                    Button("重置默认") {
+                                        appIconManager.resetToDefault()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
