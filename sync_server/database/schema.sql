@@ -62,19 +62,18 @@ CREATE TABLE IF NOT EXISTS system_events (
     FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL
 );
 
--- 计时器设置表
+-- 计时器设置表 (key-value格式)
 CREATE TABLE IF NOT EXISTS timer_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     device_id INTEGER, -- NULL表示全局设置，非NULL表示设备特定设置
-    pomodoro_time INTEGER DEFAULT 1500,
-    short_break_time INTEGER DEFAULT 300,
-    long_break_time INTEGER DEFAULT 900,
-    updated_at BIGINT NOT NULL,
+    setting_key VARCHAR(50) NOT NULL, -- 设置项键名，如 'pomodoro_time', 'short_break_time', 'long_break_time'
+    setting_value TEXT NOT NULL, -- 设置项值，支持字符串、数字等各种类型
+    updated_at BIGINT NOT NULL, -- 毫秒时间戳
     is_global BOOLEAN DEFAULT 1, -- 是否为全局设置
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
-    UNIQUE(user_id, device_id) -- 每个用户每个设备只能有一个设置
+    UNIQUE(user_id, device_id, setting_key) -- 每个用户每个设备每个设置项只能有一个值
 );
 
 -- 用户会话表（用于认证token管理）
@@ -106,6 +105,8 @@ CREATE INDEX IF NOT EXISTS idx_system_events_device ON system_events(device_id);
 
 CREATE INDEX IF NOT EXISTS idx_timer_settings_user ON timer_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_timer_settings_device ON timer_settings(device_id);
+CREATE INDEX IF NOT EXISTS idx_timer_settings_user_key ON timer_settings(user_id, setting_key);
+CREATE INDEX IF NOT EXISTS idx_timer_settings_updated_at ON timer_settings(updated_at);
 
 CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_device ON user_sessions(user_id, device_id);

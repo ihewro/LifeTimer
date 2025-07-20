@@ -261,26 +261,41 @@ function getUserSystemEvents($db, $userId) {
 }
 
 /**
- * 获取用户的计时器设置
+ * 获取用户的计时器设置 (key-value格式)
  */
 function getUserTimerSettings($db, $userId) {
-    // 优先获取全局设置，如果没有则返回null
+    // 获取用户的全局设置
     $stmt = $db->prepare('
-        SELECT pomodoro_time, short_break_time, long_break_time, updated_at
+        SELECT setting_key, setting_value, updated_at
         FROM timer_settings
         WHERE user_id = ? AND is_global = 1
         ORDER BY updated_at DESC
-        LIMIT 1
     ');
     $stmt->execute([$userId]);
-    $result = $stmt->fetch();
+    $rows = $stmt->fetchAll();
 
-    if ($result) {
-        // 数据库中的 updated_at 已经是毫秒时间戳，直接转换为整数
-        $result['updated_at'] = (int)$result['updated_at'];
+    if (empty($rows)) {
+        return null;
     }
 
-    return $result ?: null;
+    // 将key-value格式转换为原有的结构格式
+    $settings = [];
+    $maxUpdatedAt = 0;
+
+    foreach ($rows as $row) {
+        $settings[$row['setting_key']] = $row['setting_value'];
+        $maxUpdatedAt = max($maxUpdatedAt, (int)$row['updated_at']);
+    }
+
+    // 确保包含所有必需的设置项，如果缺失则使用默认值
+    $result = [
+        'pomodoro_time' => isset($settings['pomodoro_time']) ? (int)$settings['pomodoro_time'] : 1500,
+        'short_break_time' => isset($settings['short_break_time']) ? (int)$settings['short_break_time'] : 300,
+        'long_break_time' => isset($settings['long_break_time']) ? (int)$settings['long_break_time'] : 900,
+        'updated_at' => $maxUpdatedAt
+    ];
+
+    return $result;
 }
 
 /**
@@ -486,27 +501,48 @@ function getUserSystemEventsAfter($db, $userId, $timestamp) {
 }
 
 /**
- * 获取指定时间后的用户计时器设置
+ * 获取指定时间后的用户计时器设置 (key-value格式)
  */
 function getUserTimerSettingsAfter($db, $userId, $timestamp) {
-    // 直接使用毫秒时间戳进行比较
+    // 获取指定时间后更新的设置项
     $stmt = $db->prepare('
-        SELECT pomodoro_time, short_break_time, long_break_time, updated_at
+        SELECT setting_key, setting_value, updated_at
         FROM timer_settings
         WHERE user_id = ? AND updated_at > ? AND is_global = 1
         ORDER BY updated_at DESC
-        LIMIT 1
     ');
     $stmt->execute([$userId, $timestamp]);
-    $result = $stmt->fetch();
+    $rows = $stmt->fetchAll();
 
-    if ($result) {
-        // 数据库中的 updated_at 已经是毫秒时间戳，直接转换为整数
-        $result['updated_at'] = (int)$result['updated_at'];
-        error_log("Found timer settings after $timestamp for user: $userId, updated_at: {$result['updated_at']}");
+    if (empty($rows)) {
+        return null;
     }
 
-    return $result ?: null;
+    // 将key-value格式转换为原有的结构格式
+    $settings = [];
+    $maxUpdatedAt = 0;
+
+    foreach ($rows as $row) {
+        $settings[$row['setting_key']] = $row['setting_value'];
+        $maxUpdatedAt = max($maxUpdatedAt, (int)$row['updated_at']);
+    }
+
+    // 构建结果，只包含实际更新的设置项
+    $result = ['updated_at' => $maxUpdatedAt];
+
+    if (isset($settings['pomodoro_time'])) {
+        $result['pomodoro_time'] = (int)$settings['pomodoro_time'];
+    }
+    if (isset($settings['short_break_time'])) {
+        $result['short_break_time'] = (int)$settings['short_break_time'];
+    }
+    if (isset($settings['long_break_time'])) {
+        $result['long_break_time'] = (int)$settings['long_break_time'];
+    }
+
+    error_log("Found timer settings after $timestamp for user: $userId, updated_at: $maxUpdatedAt, keys: " . implode(',', array_keys($settings)));
+
+    return $result;
 }
 
 /**
@@ -638,35 +674,43 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
 }
 
 /**
- * 处理用户计时器设置变更
+ * 处理用户计时器设置变更 (key-value格式)
  */
 function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $lastSyncTimestamp) {
     // 直接使用客户端的毫秒时间戳
     $clientUpdatedAt = $settings['updated_at'];
 
-    // 检查是否有冲突
-    $stmt = $db->prepare('SELECT updated_at FROM timer_settings WHERE user_id = ? AND is_global = 1');
+    // 检查是否有冲突 - 获取最新的设置更新时间
+    $stmt = $db->prepare('SELECT MAX(updated_at) as max_updated_at FROM timer_settings WHERE user_id = ? AND is_global = 1');
     $stmt->execute([$userId]);
-    $serverSettings = $stmt->fetch();
+    $result = $stmt->fetch();
+    $serverMaxUpdatedAt = $result ? (int)$result['max_updated_at'] : 0;
 
-    if ($serverSettings && $serverSettings['updated_at'] > $lastSyncTimestamp) {
+    if ($serverMaxUpdatedAt > $lastSyncTimestamp) {
         // 有冲突，使用最新的设置（客户端优先）
-        error_log("Timer settings conflict detected for user: $userId, server: {$serverSettings['updated_at']}, client: $clientUpdatedAt, using client version");
+        error_log("Timer settings conflict detected for user: $userId, server: $serverMaxUpdatedAt, client: $clientUpdatedAt, using client version");
     }
 
-    // 更新或插入设置
+    // 删除用户的现有全局设置
+    $stmt = $db->prepare('DELETE FROM timer_settings WHERE user_id = ? AND is_global = 1');
+    $stmt->execute([$userId]);
+
+    // 插入新的设置项
+    $settingItems = [
+        'pomodoro_time' => $settings['pomodoro_time'],
+        'short_break_time' => $settings['short_break_time'],
+        'long_break_time' => $settings['long_break_time']
+    ];
+
     $stmt = $db->prepare('
-        INSERT OR REPLACE INTO timer_settings
-        (user_id, device_id, pomodoro_time, short_break_time, long_break_time, updated_at, is_global)
-        VALUES (?, NULL, ?, ?, ?, ?, 1)
+        INSERT INTO timer_settings
+        (user_id, device_id, setting_key, setting_value, updated_at, is_global)
+        VALUES (?, NULL, ?, ?, ?, 1)
     ');
-    $stmt->execute([
-        $userId,
-        $settings['pomodoro_time'],
-        $settings['short_break_time'],
-        $settings['long_break_time'],
-        $clientUpdatedAt  // 直接使用毫秒时间戳
-    ]);
+
+    foreach ($settingItems as $key => $value) {
+        $stmt->execute([$userId, $key, (string)$value, $clientUpdatedAt]);
+    }
 
     error_log("Timer settings updated for user: $userId, pomodoro: {$settings['pomodoro_time']}s, short_break: {$settings['short_break_time']}s, long_break: {$settings['long_break_time']}s, updated_at: $clientUpdatedAt");
 }

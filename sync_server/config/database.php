@@ -4,7 +4,7 @@ class Database {
     private $pdo;
     
     private function __construct() {
-        $db_path = __DIR__ . '/../database/pomodoro_sync.db';
+        $db_path = __DIR__ . '/../database/sync_database.db';
         $db_dir = dirname($db_path);
         
         // 确保数据库目录存在
