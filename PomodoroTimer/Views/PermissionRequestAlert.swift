@@ -70,14 +70,11 @@ struct PermissionRequestAlert: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button("检查权限") {
-                    activityMonitor.checkPermissions()
-                    if activityMonitor.hasPermissions {
-                        activityMonitor.handlePermissionGranted()
-                        isPresented = false
-                    }
+                Button("不再提醒") {
+                    activityMonitor.disablePermissionReminder()
                 }
                 .buttonStyle(.bordered)
+                .foregroundColor(.secondary)
 
                 Spacer()
             }
