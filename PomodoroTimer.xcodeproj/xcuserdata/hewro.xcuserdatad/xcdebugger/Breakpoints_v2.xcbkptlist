@@ -16,8 +16,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1003"
             endingLineNumber = "1003"
-            landmarkName = "SyncManager"
-            landmarkType = "3">
+            landmarkName = "collectLocalChanges(since:)"
+            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

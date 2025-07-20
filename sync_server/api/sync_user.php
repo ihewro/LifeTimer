@@ -186,6 +186,8 @@ function handleIncrementalSync() {
             }
 
             // 获取服务器端的变更
+            // TODO：这里服务端应该过滤掉本地的变更部分，而且应该返回数据结构和changed（create/delete/update）是一样的，
+            // 但是之前设计的不一样，就先不改了
             $serverChanges = [
                 'pomodoro_events' => getUserPomodoroEventsAfter($db, $userInfo['user_id'], $lastSyncTimestamp),
                 'system_events' => getUserSystemEventsAfter($db, $userInfo['user_id'], $lastSyncTimestamp),
@@ -597,13 +599,14 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
             
             if ($serverEvent && $serverEvent['updated_at'] > $lastSyncTimestamp) {
                 // 冲突：服务器端也有更新
-                $conflicts[] = [
-                    'type' => 'pomodoro_event',
-                    'uuid' => $event['uuid'],
-                    'reason' => 'concurrent_modification',
-                    'server_updated_at' => $serverEvent['updated_at'],
-                    'client_updated_at' => $event['updated_at']
-                ];
+                // TODO: 这里简化逻辑，直接忽略本地变更即可
+                // $conflicts[] = [
+                //     'type' => 'pomodoro_event',
+                //     'uuid' => $event['uuid'],
+                //     'reason' => 'concurrent_modification',
+                //     'server_updated_at' => $serverEvent['updated_at'],
+                //     'client_updated_at' => $event['updated_at']
+                // ];
             } else {
                 // 更新事件
                 $stmt = $db->prepare('

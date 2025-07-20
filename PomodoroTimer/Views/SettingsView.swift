@@ -82,6 +82,7 @@ struct SettingsView: View {
     @EnvironmentObject var eventManager: EventManager
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @EnvironmentObject var smartReminderManager: SmartReminderManager
+    @EnvironmentObject var syncManager: SyncManager
 
     @StateObject private var soundEffectManager = SoundEffectManager.shared
 
@@ -927,7 +928,8 @@ extension SettingsView {
     private func clearAllData() {
         eventManager.clearAllEvents()
         activityMonitor.clearAllData()
-        importResult = "所有数据已清除"
+        syncManager.clearSyncTimestamp()
+        importResult = "所有数据已清除，同步状态已重置"
         showingImportResult = true
     }
 
