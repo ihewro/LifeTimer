@@ -199,7 +199,8 @@ class SyncManager: ObservableObject {
 
     /// 本地服务端最后时间戳（基准时间戳）
     var lastSyncTimestamp: Int64 {
-        return userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        return userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
     }
     
     init(serverURL: String, authManager: AuthManager? = nil) {
@@ -679,7 +680,8 @@ class SyncManager: ObservableObject {
     /// 智能合并 - 使用单一增量同步操作
     private func performSmartMerge(detailsCollector: inout SyncDetailsCollector) async throws {
         // 获取当前的同步基准时间戳
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
 
         // 收集本地变更（基于当前的同步基准时间戳）
         let localChanges = await collectLocalChanges(since: lastSyncTimestamp)
@@ -902,7 +904,8 @@ class SyncManager: ObservableObject {
     /// 增量同步 - 直接使用增量同步API
     private func performIncrementalSync(detailsCollector: inout SyncDetailsCollector) async throws {
         // 获取当前的同步基准时间戳
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
 
         // 收集本地变更（基于当前的同步基准时间戳）
         let localChanges = await collectLocalChanges(since: lastSyncTimestamp)
@@ -1376,7 +1379,8 @@ class SyncManager: ObservableObject {
 
         do {
             // 获取当前的同步基准时间戳
-            let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+            // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+            let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
             print("🌐 lastSyncTimestamp: \(lastSyncTimestamp)")
 
             // 创建一个空的本地变更请求，只是为了获取服务端变更
@@ -1541,7 +1545,8 @@ class SyncManager: ObservableObject {
 
     /// 生成Git风格的同步工作区状态
     func generateSyncWorkspace() async {
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
 
         var staged: [WorkspaceItem] = []
         let unstaged: [WorkspaceItem] = []
@@ -1871,7 +1876,8 @@ class SyncManager: ObservableObject {
 
     /// 计算待同步数据数量
     private func calculatePendingSyncCount() async -> Int {
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
 
         var count = 0
 
@@ -2110,7 +2116,8 @@ class SyncManager: ObservableObject {
 
     /// 获取待同步数据列表
     func getPendingSyncData() async -> [PendingSyncItem] {
-        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 0
+        // 如果本地没有时间戳，则使用1，不能传0，否则会覆盖远程数据！！
+        let lastSyncTimestamp = userDefaults.object(forKey: lastSyncTimestampKey) as? Int64 ?? 1
         var items: [PendingSyncItem] = []
 
         // 获取待同步的番茄事件
@@ -2229,6 +2236,42 @@ class SyncManager: ObservableObject {
         }
 
         let logEntry = "[\(formatTimestamp(Date()))] 🧹 手动清除所有删除记录: 共清除\(count)条记录"
+        print(logEntry)
+        addDeletionLog(logEntry)
+    }
+
+    /// 清除本地同步时间戳（用于数据清除后重置同步状态）
+    func clearSyncTimestamp() {
+        userDefaults.removeObject(forKey: lastSyncTimestampKey)
+        lastSyncTime = nil
+        userDefaults.removeObject(forKey: lastSyncTimeKey)
+
+        // 清除同步历史
+        syncHistory.removeAll()
+        lastSyncRecord = nil
+        userDefaults.removeObject(forKey: "SyncHistory")
+        userDefaults.removeObject(forKey: "LastSyncRecord")
+
+        // 清除服务端数据缓存
+        DispatchQueue.main.async {
+            self.serverData = nil
+            self.serverDataSummary = nil
+            self.serverIncrementalChanges = nil
+            self.syncWorkspace = nil
+        }
+
+        // 清除缓存
+        clearServerDataSummaryCache()
+
+        // 更新待同步数据计数
+        updatePendingSyncCount()
+
+        // 重新生成同步工作区
+        Task {
+            await generateSyncWorkspace()
+        }
+
+        let logEntry = "[\(formatTimestamp(Date()))] 🔄 清除同步时间戳和相关状态"
         print(logEntry)
         addDeletionLog(logEntry)
     }
