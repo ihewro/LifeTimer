@@ -62,29 +62,30 @@ class LifeDataMigrator {
     private function ensureUserAndDevice() {
         echo "📋 检查用户和设备数据...\n";
         
-        // 检查是否已有用户
+        // // 检查是否已有用户
         $stmt = $this->targetDb->query("SELECT COUNT(*) FROM users");
-        $userCount = $stmt->fetchColumn();
+        // $userCount = $stmt->fetchColumn();
         
-        if ($userCount == 0) {
-            // 创建默认用户
-            $userUuid = $this->generateUUID();
-            $currentTime = time() * 1000; // 毫秒时间戳
+        // if ($userCount == 0) {
+        //     // 创建默认用户
+        //     $userUuid = $this->generateUUID();
+        //     $currentTime = time() * 1000; // 毫秒时间戳
             
-            $stmt = $this->targetDb->prepare("
-                INSERT INTO users (user_uuid, user_name, created_at, updated_at, last_active_at) 
-                VALUES (?, ?, datetime('now'), datetime('now'), datetime('now'))
-            ");
-            $stmt->execute([$userUuid, '迁移用户']);
+        //     $stmt = $this->targetDb->prepare("
+        //         INSERT INTO users (user_uuid, user_name, created_at, updated_at, last_active_at) 
+        //         VALUES (?, ?, datetime('now'), datetime('now'), datetime('now'))
+        //     ");
+        //     $stmt->execute([$userUuid, '迁移用户']);
             
-            $this->userId = $this->targetDb->lastInsertId();
-            echo "  ✓ 创建默认用户 (ID: {$this->userId})\n";
-        } else {
-            // 使用第一个用户
-            $stmt = $this->targetDb->query("SELECT id FROM users LIMIT 1");
-            $this->userId = $stmt->fetchColumn();
-            echo "  ✓ 使用现有用户 (ID: {$this->userId})\n";
-        }
+        //     $this->userId = $this->targetDb->lastInsertId();
+        //     echo "  ✓ 创建默认用户 (ID: {$this->userId})\n";
+        // } else {
+        //     // 使用第一个用户
+        //     $stmt = $this->targetDb->query("SELECT id FROM users LIMIT 1");
+        //     $this->userId = $stmt->fetchColumn();
+        //     echo "  ✓ 使用现有用户 (ID: {$this->userId})\n";
+        // }
+        $this->userId =  4;
         
         // 检查是否已有设备
         $stmt = $this->targetDb->prepare("SELECT COUNT(*) FROM devices WHERE user_id = ?");
