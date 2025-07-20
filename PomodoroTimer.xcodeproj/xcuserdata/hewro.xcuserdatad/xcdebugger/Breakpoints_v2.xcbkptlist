@@ -64,7 +64,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "284"
             endingLineNumber = "284"
-            landmarkName = "loadEvents()"
+            landmarkName = "eventsForDates(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -96,7 +96,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "286"
             endingLineNumber = "286"
-            landmarkName = "loadEvents()"
+            landmarkName = "eventsForDates(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -112,8 +112,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "152"
             endingLineNumber = "152"
-            landmarkName = "removeEvent(_:)"
-            landmarkType = "7">
+            landmarkName = "EventManager"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -128,7 +128,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "278"
             endingLineNumber = "278"
-            landmarkName = "saveEvents()"
+            landmarkName = "eventsForDates(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -144,8 +144,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "131"
             endingLineNumber = "131"
-            landmarkName = "init()"
-            landmarkType = "7">
+            landmarkName = "EventManager"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -160,7 +160,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "170"
             endingLineNumber = "170"
-            landmarkName = "updateEvent(_:)"
+            landmarkName = "invalidateCache()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -176,7 +176,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "178"
             endingLineNumber = "178"
-            landmarkName = "eventsForDate(_:)"
+            landmarkName = "invalidateCache(for:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -192,7 +192,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "185"
             endingLineNumber = "185"
-            landmarkName = "todayEvents()"
+            landmarkName = "warmupCache(for:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -208,7 +208,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "189"
             endingLineNumber = "189"
-            landmarkName = "completedPomodorosToday()"
+            landmarkName = "warmupCache(for:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -224,7 +224,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "193"
             endingLineNumber = "193"
-            landmarkName = "totalFocusTimeToday()"
+            landmarkName = "warmupCache(for:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -240,7 +240,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "300"
             endingLineNumber = "300"
-            landmarkName = "triggerDataChangeNotification()"
+            landmarkName = "eventsForDates(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -256,8 +256,70 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "292"
             endingLineNumber = "292"
-            landmarkName = "notifyEventDataChanged()"
+            landmarkName = "eventsForDates(_:)"
             landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "F2F3BFF3-C4B0-41E2-BADC-0321DE6E3E23"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "PomodoroTimer/Views/CalendarView.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1239"
+            endingLineNumber = "1239"
+            landmarkName = "eventPositionForEvent(_:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "5179D32F-A0AC-4B60-8AE0-755BF7AA4485"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "PomodoroTimer/Views/CalendarView.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1288"
+            endingLineNumber = "1288"
+            landmarkName = "EventBlock"
+            landmarkType = "14">
+            <Locations>
+               <Location
+                  uuid = "5179D32F-A0AC-4B60-8AE0-755BF7AA4485 - ea1274b889480de8"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "PomodoroTimer.EventBlock.init(event: PomodoroTimer.PomodoroEvent, selectedEvent: SwiftUI.Binding&lt;Swift.Optional&lt;PomodoroTimer.PomodoroEvent&gt;&gt;, draggedEvent: SwiftUI.Binding&lt;Swift.Optional&lt;PomodoroTimer.PomodoroEvent&gt;&gt;, dragOffset: SwiftUI.Binding&lt;__C.CGSize&gt;, hourHeight: CoreGraphics.CGFloat, selectedDate: Foundation.Date, column: Swift.Int, totalColumns: Swift.Int, containerWidth: CoreGraphics.CGFloat, highlightedEventId: SwiftUI.Binding&lt;Swift.Optional&lt;Foundation.UUID&gt;&gt;, eventManager: SwiftUI.EnvironmentObject&lt;PomodoroTimer.EventManager&gt;, positionCache: PomodoroTimer.EventPositionCache) -&gt; PomodoroTimer.EventBlock"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Views/CalendarView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "1288"
+                  endingLineNumber = "1288">
+               </Location>
+               <Location
+                  uuid = "5179D32F-A0AC-4B60-8AE0-755BF7AA4485 - 7685c1735d747d2"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "property wrapper backing initializer of PomodoroTimer.EventBlock.showingPopover : Swift.Bool"
+                  moduleName = "PomodoroTimer"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/hewro/Documents/life/PomodoroTimer/Views/CalendarView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

@@ -8,32 +8,89 @@
 import Foundation
 import SwiftUI
 
-/// 系统事件存储管理器
+/// 系统事件存储管理器（性能优化版本）
 class SystemEventStore: ObservableObject {
     static let shared = SystemEventStore()
-    
-    @Published var events: [SystemEvent] = []
+
+    @Published var events: [SystemEvent] = [] {
+        didSet {
+            // 当事件数据变化时，清除缓存
+            invalidateCache()
+        }
+    }
     @Published var isLoading = false
-    
+
     private let fileURL: URL
     private let maxEvents = 10000 // 最大事件数量限制
-    
+
+    // MARK: - 性能优化：缓存机制（线程安全版本）
+    private var dateEventsCache: [String: [SystemEvent]] = [:]
+    private var appStatsCache: [String: [AppUsageStats]] = [:]
+    private var overviewCache: [String: (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int)] = [:]
+    private let cacheQueue = DispatchQueue(label: "com.pomodorotimer.systemeventcache", qos: .userInitiated)
+    private let calendar = Calendar.current
+
+    // 线程安全的缓存访问锁
+    private let cacheLock = NSLock()
+
+    // 缓存键生成器
+    private func cacheKey(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
     private init() {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         fileURL = documentsPath.appendingPathComponent("system_events.json")
         loadEvents()
     }
     
+    // MARK: - 缓存管理方法
+
+    /// 清除所有缓存（线程安全版本）
+    private func invalidateCache() {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
+        #if DEBUG
+        print("🗑️ SystemEventStore: 清除所有缓存")
+        #endif
+
+        dateEventsCache.removeAll()
+        appStatsCache.removeAll()
+        overviewCache.removeAll()
+    }
+
+    /// 清除特定日期的缓存（线程安全版本）
+    private func invalidateCache(for date: Date) {
+        let key = cacheKey(for: date)
+
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
+        #if DEBUG
+        print("🗑️ SystemEventStore: 清除日期 \(key) 的缓存")
+        #endif
+
+        dateEventsCache.removeValue(forKey: key)
+        appStatsCache.removeValue(forKey: key)
+        overviewCache.removeValue(forKey: key)
+    }
+
     /// 保存事件
     func saveEvent(_ event: SystemEvent) {
         DispatchQueue.main.async {
             self.events.append(event)
-            
+
             // 限制事件数量，删除最旧的事件
             if self.events.count > self.maxEvents {
                 self.events.removeFirst(self.events.count - self.maxEvents)
             }
-            
+
+            // 清除相关日期的缓存
+            self.invalidateCache(for: event.timestamp)
+
             self.saveToFile()
         }
     }
@@ -73,12 +130,103 @@ class SystemEventStore: ObservableObject {
         saveToFile()
     }
     
-    /// 获取指定日期的事件
+    // MARK: - 性能优化：高效的事件查询方法
+
+    /// 获取指定日期的事件（带缓存优化，线程安全版本）
     func getEvents(for date: Date) -> [SystemEvent] {
-        let calendar = Calendar.current
-        return events.filter { calendar.isDate($0.timestamp, inSameDayAs: date) }
+        let key = cacheKey(for: date)
+
+        // 线程安全地检查缓存
+        cacheLock.lock()
+        let cachedEvents = dateEventsCache[key]
+        cacheLock.unlock()
+
+        if let cachedEvents = cachedEvents {
+            #if DEBUG
+            print("📅 SystemEventStore: 缓存命中 - 日期 \(key)")
+            #endif
+            return cachedEvents
+        }
+
+        #if DEBUG
+        print("📅 SystemEventStore: 缓存未命中 - 计算日期 \(key) 的事件")
+        #endif
+
+        // 缓存未命中，计算并缓存结果
+        let dayEvents = events.filter { calendar.isDate($0.timestamp, inSameDayAs: date) }
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        dateEventsCache[key] = dayEvents
+        cacheLock.unlock()
+
+        return dayEvents
     }
-    
+
+    /// 批量获取多个日期的事件（优化版本，线程安全）
+    func getEventsForDates(_ dates: [Date]) -> [Date: [SystemEvent]] {
+        var result: [Date: [SystemEvent]] = [:]
+        var uncachedDates: [Date] = []
+
+        // 线程安全地检查缓存
+        cacheLock.lock()
+        for date in dates {
+            let key = cacheKey(for: date)
+            if let cachedEvents = dateEventsCache[key] {
+                result[date] = cachedEvents
+            } else {
+                uncachedDates.append(date)
+            }
+        }
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📅 SystemEventStore: 批量查询 - 缓存命中 \(result.count) 个日期，需计算 \(uncachedDates.count) 个日期")
+        #endif
+
+        // 对未缓存的日期进行批量处理
+        if !uncachedDates.isEmpty {
+            let batchResult = batchProcessEvents(for: uncachedDates)
+            result.merge(batchResult) { _, new in new }
+        }
+
+        return result
+    }
+
+    /// 批量处理事件查询（减少重复遍历，线程安全版本）
+    private func batchProcessEvents(for dates: [Date]) -> [Date: [SystemEvent]] {
+        var result: [Date: [SystemEvent]] = [:]
+
+        // 初始化结果字典
+        for date in dates {
+            result[date] = []
+        }
+
+        // 单次遍历所有事件，分配到对应日期
+        for event in events {
+            for date in dates {
+                if calendar.isDate(event.timestamp, inSameDayAs: date) {
+                    result[date]?.append(event)
+                    break // 找到匹配日期后跳出内循环
+                }
+            }
+        }
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        for (date, events) in result {
+            let key = cacheKey(for: date)
+            dateEventsCache[key] = events
+        }
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📅 SystemEventStore: 批量处理完成，已缓存 \(result.count) 个日期的事件")
+        #endif
+
+        return result
+    }
+
     /// 获取指定日期范围的事件
     func getEvents(from startDate: Date, to endDate: Date) -> [SystemEvent] {
         return events.filter { event in
@@ -86,15 +234,109 @@ class SystemEventStore: ObservableObject {
         }
     }
     
-    /// 获取应用使用统计
+    /// 获取应用使用统计（带缓存优化，线程安全版本）
     func getAppUsageStats(for date: Date) -> [AppUsageStats] {
+        let key = cacheKey(for: date)
+
+        // 线程安全地检查缓存
+        cacheLock.lock()
+        let cachedStats = appStatsCache[key]
+        cacheLock.unlock()
+
+        if let cachedStats = cachedStats {
+            #if DEBUG
+            print("📊 SystemEventStore: 应用统计缓存命中 - 日期 \(key)")
+            #endif
+            return cachedStats
+        }
+
+        #if DEBUG
+        print("📊 SystemEventStore: 应用统计缓存未命中 - 计算日期 \(key) 的统计")
+        #endif
+
+        // 缓存未命中，计算统计数据
         let dayEvents = getEvents(for: date)
+        let stats = calculateAppUsageStats(from: dayEvents)
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        appStatsCache[key] = stats
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📊 SystemEventStore: 已缓存日期 \(key) 的应用统计，共 \(stats.count) 个应用")
+        #endif
+
+        return stats
+    }
+
+    /// 批量获取多个日期的应用使用统计（线程安全版本）
+    func getAppUsageStatsForDates(_ dates: [Date]) -> [Date: [AppUsageStats]] {
+        var result: [Date: [AppUsageStats]] = [:]
+        var uncachedDates: [Date] = []
+
+        // 线程安全地检查缓存
+        cacheLock.lock()
+        for date in dates {
+            let key = cacheKey(for: date)
+            if let cachedStats = appStatsCache[key] {
+                result[date] = cachedStats
+            } else {
+                uncachedDates.append(date)
+            }
+        }
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📊 SystemEventStore: 批量应用统计查询 - 缓存命中 \(result.count) 个日期，需计算 \(uncachedDates.count) 个日期")
+        #endif
+
+        // 对未缓存的日期进行批量处理
+        if !uncachedDates.isEmpty {
+            let batchResult = batchProcessAppStats(for: uncachedDates)
+            result.merge(batchResult) { _, new in new }
+        }
+
+        return result
+    }
+
+    /// 批量处理应用统计查询（线程安全版本）
+    private func batchProcessAppStats(for dates: [Date]) -> [Date: [AppUsageStats]] {
+        var result: [Date: [AppUsageStats]] = [:]
+
+        // 批量获取事件数据
+        let eventsData = getEventsForDates(dates)
+
+        // 计算每个日期的应用统计
+        for date in dates {
+            let dayEvents = eventsData[date] ?? []
+            let stats = calculateAppUsageStats(from: dayEvents)
+            result[date] = stats
+        }
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        for (date, stats) in result {
+            let key = cacheKey(for: date)
+            appStatsCache[key] = stats
+        }
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📊 SystemEventStore: 批量应用统计处理完成，已缓存 \(result.count) 个日期的统计")
+        #endif
+
+        return result
+    }
+
+    /// 计算应用使用统计（提取为独立方法）
+    private func calculateAppUsageStats(from dayEvents: [SystemEvent]) -> [AppUsageStats] {
         var appStats: [String: (totalTime: TimeInterval, count: Int, lastUsed: Date?)] = [:]
-        
+
         // 计算每个应用的使用时间
         var currentApp: String?
         var appStartTime: Date?
-        
+
         for event in dayEvents.sorted(by: { $0.timestamp < $1.timestamp }) {
             switch event.type {
             case .appActivated:
@@ -184,10 +426,40 @@ class SystemEventStore: ObservableObject {
         return getOverview(for: Date())
     }
 
-    /// 获取指定日期的总体统计
+    /// 获取指定日期的总体统计（带缓存优化，线程安全版本）
     func getOverview(for date: Date) -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
-        let dayEvents = getEvents(for: date)
+        let key = cacheKey(for: date)
 
+        // 线程安全地检查缓存
+        cacheLock.lock()
+        let cachedOverview = overviewCache[key]
+        cacheLock.unlock()
+
+        if let cachedOverview = cachedOverview {
+            #if DEBUG
+            print("📈 SystemEventStore: 概览统计缓存命中 - 日期 \(key)")
+            #endif
+            return cachedOverview
+        }
+
+        #if DEBUG
+        print("📈 SystemEventStore: 概览统计缓存未命中 - 计算日期 \(key) 的统计")
+        #endif
+
+        // 缓存未命中，计算统计数据
+        let dayEvents = getEvents(for: date)
+        let overview = calculateOverview(from: dayEvents)
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        overviewCache[key] = overview
+        cacheLock.unlock()
+
+        return overview
+    }
+
+    /// 计算总体统计（提取为独立方法）
+    private func calculateOverview(from dayEvents: [SystemEvent]) -> (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int) {
         let appSwitches = dayEvents.filter { $0.type == .appActivated }.count
         let websiteVisits = dayEvents.filter { $0.type == .urlVisit }.count
 
@@ -195,6 +467,34 @@ class SystemEventStore: ObservableObject {
         let activeTime = calculateRealActiveTime(from: dayEvents)
 
         return (activeTime: activeTime, appSwitches: appSwitches, websiteVisits: websiteVisits)
+    }
+
+    /// 批量获取多个日期的概览统计（线程安全版本）
+    func getOverviewForDates(_ dates: [Date]) -> [Date: (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int)] {
+        var result: [Date: (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int)] = [:]
+
+        // 批量获取事件数据
+        let eventsData = getEventsForDates(dates)
+
+        // 计算每个日期的统计数据
+        for date in dates {
+            let dayEvents = eventsData[date] ?? []
+            result[date] = calculateOverview(from: dayEvents)
+        }
+
+        // 线程安全地缓存结果
+        cacheLock.lock()
+        for (date, overview) in result {
+            let key = cacheKey(for: date)
+            overviewCache[key] = overview
+        }
+        cacheLock.unlock()
+
+        #if DEBUG
+        print("📈 SystemEventStore: 批量概览统计完成，已缓存 \(result.count) 个日期的统计")
+        #endif
+
+        return result
     }
 
     /// 计算真实的活跃时间（与活动页面时间轴总计逻辑保持一致）
