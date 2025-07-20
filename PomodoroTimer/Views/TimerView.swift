@@ -30,7 +30,7 @@ struct TimerView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "bell")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        // .foregroundColor(.orange)
 
                     Text("\(smartReminderManager.formatRemainingTime())后提醒")
                         .font(.caption.monospaced())
@@ -38,7 +38,7 @@ struct TimerView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.orange.opacity(0.1))
+                // .background(Color.orange.opacity(0.1))
                 .cornerRadius(6)
             } else {
                 // 空白占位，保持布局一致

@@ -682,9 +682,9 @@ struct CalendarView: View {
             ToolbarItem(placement: .confirmationAction) {
                 // 搜索框
                 HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 13))
+                        // Image(systemName: "magnifyingglass")
+                        //     .foregroundColor(.secondary)
+                        //     .font(.system(size: 13))
 
                         TextField("搜索事件", text: $searchText)
                             .textFieldStyle(.roundedBorder)
