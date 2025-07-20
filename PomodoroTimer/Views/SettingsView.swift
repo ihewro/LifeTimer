@@ -221,7 +221,7 @@ struct SettingsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("提醒间隔时间")
-                                Text("设置为0表示关闭智能提醒，支持小数（如0.1表示6秒）")
+                                Text("设置为0表示关闭智能提醒")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
