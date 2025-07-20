@@ -117,16 +117,34 @@ struct PomodoroEvent: Identifiable, Codable {
 }
 
 class EventManager: ObservableObject {
-    @Published var events: [PomodoroEvent] = []
+    @Published var events: [PomodoroEvent] = [] {
+        didSet {
+            // 当事件数据变化时，清除缓存
+            invalidateCache()
+        }
+    }
 
     private let userDefaults = UserDefaults.standard
     private let eventsKey = "PomodoroEvents"
+
+    // MARK: - 性能优化：缓存机制
+    private var dateEventsCache: [String: [PomodoroEvent]] = [:]
+    private var sortedEventsCache: [PomodoroEvent]?
+    private let cacheQueue = DispatchQueue(label: "com.pomodorotimer.eventcache", qos: .userInitiated)
+    private let calendar = Calendar.current
+
+    // 缓存键生成器
+    private func cacheKey(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
 
     var dataFilePath: String {
         let libraryPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first!
         return "\(libraryPath)/Preferences/\(Bundle.main.bundleIdentifier ?? "PomodoroTimer").plist"
     }
-    
+
     init() {
         loadEvents()
         setupNotifications()
@@ -142,15 +160,57 @@ class EventManager: ObservableObject {
         }
     }
     
+    // MARK: - 缓存管理方法
+
+    /// 清除所有缓存
+    private func invalidateCache() {
+        cacheQueue.async { [weak self] in
+            self?.dateEventsCache.removeAll()
+            self?.sortedEventsCache = nil
+        }
+    }
+
+    /// 清除特定日期的缓存
+    private func invalidateCache(for date: Date) {
+        let key = cacheKey(for: date)
+        cacheQueue.async { [weak self] in
+            self?.dateEventsCache.removeValue(forKey: key)
+        }
+    }
+
+    /// 预热缓存（为常用日期预加载数据）
+    func warmupCache(for dates: [Date]) {
+        cacheQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            for date in dates {
+                let key = self.cacheKey(for: date)
+                if self.dateEventsCache[key] == nil {
+                    let dayEvents = self.events.filter { event in
+                        self.calendar.isDate(event.startTime, inSameDayAs: date)
+                    }.sorted { $0.startTime < $1.startTime }
+
+                    self.dateEventsCache[key] = dayEvents
+                }
+            }
+        }
+    }
+
     func addEvent(_ event: PomodoroEvent) {
         events.append(event)
         saveEvents()
         notifyEventDataChanged()
+
+        // 清除相关日期的缓存
+        invalidateCache(for: event.startTime)
     }
-    
+
     func removeEvent(_ event: PomodoroEvent) {
         events.removeAll { $0.id == event.id }
         saveEvents()
+
+        // 清除相关日期的缓存
+        invalidateCache(for: event.startTime)
 
         // 创建删除事件的详细信息
         let deletedEventInfo = DeletedEventInfo(from: event, reason: "用户手动删除")
@@ -165,37 +225,142 @@ class EventManager: ObservableObject {
             ]
         )
     }
-    
+
     func updateEvent(_ event: PomodoroEvent) {
         if let index = events.firstIndex(where: { $0.id == event.id }) {
+            let oldEvent = events[index]
             events[index] = event
             saveEvents()
             notifyEventDataChanged()
+
+            // 清除相关日期的缓存（可能涉及多个日期）
+            invalidateCache(for: oldEvent.startTime)
+            invalidateCache(for: event.startTime)
         }
     }
     
+    // MARK: - 性能优化：高效的事件查询方法
+
+    /// 获取指定日期的事件（带缓存优化）- 线程安全版本
     func eventsForDate(_ date: Date) -> [PomodoroEvent] {
-        let calendar = Calendar.current
-        return events.filter { event in
+        let key = cacheKey(for: date)
+
+        // 线程安全的缓存检查
+        var cachedEvents: [PomodoroEvent]?
+        cacheQueue.sync { [weak self] in
+            cachedEvents = self?.dateEventsCache[key]
+        }
+
+        // 如果缓存命中，直接返回
+        if let cached = cachedEvents {
+            return cached
+        }
+
+        // 缓存未命中，计算结果
+        let dayEvents = events.filter { event in
             calendar.isDate(event.startTime, inSameDayAs: date)
         }.sorted { $0.startTime < $1.startTime }
+
+        // 异步缓存结果，避免阻塞主线程
+        cacheQueue.async { [weak self] in
+            self?.dateEventsCache[key] = dayEvents
+        }
+
+        return dayEvents
     }
-    
+
+    /// 批量获取多个日期的事件（优化版本）- 线程安全
+    func eventsForDates(_ dates: [Date]) -> [Date: [PomodoroEvent]] {
+        var result: [Date: [PomodoroEvent]] = [:]
+        var uncachedDates: [Date] = []
+
+        // 线程安全的缓存检查
+        cacheQueue.sync { [weak self] in
+            guard let self = self else { return }
+
+            for date in dates {
+                let key = self.cacheKey(for: date)
+                if let cachedEvents = self.dateEventsCache[key] {
+                    result[date] = cachedEvents
+                } else {
+                    uncachedDates.append(date)
+                }
+            }
+        }
+
+        // 对未缓存的日期进行批量处理
+        if !uncachedDates.isEmpty {
+            let batchResult = batchProcessEvents(for: uncachedDates)
+            // 安全合并结果
+            for (date, events) in batchResult {
+                result[date] = events
+            }
+        }
+
+        return result
+    }
+
+    /// 批量处理事件查询（减少重复遍历）- 线程安全版本
+    private func batchProcessEvents(for dates: [Date]) -> [Date: [PomodoroEvent]] {
+        // 确保输入参数有效
+        guard !dates.isEmpty else {
+            return [:]
+        }
+
+        var result: [Date: [PomodoroEvent]] = [:]
+
+        // 初始化结果字典 - 确保每个日期都有一个空数组
+        for date in dates {
+            result[date] = []
+        }
+
+        // 单次遍历所有事件，分配到对应日期
+        for event in events {
+            for date in dates {
+                if calendar.isDate(event.startTime, inSameDayAs: date) {
+                    // 安全地添加事件到对应日期
+                    if result[date] != nil {
+                        result[date]!.append(event)
+                    }
+                    break // 找到匹配日期后跳出内循环
+                }
+            }
+        }
+
+        // 对每个日期的事件进行排序
+        var sortedResult: [Date: [PomodoroEvent]] = [:]
+        for (date, eventList) in result {
+            let sortedEvents = eventList.sorted { $0.startTime < $1.startTime }
+            sortedResult[date] = sortedEvents
+        }
+
+        // 异步缓存结果
+        cacheQueue.async { [weak self] in
+            guard let self = self else { return }
+            for (date, events) in sortedResult {
+                let key = self.cacheKey(for: date)
+                self.dateEventsCache[key] = events
+            }
+        }
+
+        return sortedResult
+    }
+
     func todayEvents() -> [PomodoroEvent] {
         eventsForDate(Date())
     }
-    
+
     func completedPomodorosToday() -> Int {
         todayEvents().filter { $0.type == .pomodoro && $0.isCompleted }.count
     }
-    
+
     func totalFocusTimeToday() -> TimeInterval {
         todayEvents()
             .filter { $0.type == .pomodoro && $0.isCompleted }
             .reduce(0) { $0 + $1.duration }
     }
 
-    /// 搜索事件
+    /// 搜索事件（优化版本）
     /// - Parameter searchText: 搜索关键词
     /// - Returns: 匹配的事件列表，按时间倒序排列
     func searchEvents(_ searchText: String) -> [PomodoroEvent] {
@@ -205,13 +370,47 @@ class EventManager: ObservableObject {
 
         let trimmedText = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        return events.filter { event in
+        // 使用预排序的事件列表提高搜索性能
+        let sortedEvents = getSortedEvents()
+
+        return sortedEvents.filter { event in
             // 搜索标题
             event.title.lowercased().contains(trimmedText) ||
             // 搜索事件类型
             event.type.displayName.lowercased().contains(trimmedText)
         }
-        .sorted { $0.startTime > $1.startTime } // 按时间倒序排列，最新的在前
+        .reversed() // 已经是升序，反转为倒序
+    }
+
+    /// 获取排序后的事件列表（带缓存）
+    private func getSortedEvents() -> [PomodoroEvent] {
+        if let cached = sortedEventsCache {
+            return cached
+        }
+
+        let sorted = events.sorted { $0.startTime < $1.startTime }
+        sortedEventsCache = sorted
+        return sorted
+    }
+
+    /// 获取日期范围内的事件（优化版本）
+    func eventsInDateRange(from startDate: Date, to endDate: Date) -> [PomodoroEvent] {
+        return events.filter { event in
+            event.startTime >= startDate && event.startTime <= endDate
+        }.sorted { $0.startTime < $1.startTime }
+    }
+
+    /// 获取指定类型的事件
+    func events(ofType type: PomodoroEvent.EventType, on date: Date? = nil) -> [PomodoroEvent] {
+        var filtered = events.filter { $0.type == type }
+
+        if let date = date {
+            filtered = filtered.filter { event in
+                calendar.isDate(event.startTime, inSameDayAs: date)
+            }
+        }
+
+        return filtered.sorted { $0.startTime < $1.startTime }
     }
     
     private func addCompletedSession(from notification: Notification) {

@@ -7,6 +7,62 @@
 
 import SwiftUI
 import Foundation
+
+// MARK: - 事件位置缓存管理器
+class EventPositionCache: ObservableObject {
+    private var cache: [String: (y: CGFloat, height: CGFloat)] = [:]
+    private let calendar = Calendar.current
+
+    func getPosition(for event: PomodoroEvent, hourHeight: CGFloat) -> (y: CGFloat, height: CGFloat) {
+        // 缓存键包含时间信息，确保时间更新后缓存失效
+        let startTimeKey = Int(event.startTime.timeIntervalSince1970)
+        let endTimeKey = Int(event.endTime.timeIntervalSince1970)
+        let key = "\(event.id.uuidString)-\(startTimeKey)-\(endTimeKey)-\(Int(hourHeight * 100))"
+
+        if let cached = cache[key] {
+            #if DEBUG
+            // print("🕐 EventPositionCache: \(event.title) [缓存命中] y=\(cached.0), height=\(cached.1)")
+            #endif
+            return cached
+        }
+
+        // 缓存未命中，重新计算
+        let startHour = calendar.component(.hour, from: event.startTime)
+        let startMinute = calendar.component(.minute, from: event.startTime)
+        let endHour = calendar.component(.hour, from: event.endTime)
+        let endMinute = calendar.component(.minute, from: event.endTime)
+        let startY = CGFloat(startHour) * hourHeight + CGFloat(startMinute) * hourHeight / 60
+        let endY = CGFloat(endHour) * hourHeight + CGFloat(endMinute) * hourHeight / 60
+        let height = endY - startY
+        let finalHeight = max(20, height)
+
+        let result = (startY, finalHeight)
+        cache[key] = result
+
+        #if DEBUG
+        print("🕐 EventPositionCache: \(event.title) [缓存未命中]")
+        print("  开始时间: \(event.startTime) -> \(startHour):\(startMinute)")
+        print("  结束时间: \(event.endTime) -> \(endHour):\(endMinute)")
+        print("  hourHeight: \(hourHeight)")
+        print("  startY: \(startY), endY: \(endY), 计算高度: \(height)")
+        print("  最终位置: y=\(startY), height=\(finalHeight)")
+        print("  缓存键: \(key)")
+        #endif
+
+        return result
+    }
+
+    func clearCache() {
+        cache.removeAll()
+        #if DEBUG
+        print("🕐 EventPositionCache: 清除所有缓存")
+        #endif
+    }
+
+    func getCacheStats() -> (count: Int, keys: [String]) {
+        return (cache.count, Array(cache.keys))
+    }
+}
 import Combine
 #if canImport(AppKit)
 import AppKit
@@ -521,6 +577,9 @@ struct CalendarView: View {
     @State private var showingSearchResults = false
     @State private var highlightedEventId: UUID?
 
+    // MARK: - 性能优化：预加载和缓存管理
+    @State private var preloadTask: Task<Void, Never>?
+
     private let calendar = Calendar.current
     
     var body: some View {
@@ -609,6 +668,10 @@ struct CalendarView: View {
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 180)
+                    .onChange(of: currentViewMode) { newMode in
+                        // 视图模式切换时触发预加载
+                        triggerPreloading(for: newMode)
+                    }
 
                 }
             }
@@ -638,6 +701,99 @@ struct CalendarView: View {
                 }
             }
         }
+        .onAppear {
+            // 初始化时触发预加载
+            triggerPreloading(for: currentViewMode)
+        }
+        .onChange(of: selectedDate) { newDate in
+            // 日期切换时触发预加载
+            triggerPreloading(for: currentViewMode, selectedDate: newDate)
+        }
+        .onDisappear {
+            // 清理预加载任务
+            preloadTask?.cancel()
+        }
+    }
+
+    // MARK: - 性能优化：智能预加载机制
+
+    /// 触发预加载
+    private func triggerPreloading(for viewMode: CalendarViewMode, selectedDate: Date? = nil) {
+        // 取消之前的预加载任务
+        preloadTask?.cancel()
+
+        let targetDate = selectedDate ?? self.selectedDate
+
+        preloadTask = Task {
+            await performSmartPreloading(for: viewMode, date: targetDate)
+        }
+    }
+
+    /// 执行智能预加载
+    @MainActor
+    private func performSmartPreloading(for viewMode: CalendarViewMode, date: Date) async {
+        let preloadDates = generatePreloadDates(for: viewMode, around: date)
+
+        // 预热EventManager缓存
+        eventManager.warmupCache(for: preloadDates)
+
+        // 在后台线程预加载数据，避免阻塞UI
+        await Task.detached { [eventManager, activityMonitor] in
+            // 预加载事件数据
+            let _ = eventManager.eventsForDates(preloadDates)
+
+            // 预加载活动监控数据（仅在macOS上）
+            #if canImport(Cocoa)
+            let _ = activityMonitor.getAppUsageStatsForDates(preloadDates)
+            let _ = activityMonitor.getOverviewForDates(preloadDates)
+            #endif
+        }.value
+    }
+
+    /// 生成预加载日期列表
+    private func generatePreloadDates(for viewMode: CalendarViewMode, around date: Date) -> [Date] {
+        var dates: [Date] = []
+
+        switch viewMode {
+        case .day:
+            // 日视图：预加载前后3天
+            for i in -3...3 {
+                if let preloadDate = calendar.date(byAdding: .day, value: i, to: date) {
+                    dates.append(preloadDate)
+                }
+            }
+
+        case .week:
+            // 周视图：预加载当前周和前后各一周
+            for weekOffset in -1...1 {
+                if let weekDate = calendar.date(byAdding: .weekOfYear, value: weekOffset, to: date),
+                   let weekInterval = calendar.dateInterval(of: .weekOfYear, for: weekDate) {
+
+                    for dayOffset in 0..<7 {
+                        if let dayDate = calendar.date(byAdding: .day, value: dayOffset, to: weekInterval.start) {
+                            dates.append(dayDate)
+                        }
+                    }
+                }
+            }
+
+        case .month:
+            // 月视图：预加载当前月和前后各一个月
+            for monthOffset in -1...1 {
+                if let monthDate = calendar.date(byAdding: .month, value: monthOffset, to: date),
+                   let monthInterval = calendar.dateInterval(of: .month, for: monthDate) {
+
+                    let numberOfDays = calendar.range(of: .day, in: .month, for: monthDate)?.count ?? 30
+                    for dayOffset in 0..<numberOfDays {
+                        if let dayDate = calendar.date(byAdding: .day, value: dayOffset, to: monthInterval.start) {
+                            dates.append(dayDate)
+                        }
+                    }
+                }
+            }
+        }
+
+        return dates
     }
 
     // MARK: - 搜索相关方法
@@ -695,6 +851,9 @@ struct DayView: View {
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     private let calendar = Calendar.current
     private let hourHeight: CGFloat = 60
+
+    // 共享的事件位置缓存管理器
+    @StateObject private var sharedPositionCache = EventPositionCache()
     
     var body: some View {
         GeometryReader { geo in
@@ -707,7 +866,8 @@ struct DayView: View {
                     draggedEvent: $draggedEvent,
                     dragOffset: $dragOffset,
                     hourHeight: hourHeight,
-                    highlightedEventId: $highlightedEventId
+                    highlightedEventId: $highlightedEventId,
+                    sharedPositionCache: sharedPositionCache
                 )
                 .environmentObject(eventManager)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -734,6 +894,11 @@ struct DayView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
     }
+
+    // 清除共享位置缓存的辅助方法
+    private func clearPositionCache() {
+        sharedPositionCache.clearCache()
+    }
 }
 
 // MARK: - 时间轴视图
@@ -745,6 +910,7 @@ struct TimelineView: View {
     @Binding var dragOffset: CGSize
     let hourHeight: CGFloat
     @Binding var highlightedEventId: UUID?
+    @ObservedObject var sharedPositionCache: EventPositionCache
 
     @EnvironmentObject var eventManager: EventManager
     @State private var selectionStart: CGPoint?
@@ -754,14 +920,52 @@ struct TimelineView: View {
     private let calendar = Calendar.current
     private let hours = Array(0...23)
     
+    // MARK: - 性能优化：缓存计算属性
+    @State private var cachedEventsForDay: [PomodoroEvent] = []
+    @State private var cachedEventsDate: Date?
+
     private var eventsForDay: [PomodoroEvent] {
-        eventManager.eventsForDate(selectedDate)
+        // 使用缓存避免重复计算
+        if cachedEventsDate != selectedDate {
+            let events = eventManager.eventsForDate(selectedDate)
+            cachedEventsForDay = events
+            cachedEventsDate = selectedDate
+
+            // 调试信息
+            #if DEBUG
+            print("📅 DayView: 加载日期 \(selectedDate) 的事件，找到 \(events.count) 个事件")
+            for event in events {
+                print("  - \(event.title) (\(event.type.displayName)) - 时间: \(event.startTime) 到 \(event.endTime)")
+            }
+            #endif
+        }
+        return cachedEventsForDay
     }
 
     // 性能优化：缓存事件布局信息，避免拖拽时重复计算
+    @State private var cachedEventLayoutInfo: [(event: PomodoroEvent, column: Int, totalColumns: Int)] = []
+    @State private var cachedLayoutEventsHash: Int = 0
+    @State private var cachedLayoutDate: Date?
+
+    // 修复：直接计算布局，暂时禁用有问题的缓存机制
     private var eventLayoutInfo: [(event: PomodoroEvent, column: Int, totalColumns: Int)] {
-        // 只有在事件列表变化时才重新计算布局
-        computeEventColumns(events: eventsForDay)
+        // 直接从数据源获取事件并计算布局
+        let events = eventManager.eventsForDate(selectedDate)
+        let layoutInfo = computeEventColumns(events: events)
+
+        // 调试信息
+        #if DEBUG
+        print("📊 DayView: 直接计算事件布局")
+        print("📊 DayView: 日期: \(selectedDate)")
+        print("📊 DayView: 输入事件数量: \(events.count)")
+        print("📊 DayView: 输出布局信息数量: \(layoutInfo.count)")
+        for (i, info) in layoutInfo.enumerated() {
+            let (event, column, totalColumns) = info
+            print("  事件\(i): \(event.title) - 列\(column)/\(totalColumns)")
+        }
+        #endif
+
+        return layoutInfo
     }
 
     var body: some View {
@@ -804,7 +1008,12 @@ struct TimelineView: View {
                             }
                         }
 
-                    // 事件块（并列排布）- 性能优化，使用动态宽度
+                    // 事件块（并列排布）- 使用正确的缓存机制
+                    // 调试信息
+                    #if DEBUG
+                    let _ = print("🎨 DayView: 准备渲染 \(eventLayoutInfo.count) 个事件块")
+                    #endif
+
                     ForEach(eventLayoutInfo, id: \.0.id) { info in
                         let (event, column, totalColumns) = info
                         EventBlock(
@@ -817,7 +1026,8 @@ struct TimelineView: View {
                             column: column,
                             totalColumns: totalColumns,
                             containerWidth: geometry.size.width-50, // 使用TimelineView本身的宽度
-                            highlightedEventId: $highlightedEventId
+                            highlightedEventId: $highlightedEventId,
+                            positionCache: sharedPositionCache
                         )
                         .id(event.id) // 确保正确的视图标识，提高更新性能
                         .drawingGroup() // 将事件块渲染为单个图层，提高性能
@@ -871,10 +1081,43 @@ struct TimelineView: View {
             }
         }
         }
+        .onAppear {
+            // 视图出现时清除所有缓存，确保数据是最新的
+            clearAllCaches()
+
+            #if DEBUG
+            print("📅 DayView: 视图出现，清除所有缓存")
+            #endif
+        }
+        .onChange(of: selectedDate) { _ in
+            // 日期变化时清除所有缓存
+            clearAllCaches()
+
+            #if DEBUG
+            print("📅 DayView: 日期变化，清除所有缓存")
+            #endif
+        }
+        .onChange(of: eventManager.events.count) { _ in
+            // 事件数量变化时清除所有缓存
+            clearAllCaches()
+
+            #if DEBUG
+            print("📅 DayView: 事件数量变化，清除所有缓存")
+            #endif
+        }
     }
+
+
 
     // --- 新增：事件并列排布算法 ---
     private func computeEventColumns(events: [PomodoroEvent]) -> [(PomodoroEvent, Int, Int)] {
+        #if DEBUG
+        print("🔧 computeEventColumns: 开始计算 \(events.count) 个事件的布局")
+        for (i, event) in events.enumerated() {
+            print("  输入事件\(i): \(event.title) - \(event.startTime) 到 \(event.endTime)")
+        }
+        #endif
+
         // 按开始时间排序
         let sorted = events.sorted { $0.startTime < $1.startTime }
         var result: [(PomodoroEvent, Int, Int)] = []
@@ -913,9 +1156,20 @@ struct TimelineView: View {
             let maxCol = overlapping.map { $0.2 }.max() ?? 1
             eventToMaxCol[event.id] = maxCol
         }
-        return result.map { (event, col, _) in
+
+        let finalResult = result.map { (event, col, _) in
             (event, col, eventToMaxCol[event.id] ?? 1)
         }
+
+        #if DEBUG
+        print("🔧 computeEventColumns: 计算完成，输出 \(finalResult.count) 个布局信息")
+        for (i, info) in finalResult.enumerated() {
+            let (event, column, totalColumns) = info
+            print("  输出事件\(i): \(event.title) - 列\(column)/\(totalColumns)")
+        }
+        #endif
+
+        return finalResult
     }
 
     // 计算事件的视觉边界（考虑最小高度）
@@ -990,10 +1244,36 @@ struct TimelineView: View {
         let height = endY - startY
         return (startY, max(20, height))
     }
+
+    // 清除 TimelineView 缓存的辅助方法
+    private func clearAllCaches() {
+        // 清除事件数据缓存
+        cachedEventsDate = nil
+        cachedEventsForDay = []
+
+        // 清除布局缓存
+        cachedLayoutEventsHash = 0
+        cachedEventLayoutInfo = []
+        cachedLayoutDate = nil
+    }
 }
                 
-// MARK: - 事件块
-struct EventBlock: View {
+// MARK: - 事件块（性能优化版本）
+struct EventBlock: View, Equatable {
+
+    // MARK: - Equatable 实现
+    static func == (lhs: EventBlock, rhs: EventBlock) -> Bool {
+        return lhs.event.id == rhs.event.id &&
+               lhs.event.title == rhs.event.title &&
+               lhs.event.startTime == rhs.event.startTime &&
+               lhs.event.endTime == rhs.event.endTime &&
+               lhs.event.type == rhs.event.type &&
+               lhs.selectedEvent?.id == rhs.selectedEvent?.id &&
+               lhs.draggedEvent?.id == rhs.draggedEvent?.id &&
+               lhs.column == rhs.column &&
+               lhs.totalColumns == rhs.totalColumns &&
+               lhs.highlightedEventId == rhs.highlightedEventId
+    }
     let event: PomodoroEvent
     @Binding var selectedEvent: PomodoroEvent?
     @Binding var draggedEvent: PomodoroEvent?
@@ -1007,7 +1287,8 @@ struct EventBlock: View {
     @EnvironmentObject var eventManager: EventManager
     @State private var showingPopover = false
 
-    // 性能优化：缓存计算结果
+    // 性能优化：使用共享的位置缓存管理器
+    @ObservedObject var positionCache: EventPositionCache
     private let calendar = Calendar.current
     @State private var isDragging = false
     @State private var dragStartOffset: CGSize = .zero
@@ -1017,19 +1298,12 @@ struct EventBlock: View {
     private let dragThreshold: CGFloat = 10.0
     // 更新频率限制（毫秒）- 提高更新频率以改善响应性
     private let updateThrottleMs: TimeInterval = 8.33 // ~120fps
+
     private var eventPosition: (y: CGFloat, height: CGFloat) {
-        let startHour = calendar.component(.hour, from: event.startTime)
-        let startMinute = calendar.component(.minute, from: event.startTime)
-        let endHour = calendar.component(.hour, from: event.endTime)
-        let endMinute = calendar.component(.minute, from: event.endTime)
-        let startY = CGFloat(startHour) * hourHeight + CGFloat(startMinute) * hourHeight / 60
-        let endY = CGFloat(endHour) * hourHeight + CGFloat(endMinute) * hourHeight / 60
-        let height = endY - startY
-        return (startY, max(20, height))
+        // 使用新的缓存管理器
+        return positionCache.getPosition(for: event, hourHeight: hourHeight)
     }
     var body: some View {
-        let position = eventPosition
-
         // 动态计算宽度：使用容器宽度而不是固定值
         let leftPadding: CGFloat = 60 // 时间标签区域宽度
         let rightPadding: CGFloat = 20 // 右侧留白
@@ -1038,6 +1312,14 @@ struct EventBlock: View {
         let totalGapWidth = gap * CGFloat(totalColumns - 1)
         let width = (availableWidth - totalGapWidth) / CGFloat(totalColumns)
         let x = leftPadding + CGFloat(column) * (width + gap)
+
+        // 直接获取位置信息
+        let position = eventPosition
+
+        // 调试信息
+        #if DEBUG
+        let _ = print("🎯 EventBlock: \(event.title) - 位置: x=\(x), y=\(position.y), 宽度=\(width), 高度=\(position.height), 容器宽度=\(containerWidth)")
+        #endif
         HStack(alignment: .top, spacing: 0) {
             // 左侧深色border - 与右侧内容区域高度保持一致
             Rectangle()
@@ -1066,7 +1348,7 @@ struct EventBlock: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .frame(width: width, height: max(20, position.height))
-        .position(x: x + width / 2, y: position.y + position.height / 2)
+        .position(x: x + width / 2, y: position.y + max(20, position.height) / 2)
         .offset(draggedEvent?.id == event.id ? dragOffset : .zero)
         .scaleEffect(highlightedEventId == event.id ? 1.1 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: selectedEvent?.id == event.id)
@@ -1111,6 +1393,19 @@ struct EventBlock: View {
                         handleDragEnded(value)
                     }
             )
+            .onAppear {
+                // 视图出现时，缓存会自动按需计算，无需特殊处理
+                #if DEBUG
+                let stats = positionCache.getCacheStats()
+                print("🕐 EventBlock onAppear: \(event.title), 缓存统计: \(stats.count) 项")
+                #endif
+            }
+            .onChange(of: hourHeight) { _ in
+                // hourHeight 变化时，旧缓存会自动失效（因为缓存键包含 hourHeight）
+                #if DEBUG
+                print("🕐 EventBlock: \(event.title) hourHeight 变化，缓存将自动更新")
+                #endif
+            }
     }
 
     // MARK: - 性能优化的拖拽处理
@@ -1334,23 +1629,15 @@ struct MiniCalendarView: View {
         }
     }
 
-    /// 执行迷你日历数据加载
+    /// 执行迷你日历数据加载（优化版本）
     @MainActor
     private func performMiniCalendarDataLoading() async {
         let monthDates = monthDays
 
-        // 在后台线程执行数据查询
+        // 在后台线程执行数据查询，使用批量查询优化
         let eventsCache = await Task.detached { [eventManager] in
-            await MainActor.run {
-                var tempCache: [Date: [PomodoroEvent]] = [:]
-
-                for date in monthDates {
-                    let dayEvents = eventManager.eventsForDate(date)
-                    tempCache[date] = dayEvents
-                }
-
-                return tempCache
-            }
+            // 使用EventManager的批量查询方法
+            return eventManager.eventsForDates(monthDates)
         }.value
 
         // 检查任务是否被取消
@@ -1661,27 +1948,25 @@ struct DayStatsPanel: View {
     private func performDayStatsLoading() async {
         // 在后台线程执行数据查询
         let (stats, apps) = await Task.detached { [eventManager, activityMonitor, selectedDate] in
-            await MainActor.run {
-                // 计算当日统计
-                let dayEvents = eventManager.eventsForDate(selectedDate)
+            // 计算当日统计
+            let dayEvents = eventManager.eventsForDate(selectedDate)
 
-                var totalActiveTime: TimeInterval = 0
-                for event in dayEvents {
-                    if event.type == .pomodoro || event.type == .countUp || event.type == .custom {
-                        totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
-                    }
+            var totalActiveTime: TimeInterval = 0
+            for event in dayEvents {
+                if event.type == .pomodoro || event.type == .countUp || event.type == .custom {
+                    totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
                 }
-
-                let pomodoroSessions = dayEvents.filter { $0.type == .pomodoro }.count
-                let overview = activityMonitor.getOverview(for: selectedDate)
-                let appSwitches = overview.appSwitches
-
-                // 获取热门应用
-                let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
-                let topApps = Array(appStats.prefix(5))
-
-                return ((totalActiveTime, pomodoroSessions, appSwitches), topApps)
             }
+
+            let pomodoroSessions = dayEvents.filter { $0.type == .pomodoro }.count
+            let overview = activityMonitor.getOverview(for: selectedDate)
+            let appSwitches = overview.appSwitches
+
+            // 获取热门应用
+            let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
+            let topApps = Array(appStats.prefix(5))
+
+            return ((totalActiveTime, pomodoroSessions, appSwitches), topApps)
         }.value
 
         // 检查任务是否被取消
@@ -2137,7 +2422,7 @@ struct WeekView: View {
         }
     }
 
-    // 事件并列排布算法（使用视觉边界检测）
+    // WeekView 的事件并列排布算法
     private func computeEventColumns(events: [PomodoroEvent]) -> [(PomodoroEvent, Int, Int)] {
         // 按开始时间排序
         let sorted = events.sorted { $0.startTime < $1.startTime }
@@ -2182,7 +2467,7 @@ struct WeekView: View {
         }
     }
 
-    // 计算事件的视觉边界（考虑最小高度）- 周视图版本
+    // 计算事件的视觉边界（考虑最小高度）- WeekView 版本
     private func getEventVisualBounds(_ event: PomodoroEvent) -> (minY: CGFloat, maxY: CGFloat) {
         let startHour = calendar.component(.hour, from: event.startTime)
         let startMinute = calendar.component(.minute, from: event.startTime)
@@ -2432,27 +2717,39 @@ struct MonthView: View {
         !calendar.isDate(displayMonth, equalTo: dataMonth, toGranularity: .month) || isLoadingData
     }
 
-    // 获取当前月的所有日期（包括前后月份的日期以填满6周）
+    // 获取当前月的所有日期（包括前后月份的日期以填满6周）- 安全版本
     private var monthDays: [Date] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: displayMonth) else {
+        // 安全检查显示月份
+        guard displayMonth.timeIntervalSince1970 > 0,
+              let monthInterval = calendar.dateInterval(of: .month, for: displayMonth) else {
+            print("⚠️ MonthView: 无效的显示月份，返回空日期数组")
             return []
         }
 
         let firstOfMonth = monthInterval.start
         let firstWeekday = calendar.component(.weekday, from: firstOfMonth)
-        let daysToSubtract = (firstWeekday - 1) % 7
+        let daysToSubtract = max(0, (firstWeekday - 1) % 7) // 确保非负数
 
         guard let startDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: firstOfMonth) else {
+            print("⚠️ MonthView: 无法计算月份开始日期")
             return []
         }
 
         var days: [Date] = []
         for i in 0..<42 { // 6周 × 7天
             if let day = calendar.date(byAdding: .day, value: i, to: startDate) {
-                days.append(day)
+                // 额外验证生成的日期是否有效
+                if day.timeIntervalSince1970 > 0 {
+                    days.append(day)
+                } else {
+                    print("⚠️ MonthView: 生成了无效日期，跳过")
+                }
+            } else {
+                print("⚠️ MonthView: 无法生成第 \(i) 天的日期")
             }
         }
 
+        print("📅 MonthView: 成功生成 \(days.count) 个日期")
         return days
     }
 
@@ -2782,7 +3079,7 @@ struct MonthView: View {
         var totalProductivity: Double = 0
 
         for date in monthDates {
-            let dayEvents = eventManager.eventsForDate(selectedDate)
+            let dayEvents = eventManager.eventsForDate(date)
             let appStats = activityMonitor.getAppUsageStats(for: date)
 
             if !dayEvents.isEmpty || !appStats.isEmpty {
@@ -2938,74 +3235,21 @@ struct MonthView: View {
         }
     }
 
-    /// 批量加载事件数据 - 优化版本
+    /// 批量加载事件数据 - 优化版本（使用EventManager的批量查询）
     private func loadEventsData(for dates: [Date]) async -> [Date: [PomodoroEvent]] {
-        // 在后台线程执行数据过滤，避免阻塞主线程
+        // 在后台线程执行数据查询，使用EventManager的优化批量查询
         return await Task.detached { [eventManager] in
-            await MainActor.run {
-                let allEvents = eventManager.events
-                let calendar = Calendar.current
-
-                // 优化算法：先按日期范围过滤，再分组
-                let monthStart = dates.first ?? Date()
-                let monthEnd = dates.last ?? Date()
-
-                // 预过滤：只获取月份范围内的事件
-                let monthEvents = allEvents.filter { event in
-                    event.startTime >= monthStart && event.startTime <= monthEnd
-                }
-
-                // 使用更高效的分组算法
-                var tempCache: [Date: [PomodoroEvent]] = [:]
-
-                // 为每个日期初始化空数组
-                for date in dates {
-                    tempCache[date] = []
-                }
-
-                // 批量分组事件到对应日期
-                for event in monthEvents {
-                    for date in dates {
-                        if calendar.isDate(event.startTime, inSameDayAs: date) {
-                            tempCache[date]?.append(event)
-                            break // 找到匹配日期后跳出内循环
-                        }
-                    }
-                }
-
-                // 对每日事件进行排序
-                for date in dates {
-                    tempCache[date]?.sort { $0.startTime < $1.startTime }
-                }
-
-                return tempCache
-            }
+            // 使用EventManager的批量查询方法，利用其内置缓存
+            return eventManager.eventsForDates(dates)
         }.value
     }
 
-    /// 批量加载活动数据 - 优化版本
+    /// 批量加载活动数据 - 优化版本（使用批量查询）
     private func loadActivityData(for dates: [Date]) async -> [Date: [AppUsageStats]] {
-        // 在后台线程执行数据查询
+        // 在后台线程执行数据查询，使用ActivityMonitorManager的批量查询
         return await Task.detached { [activityMonitor] in
-            var tempCache: [Date: [AppUsageStats]] = [:]
-
-            // 并发加载活动数据以提高性能
-            await withTaskGroup(of: (Date, [AppUsageStats]).self) { group in
-                for date in dates {
-                    group.addTask {
-                        await MainActor.run {
-                            let stats = activityMonitor.getAppUsageStats(for: date)
-                            return (date, stats)
-                        }
-                    }
-                }
-
-                for await (date, stats) in group {
-                    tempCache[date] = stats
-                }
-            }
-
-            return tempCache
+            // 使用ActivityMonitorManager的批量查询方法
+            return activityMonitor.getAppUsageStatsForDates(dates)
         }.value
     }
 
@@ -3017,7 +3261,7 @@ struct MonthView: View {
         guard !preloadedMonths.contains(currentMonthKey) else { return }
 
         // 标记当前月份为已预加载
-        await MainActor.run {
+        _ = await MainActor.run {
             preloadedMonths.insert(currentMonthKey)
         }
 
@@ -3083,40 +3327,42 @@ struct MonthView: View {
         }
     }
 
-    /// 执行月度统计数据加载
+    /// 执行月度统计数据加载（优化版本）
     @MainActor
     private func performMonthStatsLoading() async {
+        // 先在主线程获取月份日期
+        let monthDates = getMonthDates(for: displayMonth)
+
         // 在后台线程执行数据查询
-        let stats = await Task.detached { [eventManager, activityMonitor, displayMonth] in
-            await MainActor.run {
-                let monthDates = getMonthDates(for: displayMonth)
+        let stats = await Task.detached { [eventManager, activityMonitor] in
+            // 使用批量查询优化事件数据获取
+            let monthEventsData = eventManager.eventsForDates(monthDates)
 
-                var activeDays = 0
-                var totalActiveTime: TimeInterval = 0
-                var pomodoroSessions = 0
-                var totalProductivity: Double = 0
+            var activeDays = 0
+            var totalActiveTime: TimeInterval = 0
+            var pomodoroSessions = 0
+            var totalProductivity: Double = 0
 
-                for date in monthDates {
-                    let dayEvents = eventManager.eventsForDate(date)
-                    let appStats = activityMonitor.getAppUsageStats(for: date)
+            for date in monthDates {
+                let dayEvents = monthEventsData[date] ?? []
+                let appStats = activityMonitor.getAppUsageStats(for: date)
 
-                    if !dayEvents.isEmpty || !appStats.isEmpty {
-                        activeDays += 1
-                    }
-
-                    let overview = activityMonitor.getOverview(for: date)
-                    totalActiveTime += overview.activeTime
-
-                    pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count
-
-                    let productivity = activityMonitor.getProductivityAnalysis(for: date)
-                    totalProductivity += productivity.productivityScore
+                if !dayEvents.isEmpty || !appStats.isEmpty {
+                    activeDays += 1
                 }
 
-                let avgProductivity = activeDays > 0 ? totalProductivity / Double(activeDays) : 0
+                let overview = activityMonitor.getOverview(for: date)
+                totalActiveTime += overview.activeTime
 
-                return (activeDays, totalActiveTime, pomodoroSessions, avgProductivity)
+                pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count
+
+                let productivity = activityMonitor.getProductivityAnalysis(for: date)
+                totalProductivity += productivity.productivityScore
             }
+
+            let avgProductivity = activeDays > 0 ? totalProductivity / Double(activeDays) : 0
+
+            return (activeDays, totalActiveTime, pomodoroSessions, avgProductivity)
         }.value
 
         // 检查任务是否被取消
@@ -3148,7 +3394,7 @@ struct MonthView: View {
     }
 }
 
-// MARK: - 月视图日期单元格
+// MARK: - 月视图日期单元格（性能优化版本）
 struct MonthDayCell: View {
     let date: Date
     @Binding var selectedDate: Date
@@ -3161,16 +3407,26 @@ struct MonthDayCell: View {
 
     private let calendar = Calendar.current
 
+    // 性能优化：缓存计算属性（移除日期数字缓存，避免视图复用问题）
+    @State private var cachedMaxVisibleEvents: Int?
+    @State private var cachedCellHeight: CGFloat?
+
     private var isSelected: Bool {
-        calendar.isDate(date, inSameDayAs: selectedDate)
+        // 安全检查，避免日期比较时的潜在问题
+        guard date.timeIntervalSince1970 > 0 else { return false }
+        return calendar.isDate(date, inSameDayAs: selectedDate)
     }
 
     private var isCurrentMonth: Bool {
-        calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
+        // 安全检查，避免日期比较时的潜在问题
+        guard date.timeIntervalSince1970 > 0 else { return false }
+        return calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
     }
 
     private var isToday: Bool {
-        calendar.isDateInToday(date)
+        // 安全检查，避免日期比较时的潜在问题
+        guard date.timeIntervalSince1970 > 0 else { return false }
+        return calendar.isDateInToday(date)
     }
 
     private var hasEvents: Bool {
@@ -3182,27 +3438,51 @@ struct MonthDayCell: View {
     }
 
     private var dayNumber: String {
-        "\(calendar.component(.day, from: date))"
+        // 直接计算日期数字，避免缓存导致的视图复用问题
+        let dayComponent = calendar.component(.day, from: date)
+
+        // 调试信息
+        #if DEBUG
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        print("🗓️ MonthDayCell: 日期 \(formatter.string(from: date)) -> 日期数字: \(dayComponent)")
+        #endif
+
+        return "\(dayComponent)"
     }
 
-    // 根据单元格高度动态计算可显示的事件数量
+    // 根据单元格高度动态计算可显示的事件数量（性能优化版本）- 安全版本
     private var maxVisibleEvents: Int {
-        // 预留空间：日期数字区域(~20pt) + 顶部padding(2pt) + 底部padding(2pt) + Spacer
-        // 每个事件行大约需要 14pt (字体10pt + padding 4pt)
-        // "还有X项"指示器大约需要 12pt
-        let reservedSpace: CGFloat = 26 // 日期数字和padding
-        let eventRowHeight: CGFloat = 16 // 增加事件行高度以适应更大字体
-        let moreIndicatorHeight: CGFloat = 14
+        // 使用缓存避免重复计算
+        if cachedCellHeight != cellHeight || cachedMaxVisibleEvents == nil {
+            // 安全检查单元格高度
+            guard cellHeight > 0 else {
+                cachedMaxVisibleEvents = 1
+                cachedCellHeight = cellHeight
+                return 1
+            }
 
-        let availableForEvents = cellHeight - reservedSpace
+            // 预留空间：日期数字区域(~20pt) + 顶部padding(2pt) + 底部padding(2pt) + Spacer
+            // 每个事件行大约需要 14pt (字体10pt + padding 4pt)
+            // "还有X项"指示器大约需要 12pt
+            let reservedSpace: CGFloat = 26 // 日期数字和padding
+            let eventRowHeight: CGFloat = 16 // 增加事件行高度以适应更大字体
+            let moreIndicatorHeight: CGFloat = 14
 
-        if events.count <= 1 {
-            return max(1, Int(availableForEvents / eventRowHeight))
-        } else {
-            // 如果有多个事件，需要为"还有X项"指示器预留空间
-            let spaceForEventsAndIndicator = availableForEvents - moreIndicatorHeight
-            return max(1, Int(spaceForEventsAndIndicator / eventRowHeight))
+            let availableForEvents = max(0, cellHeight - reservedSpace)
+
+            if events.count <= 1 {
+                cachedMaxVisibleEvents = max(1, Int(availableForEvents / eventRowHeight))
+            } else {
+                // 如果有多个事件，需要为"还有X项"指示器预留空间
+                let spaceForEventsAndIndicator = max(0, availableForEvents - moreIndicatorHeight)
+                cachedMaxVisibleEvents = max(1, Int(spaceForEventsAndIndicator / eventRowHeight))
+            }
+
+            cachedCellHeight = cellHeight
         }
+
+        return cachedMaxVisibleEvents ?? 1 // 提供默认值，避免强制解包崩溃
     }
 
     var body: some View {

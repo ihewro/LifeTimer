@@ -603,7 +603,7 @@ extension ActivityMonitorManager {
         #endif
     }
 
-    /// 获取生产力分析
+    /// 获取生产力分析（优化版本）
     func getProductivityAnalysis(for date: Date = Date()) -> ProductivityAnalysis {
         #if canImport(Cocoa)
         let appStats = getAppUsageStats(for: date)
@@ -642,6 +642,40 @@ extension ActivityMonitorManager {
             topProductiveApp: "iOS应用",
             totalWebsiteVisits: 10
         )
+        #endif
+    }
+
+    // MARK: - 批量查询优化方法
+
+    /// 批量获取多个日期的概览统计
+    func getOverviewForDates(_ dates: [Date]) -> [Date: (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int)] {
+        #if canImport(Cocoa)
+        return eventStore.getOverviewForDates(dates)
+        #else
+        // iOS 版本返回模拟数据
+        var result: [Date: (activeTime: TimeInterval, appSwitches: Int, websiteVisits: Int)] = [:]
+        for date in dates {
+            result[date] = (activeTime: 3600, appSwitches: 10, websiteVisits: 5)
+        }
+        return result
+        #endif
+    }
+
+    /// 批量获取多个日期的应用使用统计（优化版本）
+    func getAppUsageStatsForDates(_ dates: [Date]) -> [Date: [AppUsageStats]] {
+        #if canImport(Cocoa)
+        // 使用 SystemEventStore 的批量查询方法，避免频繁的单独调用
+        return eventStore.getAppUsageStatsForDates(dates)
+        #else
+        // iOS 版本返回模拟数据
+        var result: [Date: [AppUsageStats]] = [:]
+        for date in dates {
+            result[date] = [
+                AppUsageStats(appName: "iOS应用1", totalTime: 3600, activationCount: 5, lastUsed: date),
+                AppUsageStats(appName: "iOS应用2", totalTime: 1800, activationCount: 3, lastUsed: date)
+            ]
+        }
+        return result
         #endif
     }
 
