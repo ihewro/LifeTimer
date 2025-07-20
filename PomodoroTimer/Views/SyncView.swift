@@ -75,7 +75,7 @@ struct SyncView: View {
                 }
             }
         } message: {
-            Text("解绑设备后，您需要重新登录才能继续使用同步功能。此操作不可撤销，确定要继续吗？")
+            Text("解绑设备后，您需要重新绑定或者注册新账号才能继续使用同步功能。此操作不可撤销，确定要继续吗？")
         }
         .alert("解绑失败", isPresented: .constant(unbindError != nil)) {
             Button("确定") {
@@ -85,6 +85,22 @@ struct SyncView: View {
             if let error = unbindError {
                 Text(error)
             }
+        }
+        .alert("认证失败", isPresented: $syncManager.authenticationFailureDetected) {
+            Button("重新登录") {
+                Task {
+                    await handleAuthenticationFailure()
+                }
+            }
+            Button("取消", role: .cancel) {
+                // 重置认证失败标志
+                syncManager.authenticationFailureDetected = false
+                syncManager.authenticationFailureMessage = ""
+            }
+        } message: {
+            Text(syncManager.authenticationFailureMessage.isEmpty ?
+                 "检测到认证失效，需要重新登录以继续使用同步功能。" :
+                 syncManager.authenticationFailureMessage)
         }
     }
 
@@ -1057,9 +1073,9 @@ struct SyncView: View {
                 // 服务端数据最后时间戳
                 if let serverData = syncManager.serverData {
                     let serverTimestamp = Int64(serverData.lastUpdated.timeIntervalSince1970 * 1000)
-                    debugInfoRow("服务端数据最后时间戳1", formatTimestampWithDate(serverTimestamp))
+                    debugInfoRow("服务端数据最后时间戳（来源完整数据）", formatTimestampWithDate(serverTimestamp))
                 } else if let serverSummary = syncManager.serverDataSummary {
-                    debugInfoRow("服务端数据最后时间戳2", formatTimestampWithDate(serverSummary.serverTimestamp))
+                    debugInfoRow("服务端数据最后时间戳（来源摘要数据）", formatTimestampWithDate(serverSummary.serverTimestamp))
                 }
 
                 // 删除记录统计
@@ -2574,6 +2590,38 @@ extension SyncView {
         }
 
         isUnbinding = false
+    }
+
+    /// 处理认证失败，执行自动登出流程
+    private func handleAuthenticationFailure() async {
+        print("🔐 开始处理认证失败，执行自动登出流程")
+
+        // 1. 清除认证失败标志
+        syncManager.authenticationFailureDetected = false
+        syncManager.authenticationFailureMessage = ""
+
+        // 2. 执行登出操作，清除本地认证数据
+        await authManager.logout()
+
+        // 3. 重置同步状态
+        await MainActor.run {
+            syncManager.syncStatus = .idle
+            syncManager.lastSyncTime = nil
+            syncManager.pendingSyncCount = 0
+            syncManager.serverData = nil
+            syncManager.serverDataSummary = nil
+            syncManager.serverIncrementalChanges = nil
+            syncManager.syncWorkspace = nil
+            syncManager.lastSyncRecord = nil
+            syncManager.serverConnectionStatus = "未连接"
+            syncManager.lastServerResponseStatus = "未知"
+            syncManager.lastServerResponseTime = nil
+        }
+
+        print("🔐 自动登出完成，用户界面将切换到未认证状态")
+
+        // 4. 显示提示信息（可选）
+        // 由于UI会自动切换到未认证状态，这里不需要额外的提示
     }
 }
 

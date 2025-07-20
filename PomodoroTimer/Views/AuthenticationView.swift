@@ -50,7 +50,7 @@ struct AuthenticationView: View {
             Spacer()
         }
         .padding()
-        .frame(maxWidth: 500)
+        .frame(maxWidth: 500, minHeight: 600) // 确保最小高度，保证关闭按钮可见
         .onAppear {
             loadServerURL()
         }
@@ -99,14 +99,16 @@ struct AuthenticationView: View {
                     .font(.headline)
                 Spacer()
 
-                Button(action: {
-                    showingServerConfig.toggle()
-                }) {
-                    Image(systemName: showingServerConfig ? "chevron.up" : "chevron.down")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
+                Image(systemName: showingServerConfig ? "chevron.up" : "chevron.down")
+                    .foregroundColor(.secondary)
             }
+            .contentShape(Rectangle()) // 让整个HStack区域都可以点击
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showingServerConfig.toggle()
+                }
+            }
+            .help("点击展开或收起服务器配置")
 
             if showingServerConfig {
                 VStack(spacing: 8) {
@@ -118,7 +120,7 @@ struct AuthenticationView: View {
                     }
 
                     HStack {
-                        TextField("http://localhost:8080", text: $serverURL)
+                        TextField("", text: $serverURL)
                             .textFieldStyle(.roundedBorder)
                             .font(.monospaced(.body)())
 
@@ -210,31 +212,60 @@ struct AuthenticationView: View {
     
     private var authActionsSection: some View {
         VStack(spacing: 16) {
-            Button(action: {
-                Task {
-                    await initializeAsNewUser()
+            // 主要登录选项
+            VStack(spacing: 8) {
+                Button(action: {
+                    Task {
+                        await initializeDevice()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "iphone.and.arrow.forward")
+                        Text("使用此设备登录")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-            }) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("作为新用户开始")
-                }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .disabled(authManager.authStatus == .authenticating)
+
+                Text("首次使用将创建新账户，已注册设备将自动登录")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(authManager.authStatus == .authenticating)
-            
-            Button(action: {
-                showingUserUUIDInput = true
-            }) {
-                HStack {
-                    Image(systemName: "link.circle.fill")
-                    Text("绑定到现有账户")
-                }
-                .frame(maxWidth: .infinity)
+
+            // 分隔线
+            HStack {
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(.secondary.opacity(0.3))
+                Text("或")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(.secondary.opacity(0.3))
             }
-            .buttonStyle(.bordered)
-            .disabled(authManager.authStatus == .authenticating)
+
+            // 绑定选项
+            VStack(spacing: 8) {
+                Button(action: {
+                    showingUserUUIDInput = true
+                }) {
+                    HStack {
+                        Image(systemName: "link.circle.fill")
+                        Text("绑定到现有账户")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(authManager.authStatus == .authenticating)
+
+                Text("如果您在其他设备上已有账户，可以输入用户ID进行绑定")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             
             if authManager.authStatus == .tokenExpired {
                 Button(action: {
@@ -286,7 +317,7 @@ struct AuthenticationView: View {
     
 
     
-    private func initializeAsNewUser() async {
+    private func initializeDevice() async {
         do {
             _ = try await authManager.initializeDevice()
         } catch {

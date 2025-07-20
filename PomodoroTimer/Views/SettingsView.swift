@@ -126,9 +126,9 @@ struct SettingsView: View {
             // 左侧：设置标签 Picker
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $selectedTab) {
-                    Label("计时", systemImage: "timer").tag(0)
-                    Label("活动", systemImage: "chart.bar").tag(1)
-                    Label("关于", systemImage: "info.circle").tag(2)
+                    Text("计时").tag(0)
+                    Text("活动").tag(1)
+                    Text("关于").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 300)
@@ -406,38 +406,38 @@ struct SettingsView: View {
                     .padding(.horizontal, 20)
                 }
 
-                // 统计信息
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("统计信息")
-                        .font(.headline)
-                        .padding(.horizontal, 20)
+                // // 统计信息
+                // VStack(alignment: .leading, spacing: 12) {
+                //     Text("统计信息")
+                //         .font(.headline)
+                //         .padding(.horizontal, 20)
 
-                    VStack(spacing: 12) {
-                        StatisticRow(
-                            title: "今日完成番茄",
-                            value: "\(eventManager.completedPomodorosToday())个"
-                        )
-                        .padding(.horizontal, 20)
+                //     VStack(spacing: 12) {
+                //         StatisticRow(
+                //             title: "今日完成番茄",
+                //             value: "\(eventManager.completedPomodorosToday())个"
+                //         )
+                //         .padding(.horizontal, 20)
 
-                        StatisticRow(
-                            title: "今日专注时间",
-                            value: formatTotalTime(eventManager.totalFocusTimeToday())
-                        )
-                        .padding(.horizontal, 20)
+                //         StatisticRow(
+                //             title: "今日专注时间",
+                //             value: formatTotalTime(eventManager.totalFocusTimeToday())
+                //         )
+                //         .padding(.horizontal, 20)
 
-                        Button("查看详细统计") {
-                            rightSidebarContent = .statistics
-                            showingRightSidebar = true
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(.accentColor)
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.vertical, 12)
-                    .background(Color.systemBackground)
-                    .cornerRadius(8)
-                    .padding(.horizontal, 20)
-                }
+                //         // Button("查看详细统计") {
+                //         //     rightSidebarContent = .statistics
+                //         //     showingRightSidebar = true
+                //         // }
+                //         // .buttonStyle(.borderless)
+                //         // .foregroundColor(.accentColor)
+                //         // .padding(.horizontal, 20)
+                //     }
+                //     .padding(.vertical, 12)
+                //     .background(Color.systemBackground)
+                //     .cornerRadius(8)
+                //     .padding(.horizontal, 20)
+                // }
 
                 // 数据存储
                 VStack(alignment: .leading, spacing: 12) {
@@ -522,110 +522,6 @@ struct SettingsView: View {
         }
     }
 
-    private var audioSettingsView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("音频设置")
-                        .font(.headline)
-                        .padding(.horizontal, 20)
-
-                    VStack(spacing: 16) {
-                        // BGM文件夹路径
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("BGM文件夹")
-                                Spacer()
-                                Button("选择") {
-                                    audioManager.selectBGMFolder()
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-
-                            if !audioManager.bgmFolderPath.isEmpty {
-                                Text(audioManager.bgmFolderPath)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // 音量控制
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("音量")
-                                Spacer()
-                                Text("\(Int(audioManager.volume * 100))%")
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Slider(
-                                value: Binding(
-                                    get: { audioManager.volume },
-                                    set: { audioManager.setVolume($0) }
-                                ),
-                                in: 0...1
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        // 音乐列表
-                        if !audioManager.tracks.isEmpty {
-                            NavigationLink("音乐列表 (\(audioManager.tracks.count)首)") {
-                                MusicListView()
-                                    .environmentObject(audioManager)
-                            }
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                    .padding(.vertical, 12)
-                    .background(Color.systemBackground)
-                    .cornerRadius(8)
-                    .padding(.horizontal, 20)
-                }
-            }
-            .padding(.vertical, 20)
-        }
-    }
-
-    private var statisticsView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("统计信息")
-                        .font(.headline)
-                        .padding(.horizontal, 20)
-
-                    VStack(spacing: 12) {
-                        StatisticRow(
-                            title: "今日完成番茄",
-                            value: "\(eventManager.completedPomodorosToday())个"
-                        )
-                        .padding(.horizontal, 20)
-
-                        StatisticRow(
-                            title: "今日专注时间",
-                            value: formatTotalTime(eventManager.totalFocusTimeToday())
-                        )
-                        .padding(.horizontal, 20)
-
-//                        NavigationLink("查看详细统计") {
-//                            StatisticsView()
-//                                .environmentObject(eventManager)
-//                        }
-//                        .padding(.horizontal, 20)
-                    }
-                    .padding(.vertical, 12)
-                    .background(Color.systemBackground)
-                    .cornerRadius(8)
-                    .padding(.horizontal, 20)
-                }
-            }
-            .padding(.vertical, 20)
-        }
-    }
 
     private var aboutView: some View {
         ScrollView {
@@ -649,9 +545,9 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        Button("重置数据") {
-                            // 重置所有数据
-                        }
+                        // Button("重置数据") {
+                        //     // 重置所有数据
+                        // }
                         .foregroundColor(.red)
                         .padding(.horizontal, 20)
                     }

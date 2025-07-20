@@ -16,8 +16,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1003"
             endingLineNumber = "1003"
-            landmarkName = "applyFullServerData(_:mode:)"
-            landmarkType = "7">
+            landmarkName = "SyncManager"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -32,8 +32,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1214"
             endingLineNumber = "1214"
-            landmarkName = "SyncManager"
-            landmarkType = "3">
+            landmarkName = "smartMergeServerData(_:into:)"
+            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -48,7 +48,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1404"
             endingLineNumber = "1404"
-            landmarkName = "loadFullServerData()"
+            landmarkName = "loadServerChangesPreview()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -80,7 +80,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1414"
             endingLineNumber = "1414"
-            landmarkName = "loadLocalDataPreview()"
+            landmarkName = "loadServerChangesPreview()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

@@ -154,6 +154,10 @@ class SyncManager: ObservableObject {
     @Published var lastServerResponseTime: Date? = nil
     @Published var serverConnectionStatus: String = "未连接"
 
+    // 认证失败通知
+    @Published var authenticationFailureDetected: Bool = false
+    @Published var authenticationFailureMessage: String = ""
+
     // 数据预览缓存
     private var serverDataSummaryCache: ServerDataSummary? = nil
     private var summaryCache: (summary: ServerDataSummary, timestamp: Date)? = nil
@@ -320,7 +324,70 @@ class SyncManager: ObservableObject {
         }
     }
 
+    /// 处理认证错误，检测是否需要自动登出
+    private func handleAuthenticationError(_ error: Error) async {
+        var shouldTriggerLogout = false
+        var errorMessage = ""
 
+        // 检查不同类型的认证错误
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .httpError(let statusCode):
+                if statusCode == 401 {
+                    shouldTriggerLogout = true
+                    errorMessage = "认证已过期，需要重新登录"
+                    print("🔐 检测到401错误，触发自动登出")
+                }
+            case .serverError(let message):
+                if message.contains("Authentication required") ||
+                   message.contains("认证失败") ||
+                   message.contains("Token expired") ||
+                   message.contains("Invalid token") {
+                    shouldTriggerLogout = true
+                    errorMessage = "认证失败：\(message)"
+                    print("🔐 检测到认证相关服务器错误，触发自动登出: \(message)")
+                }
+            default:
+                break
+            }
+        } else if let syncError = error as? SyncError {
+            switch syncError {
+            case .notAuthenticated, .tokenExpired:
+                shouldTriggerLogout = true
+                errorMessage = syncError.localizedDescription
+                print("🔐 检测到同步认证错误，触发自动登出: \(syncError)")
+            default:
+                break
+            }
+        } else if let authError = error as? AuthError {
+            switch authError {
+            case .tokenRefreshFailed, .notAuthenticated:
+                shouldTriggerLogout = true
+                errorMessage = authError.localizedDescription
+                print("🔐 检测到认证管理器错误，触发自动登出: \(authError)")
+            default:
+                break
+            }
+        }
+
+        // 如果需要触发登出，更新状态
+        if shouldTriggerLogout {
+            let finalErrorMessage = errorMessage // 在进入MainActor之前保存值
+            await MainActor.run {
+                self.authenticationFailureDetected = true
+                self.authenticationFailureMessage = finalErrorMessage
+                print("🔐 设置认证失败标志，等待UI处理自动登出")
+            }
+        }
+    }
+
+    /// 重置认证失败标志
+    func resetAuthenticationFailureFlag() {
+        DispatchQueue.main.async {
+            self.authenticationFailureDetected = false
+            self.authenticationFailureMessage = ""
+        }
+    }
 
     /// 获取设备名称
     private func getDeviceName() -> String {
@@ -445,7 +512,13 @@ class SyncManager: ObservableObject {
     private func performSyncInternal(mode: SyncMode) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int, syncDetails: SyncDetails?) {
         // 如果有认证管理器，确保用户已认证
         if authManager != nil {
-            try await ensureAuthenticated()
+            do {
+                try await ensureAuthenticated()
+            } catch {
+                // 检查是否是认证相关错误，如果是则触发自动登出
+                await handleAuthenticationError(error)
+                throw error
+            }
         }
 
         guard let authManager = authManager,
@@ -492,13 +565,20 @@ class SyncManager: ObservableObject {
               let token = authManager.sessionToken else {
             throw SyncError.notAuthenticated
         }
-        let response = try await apiClient.fullSync(token: token)
 
-        // 收集下载的详情
-        collectDownloadDetails(from: response.data, to: &detailsCollector)
+        do {
+            let response = try await apiClient.fullSync(token: token)
 
-        await applyFullServerData(response.data, mode: .forceOverwriteLocal)
-        userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
+            // 收集下载的详情
+            collectDownloadDetails(from: response.data, to: &detailsCollector)
+
+            await applyFullServerData(response.data, mode: .forceOverwriteLocal)
+            userDefaults.set(response.data.serverTimestamp, forKey: lastSyncTimestampKey)
+        } catch {
+            // 检查是否是认证相关错误
+            await handleAuthenticationError(error)
+            throw error
+        }
     }
 
     /// 强制覆盖远程
@@ -1261,6 +1341,10 @@ class SyncManager: ObservableObject {
             }
         } catch {
             print("❌ 加载服务端数据摘要失败: \(error)")
+
+            // 检查是否是认证相关错误
+            await handleAuthenticationError(error)
+
             DispatchQueue.main.async {
                 self.serverDataSummary = nil
                 self.isLoadingServerData = false
@@ -1334,6 +1418,10 @@ class SyncManager: ObservableObject {
             }
         } catch {
             print("❌ 增量拉取远端变更数据失败: \(error)")
+
+            // 检查是否是认证相关错误
+            await handleAuthenticationError(error)
+
             DispatchQueue.main.async {
                 self.isLoadingServerData = false
                 self.lastServerResponseStatus = "增量拉取失败: \(error.localizedDescription)"
@@ -1390,6 +1478,10 @@ class SyncManager: ObservableObject {
             }
         } catch {
             print("❌ 加载完整服务端数据预览失败: \(error)")
+
+            // 检查是否是认证相关错误
+            await handleAuthenticationError(error)
+
             DispatchQueue.main.async {
                 self.serverData = nil
                 self.isLoadingServerData = false
