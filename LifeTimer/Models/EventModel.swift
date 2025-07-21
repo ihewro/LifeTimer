@@ -547,4 +547,66 @@ class EventManager: ObservableObject {
             return false
         }
     }
+
+    // MARK: - 任务选择器优化方法
+
+    /// 线程安全地获取任务标题列表（用于任务选择器）
+    func getTaskTitlesSnapshot() -> [String] {
+        // 创建事件数组的快照，避免在处理过程中数据被修改
+        let eventsSnapshot = events
+        return eventsSnapshot.map { $0.title }
+    }
+
+    /// 异步获取最近常用任务（优化版本）
+    func getRecentTasksAsync(limit: Int = 10) async -> [String] {
+        return await withCheckedContinuation { continuation in
+            cacheQueue.async { [weak self] in
+                guard let self = self else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                // 线程安全地获取事件快照
+                let eventsSnapshot = self.events
+
+                // 提取所有任务标题
+                let allTitles = eventsSnapshot.map { $0.title }
+                let uniqueTitles = Array(Set(allTitles))
+
+                // 计算任务使用频率
+                let taskFrequency = Dictionary(grouping: allTitles, by: { $0 })
+                    .mapValues { $0.count }
+
+                // 按使用频率排序，取前N个
+                let sortedTasks = uniqueTitles
+                    .sorted { taskFrequency[$0] ?? 0 > taskFrequency[$1] ?? 0 }
+                    .prefix(limit)
+                    .map { $0 }
+
+                continuation.resume(returning: sortedTasks)
+            }
+        }
+    }
+
+    /// 获取任务使用频率统计（异步，线程安全）
+    func getTaskFrequencyAsync() async -> [String: Int] {
+        return await withCheckedContinuation { continuation in
+            cacheQueue.async { [weak self] in
+                guard let self = self else {
+                    continuation.resume(returning: [:])
+                    return
+                }
+
+                // 线程安全地获取事件快照
+                let eventsSnapshot = self.events
+
+                // 计算任务使用频率
+                let allTitles = eventsSnapshot.map { $0.title }
+                let taskFrequency = Dictionary(grouping: allTitles, by: { $0 })
+                    .mapValues { $0.count }
+
+                continuation.resume(returning: taskFrequency)
+            }
+        }
+    }
 }

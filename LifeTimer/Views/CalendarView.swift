@@ -1374,7 +1374,7 @@ struct EventBlock: View, Equatable {
                     selectedEvent = nil
                 })
                 .environmentObject(eventManager)
-                .frame(width: 300)
+                .frame(minWidth: 300)
             }
             .contextMenu {
                 Button(role: .destructive) {
@@ -1806,7 +1806,7 @@ struct DayStatsPanel: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.blue)
-                    Text("专注时间")
+                    Text("日专注时间")
                     Spacer()
                     Text(formatTime(dayStats.totalActiveTime))
                         .fontWeight(.medium)
@@ -1818,15 +1818,6 @@ struct DayStatsPanel: View {
                     Text("番茄个数")
                     Spacer()
                     Text("\(dayStats.pomodoroSessions)")
-                        .fontWeight(.medium)
-                }
-
-                HStack {
-                    Image(systemName: "app.badge")
-                        .foregroundColor(.orange)
-                    Text("应用切换")
-                    Spacer()
-                    Text("\(dayStats.appSwitches)")
                         .fontWeight(.medium)
                 }
             }
@@ -1891,10 +1882,10 @@ struct DayStatsPanel: View {
         // 获取当日事件
         let dayEvents = eventManager.eventsForDate(selectedDate)
 
-        // 计算活跃时间（番茄时间+正计时间+自定义事件，不包含休息）
+        // 计算活跃时间（番茄时间+正计时间，不包含休息和自定义事件）
         var totalActiveTime: TimeInterval = 0
         for event in dayEvents {
-            if event.type == .pomodoro || event.type == .countUp || event.type == .custom {
+            if event.type == .pomodoro || event.type == .countUp {
                 totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
             }
         }
@@ -1953,7 +1944,7 @@ struct DayStatsPanel: View {
 
             var totalActiveTime: TimeInterval = 0
             for event in dayEvents {
-                if event.type == .pomodoro || event.type == .countUp || event.type == .custom {
+                if event.type == .pomodoro || event.type == .countUp {
                     totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
                 }
             }
@@ -2287,18 +2278,9 @@ struct WeekView: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.blue)
-                    Text("总专注时间")
+                    Text("周专注时间")
                     Spacer()
                     Text(formatTime(weekStats.totalActiveTime))
-                        .fontWeight(.medium)
-                }
-
-                HStack {
-                    Image(systemName: "app.badge")
-                        .foregroundColor(.orange)
-                    Text("应用切换")
-                    Spacer()
-                    Text("\(weekStats.totalAppSwitches)")
                         .fontWeight(.medium)
                 }
 
@@ -2375,12 +2357,21 @@ struct WeekView: View {
         var pomodoroSessions = 0
 
         for date in weekDates {
-            let overview = activityMonitor.getTodayOverview()
-            totalActiveTime += overview.activeTime
+            // 获取当日事件
+            let dayEvents = eventManager.eventsForDate(date)
+
+            // 计算活跃时间（番茄时间+正计时间，不包含休息和自定义事件）
+            for event in dayEvents {
+                if event.type == .pomodoro || event.type == .countUp {
+                    totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
+                }
+            }
+
+            // 获取应用切换次数（仍使用系统监控数据）
+            let overview = activityMonitor.getOverview(for: date)
             totalAppSwitches += overview.appSwitches
 
             // 计算当日番茄时钟会话
-            let dayEvents = eventManager.eventsForDate(date)
             pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count
         }
 
@@ -2626,7 +2617,7 @@ struct WeekEventBlock: View {
                 }
             )
             .environmentObject(eventManager)
-            .frame(width: 350, height: 400)
+            .frame(minWidth: 350)
         }
         .contextMenu {
             Button(role: .destructive) {
@@ -2986,7 +2977,7 @@ struct MonthView: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundColor(.orange)
-                    Text("总专注时间")
+                    Text("月专注时间")
                     Spacer()
                     Text(formatTime(monthStats.totalActiveTime))
                         .fontWeight(.medium)
@@ -3086,8 +3077,12 @@ struct MonthView: View {
                 activeDays += 1
             }
 
-            let overview = activityMonitor.getOverview(for: date)
-            totalActiveTime += overview.activeTime
+            // 计算活跃时间（番茄时间+正计时间，不包含休息和自定义事件）
+            for event in dayEvents {
+                if event.type == .pomodoro || event.type == .countUp {
+                    totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
+                }
+            }
 
             pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count
 
@@ -3351,8 +3346,12 @@ struct MonthView: View {
                     activeDays += 1
                 }
 
-                let overview = activityMonitor.getOverview(for: date)
-                totalActiveTime += overview.activeTime
+                // 计算活跃时间（番茄时间+正计时间，不包含休息和自定义事件）
+                for event in dayEvents {
+                    if event.type == .pomodoro || event.type == .countUp {
+                        totalActiveTime += event.endTime.timeIntervalSince(event.startTime)
+                    }
+                }
 
                 pomodoroSessions += dayEvents.filter { $0.type == .pomodoro }.count
 
@@ -4103,7 +4102,7 @@ struct OptimizedEventRowView: View {
                         self.selectedEvent = nil
                     }
                 )
-                .frame(width: 300)
+                .frame(minWidth: 300)
                 .environmentObject(eventManager)
             }
         }
