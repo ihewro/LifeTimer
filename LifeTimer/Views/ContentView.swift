@@ -201,8 +201,11 @@ struct ContentView: View {
         #endif
         }
         .onAppear {
-            // 初始化selectedTask - 从最近的事件中设置默认任务
-            setDefaultTaskFromRecentEvent()
+            // 只有在计时器空闲状态且用户未设置自定义任务时，才从最近事件设置默认任务
+            // 这样可以防止窗口重新激活时覆盖用户在计时过程中修改的任务
+            if timerModel.timerState == .idle && !timerModel.hasUserSetCustomTask {
+                setDefaultTaskFromRecentEvent()
+            }
         }
     }
 

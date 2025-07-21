@@ -368,6 +368,7 @@ struct TimerView: View {
             smartReminderManager.setTimerModel(timerModel)
 
             // 只有在计时器空闲状态且用户未设置自定义任务时，才从最近事件设置默认任务
+            // 这样可以防止窗口重新激活时覆盖用户在计时过程中修改的任务
             if timerModel.timerState == .idle && !timerModel.hasUserSetCustomTask {
                 setDefaultTaskFromRecentEvent()
             }
@@ -379,11 +380,22 @@ struct TimerView: View {
                 showingCompletionDialog = true
             }
 
+            // 当计时器从运行状态变为空闲状态时，如果用户设置了自定义任务，保持任务显示
+            if newState == .idle && timerModel.hasUserSetCustomTask {
+                selectedTask = timerModel.userCustomTaskTitle
+            }
         }
         .onChange(of: selectedTask) { newTask in
             // 用户修改任务时，设置自定义任务到TimerModel
             // TimerModel会自动处理运行时的任务切换逻辑
             timerModel.setUserCustomTask(newTask)
+        }
+        .onChange(of: timerModel.userCustomTaskTitle) { newTitle in
+            // 当TimerModel中的自定义任务标题发生变化时，同步更新selectedTask
+            // 这确保了计时过程中的任务修改能够在UI层面保持同步
+            if timerModel.hasUserSetCustomTask && !newTitle.isEmpty {
+                selectedTask = newTitle
+            }
         }
         .toolbar {
             // 左侧：智能提醒状态显示
@@ -777,49 +789,30 @@ struct TaskSelectorPopoverView: View {
     @State private var searchText = ""
     @EnvironmentObject var eventManager: EventManager
 
+    // 异步数据状态
+    @State private var recentTasks: [String] = []
+    @State private var filteredRecentTasks: [String] = []
+    @State private var filteredPresetTasks: [String] = []
+    @State private var isLoadingData = false
+    @State private var dataLoadingTask: Task<Void, Never>?
+
     // 预设任务类型
     private let presetTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考", "休息", "运动"]
 
-    // 从事件历史中获取最近常用任务
-    var recentTasksFromHistory: [String] {
-        let allTitles = eventManager.events.map { $0.title }
-        let uniqueTitles = Array(Set(allTitles))
+    // 缓存的任务频率数据
+    @State private var taskFrequencyCache: [String: Int] = [:]
+    @State private var lastCacheUpdate: Date = Date.distantPast
+    private let cacheValidDuration: TimeInterval = 60 // 缓存1分钟
 
-        // 按使用频率排序，取前10个
-        let taskFrequency = Dictionary(grouping: allTitles, by: { $0 })
-            .mapValues { $0.count }
-
-        return uniqueTitles
-            .sorted { taskFrequency[$0] ?? 0 > taskFrequency[$1] ?? 0 }
-            .prefix(10)
-            .map { $0 }
-    }
-
-    // 过滤最近常用任务
-    var filteredRecentTasks: [String] {
-        let recentTasks = recentTasksFromHistory
-        if searchText.isEmpty {
-            return recentTasks
-        } else {
-            return recentTasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
-
-    // 过滤预设任务
-    var filteredPresetTasks: [String] {
-        if searchText.isEmpty {
-            return presetTasks
-        } else {
-            return presetTasks.filter { $0.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
+    // 线程安全的队列
+    private let dataProcessingQueue = DispatchQueue(label: "com.pomodorotimer.taskprocessing", qos: .userInitiated)
 
     // 检查是否需要显示"创建新任务"选项
     var shouldShowCreateOption: Bool {
         !searchText.isEmpty &&
         !filteredRecentTasks.contains(searchText) &&
         !filteredPresetTasks.contains(searchText) &&
-        !recentTasksFromHistory.contains(searchText)
+        !recentTasks.contains(searchText)
     }
 
     var body: some View {
@@ -832,44 +825,203 @@ struct TaskSelectorPopoverView: View {
                 .padding(.bottom, 12)
 
             // 任务列表
-            List {
-                // 最近常用分组
-                if !filteredRecentTasks.isEmpty {
-                    Section("最近常用") {
-                        ForEach(filteredRecentTasks, id: \.self) { task in
-                            TaskRowView(task: task, isSelected: task == selectedTask) {
-                                selectedTask = task
+            if isLoadingData {
+                // 加载状态
+                VStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("加载任务列表...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    // 最近常用分组
+                    if !filteredRecentTasks.isEmpty {
+                        Section("最近常用") {
+                            ForEach(filteredRecentTasks, id: \.self) { task in
+                                TaskRowView(task: task, isSelected: task == selectedTask) {
+                                    selectedTask = task
+                                    isPresented = false
+                                }
+                            }
+                        }
+                    }
+
+                    // 预设任务分组
+                    if !filteredPresetTasks.isEmpty {
+                        Section("预设任务") {
+                            ForEach(filteredPresetTasks, id: \.self) { task in
+                                TaskRowView(task: task, isSelected: task == selectedTask) {
+                                    selectedTask = task
+                                    isPresented = false
+                                }
+                            }
+                        }
+                    }
+
+                    // 创建新任务选项
+                    if shouldShowCreateOption {
+                        Section("创建新任务") {
+                            TaskRowView(task: searchText, isSelected: false, isNewTask: true) {
+                                selectedTask = searchText
                                 isPresented = false
                             }
                         }
                     }
                 }
-
-                // 预设任务分组
-                if !filteredPresetTasks.isEmpty {
-                    Section("预设任务") {
-                        ForEach(filteredPresetTasks, id: \.self) { task in
-                            TaskRowView(task: task, isSelected: task == selectedTask) {
-                                selectedTask = task
-                                isPresented = false
-                            }
-                        }
-                    }
-                }
-
-                // 创建新任务选项
-                if shouldShowCreateOption {
-                    Section("创建新任务") {
-                        TaskRowView(task: searchText, isSelected: false, isNewTask: true) {
-                            selectedTask = searchText
-                            isPresented = false
-                        }
-                    }
-                }
+                .listStyle(SidebarListStyle())
             }
-            .listStyle(SidebarListStyle())
         }
         .frame(width: 280, height: 320)
+        .onAppear {
+            loadTaskData()
+        }
+        .onDisappear {
+            // 取消正在进行的数据加载任务
+            dataLoadingTask?.cancel()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EventDataChanged"))) { _ in
+            // 当事件数据发生变化时，智能刷新缓存
+            if isCacheValid() {
+                // 如果缓存仍然有效，延迟刷新以避免频繁更新
+                dataLoadingTask?.cancel()
+                dataLoadingTask = Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 500ms延迟
+                    if !Task.isCancelled {
+                        await performDataLoading()
+                    }
+                }
+            } else {
+                // 缓存已过期，立即刷新
+                loadTaskData()
+            }
+        }
+        .onChange(of: searchText) { newSearchText in
+            // 使用防抖机制优化搜索性能
+            dataLoadingTask?.cancel()
+            dataLoadingTask = Task {
+                // 防抖延迟
+                try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+
+                if !Task.isCancelled {
+                    await performSearch(searchText: newSearchText)
+                }
+            }
+        }
+    }
+
+    // MARK: - 异步数据处理方法
+
+    /// 加载任务数据（异步，线程安全）
+    private func loadTaskData() {
+        // 如果已经在加载，取消之前的任务
+        dataLoadingTask?.cancel()
+
+        dataLoadingTask = Task {
+            await performDataLoading()
+        }
+    }
+
+    /// 执行数据加载（在后台线程）
+    @MainActor
+    private func performDataLoading() async {
+        #if DEBUG
+        let startTime = CFAbsoluteTimeGetCurrent()
+        print("🔄 TaskSelector: 开始加载任务数据")
+        #endif
+
+        isLoadingData = true
+
+        // 在后台线程执行数据处理
+        let (recentTasksResult, frequencyCache) = await Task.detached { [eventManager] in
+            return await self.processTaskDataInBackground(eventManager: eventManager)
+        }.value
+
+        // 检查任务是否被取消
+        guard !Task.isCancelled else {
+            isLoadingData = false
+            #if DEBUG
+            print("❌ TaskSelector: 数据加载被取消")
+            #endif
+            return
+        }
+
+        // 在主线程更新UI状态
+        recentTasks = recentTasksResult
+        taskFrequencyCache = frequencyCache
+        lastCacheUpdate = Date()
+
+        // 执行初始搜索过滤
+        await performSearch(searchText: searchText)
+
+        isLoadingData = false
+
+        #if DEBUG
+        let endTime = CFAbsoluteTimeGetCurrent()
+        print("✅ TaskSelector: 数据加载完成，耗时: \(String(format: "%.2f", (endTime - startTime) * 1000))ms，任务数量: \(recentTasksResult.count)")
+        #endif
+    }
+
+    /// 在后台线程处理任务数据（线程安全）
+    private func processTaskDataInBackground(eventManager: EventManager) async -> ([String], [String: Int]) {
+        // 使用 EventManager 的线程安全方法
+        async let recentTasks = eventManager.getRecentTasksAsync(limit: 10)
+        async let taskFrequency = eventManager.getTaskFrequencyAsync()
+
+        let tasks = await recentTasks
+        let frequency = await taskFrequency
+
+        return (tasks, frequency)
+    }
+
+    /// 执行搜索过滤（异步，防抖）
+    @MainActor
+    private func performSearch(searchText: String) async {
+        #if DEBUG
+        let startTime = CFAbsoluteTimeGetCurrent()
+        #endif
+
+        // 在后台线程执行搜索过滤
+        let (filteredRecent, filteredPreset) = await Task.detached { [recentTasks, presetTasks] in
+            let filteredRecent: [String]
+            let filteredPreset: [String]
+
+            if searchText.isEmpty {
+                filteredRecent = recentTasks
+                filteredPreset = presetTasks
+            } else {
+                // 使用更高效的搜索算法
+                let searchTextLowercased = searchText.lowercased()
+                filteredRecent = recentTasks.filter { $0.lowercased().contains(searchTextLowercased) }
+                filteredPreset = presetTasks.filter { $0.lowercased().contains(searchTextLowercased) }
+            }
+
+            return (filteredRecent, filteredPreset)
+        }.value
+
+        // 检查任务是否被取消
+        guard !Task.isCancelled else {
+            #if DEBUG
+            print("❌ TaskSelector: 搜索被取消")
+            #endif
+            return
+        }
+
+        // 在主线程更新UI
+        filteredRecentTasks = filteredRecent
+        filteredPresetTasks = filteredPreset
+
+        #if DEBUG
+        let endTime = CFAbsoluteTimeGetCurrent()
+        print("🔍 TaskSelector: 搜索完成 '\(searchText)'，耗时: \(String(format: "%.2f", (endTime - startTime) * 1000))ms，结果: \(filteredRecent.count + filteredPreset.count) 个")
+        #endif
+    }
+
+    /// 检查缓存是否有效
+    private func isCacheValid() -> Bool {
+        Date().timeIntervalSince(lastCacheUpdate) < cacheValidDuration
     }
 }
 
