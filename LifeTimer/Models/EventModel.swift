@@ -557,7 +557,7 @@ class EventManager: ObservableObject {
         return eventsSnapshot.map { $0.title }
     }
 
-    /// 异步获取最近常用任务（优化版本）
+    /// 异步获取最近任务（按时间先后顺序去重）
     func getRecentTasksAsync(limit: Int = 10) async -> [String] {
         return await withCheckedContinuation { continuation in
             cacheQueue.async { [weak self] in
@@ -569,21 +569,26 @@ class EventManager: ObservableObject {
                 // 线程安全地获取事件快照
                 let eventsSnapshot = self.events
 
-                // 提取所有任务标题
-                let allTitles = eventsSnapshot.map { $0.title }
-                let uniqueTitles = Array(Set(allTitles))
+                // 按时间倒序排序（最新的在前）
+                let sortedEvents = eventsSnapshot.sorted { $0.startTime > $1.startTime }
 
-                // 计算任务使用频率
-                let taskFrequency = Dictionary(grouping: allTitles, by: { $0 })
-                    .mapValues { $0.count }
+                // 按时间先后顺序去重，保留最新出现的任务
+                var seenTitles = Set<String>()
+                var recentTasks: [String] = []
 
-                // 按使用频率排序，取前N个
-                let sortedTasks = uniqueTitles
-                    .sorted { taskFrequency[$0] ?? 0 > taskFrequency[$1] ?? 0 }
-                    .prefix(limit)
-                    .map { $0 }
+                for event in sortedEvents {
+                    if !seenTitles.contains(event.title) && recentTasks.count < limit {
+                        seenTitles.insert(event.title)
+                        recentTasks.append(event.title)
+                    }
 
-                continuation.resume(returning: sortedTasks)
+                    // 如果已经收集到足够的任务，提前退出
+                    if recentTasks.count >= limit {
+                        break
+                    }
+                }
+
+                continuation.resume(returning: recentTasks)
             }
         }
     }

@@ -921,25 +921,21 @@ struct TimelineView: View {
     private let hours = Array(0...23)
     
     // MARK: - 性能优化：缓存计算属性
-    @State private var cachedEventsForDay: [PomodoroEvent] = []
-    @State private var cachedEventsDate: Date?
+    @State private var eventsForDay: [PomodoroEvent] = []
 
-    private var eventsForDay: [PomodoroEvent] {
-        // 使用缓存避免重复计算
-        if cachedEventsDate != selectedDate {
-            let events = eventManager.eventsForDate(selectedDate)
-            cachedEventsForDay = events
-            cachedEventsDate = selectedDate
+    // 加载指定日期的事件数据的纯函数
+    private func loadEventsForDate(_ date: Date) -> [PomodoroEvent] {
+        let events = eventManager.eventsForDate(date)
 
-            // 调试信息
-            #if DEBUG
-            print("📅 DayView: 加载日期 \(selectedDate) 的事件，找到 \(events.count) 个事件")
-            for event in events {
-                print("  - \(event.title) (\(event.type.displayName)) - 时间: \(event.startTime) 到 \(event.endTime)")
-            }
-            #endif
+        // 调试信息
+        #if DEBUG
+        print("📅 DayView: 加载日期 \(date) 的事件，找到 \(events.count) 个事件")
+        for event in events {
+            print("  - \(event.title) (\(event.type.displayName)) - 时间: \(event.startTime) 到 \(event.endTime)")
         }
-        return cachedEventsForDay
+        #endif
+
+        return events
     }
 
     // 性能优化：缓存事件布局信息，避免拖拽时重复计算
@@ -1084,17 +1080,21 @@ struct TimelineView: View {
         .onAppear {
             // 视图出现时清除所有缓存，确保数据是最新的
             clearAllCaches()
+            // 初始化时加载事件数据
+            eventsForDay = loadEventsForDate(selectedDate)
 
             #if DEBUG
-            print("📅 DayView: 视图出现，清除所有缓存")
+            print("📅 TimelineView: 视图出现，清除所有缓存并加载事件数据")
             #endif
         }
-        .onChange(of: selectedDate) { _ in
+        .onChange(of: selectedDate) { newDate in
             // 日期变化时清除所有缓存
             clearAllCaches()
+            // 当选中日期变化时重新加载事件数据
+            eventsForDay = loadEventsForDate(newDate)
 
             #if DEBUG
-            print("📅 DayView: 日期变化，清除所有缓存")
+            print("📅 TimelineView: 日期变化，清除所有缓存并重新加载事件数据")
             #endif
         }
         .onChange(of: eventManager.events.count) { _ in
@@ -1247,10 +1247,6 @@ struct TimelineView: View {
 
     // 清除 TimelineView 缓存的辅助方法
     private func clearAllCaches() {
-        // 清除事件数据缓存
-        cachedEventsDate = nil
-        cachedEventsForDay = []
-
         // 清除布局缓存
         cachedLayoutEventsHash = 0
         cachedEventLayoutInfo = []
@@ -2595,7 +2591,7 @@ struct WeekEventBlock: View {
         .onTapGesture(count: 2) {
             showingPopover = true
         }
-       .simultaneousGesture(
+        .simultaneousGesture(
             TapGesture()
                 .onEnded { _ in
                     selectedEvent = event
@@ -3407,8 +3403,7 @@ struct MonthDayCell: View {
     private let calendar = Calendar.current
 
     // 性能优化：缓存计算属性（移除日期数字缓存，避免视图复用问题）
-    @State private var cachedMaxVisibleEvents: Int?
-    @State private var cachedCellHeight: CGFloat?
+    @State private var maxVisibleEvents: Int = 1
 
     private var isSelected: Bool {
         // 安全检查，避免日期比较时的潜在问题
@@ -3450,38 +3445,27 @@ struct MonthDayCell: View {
         return "\(dayComponent)"
     }
 
-    // 根据单元格高度动态计算可显示的事件数量（性能优化版本）- 安全版本
-    private var maxVisibleEvents: Int {
-        // 使用缓存避免重复计算
-        if cachedCellHeight != cellHeight || cachedMaxVisibleEvents == nil {
-            // 安全检查单元格高度
-            guard cellHeight > 0 else {
-                cachedMaxVisibleEvents = 1
-                cachedCellHeight = cellHeight
-                return 1
-            }
+    // 计算可显示的事件数量的纯函数
+    private func calculateMaxVisibleEvents(for cellHeight: CGFloat, eventCount: Int) -> Int {
+        // 安全检查单元格高度
+        guard cellHeight > 0 else { return 1 }
 
-            // 预留空间：日期数字区域(~20pt) + 顶部padding(2pt) + 底部padding(2pt) + Spacer
-            // 每个事件行大约需要 14pt (字体10pt + padding 4pt)
-            // "还有X项"指示器大约需要 12pt
-            let reservedSpace: CGFloat = 26 // 日期数字和padding
-            let eventRowHeight: CGFloat = 16 // 增加事件行高度以适应更大字体
-            let moreIndicatorHeight: CGFloat = 14
+        // 预留空间：日期数字区域(~20pt) + 顶部padding(2pt) + 底部padding(2pt) + Spacer
+        // 每个事件行大约需要 14pt (字体10pt + padding 4pt)
+        // "还有X项"指示器大约需要 12pt
+        let reservedSpace: CGFloat = 26 // 日期数字和padding
+        let eventRowHeight: CGFloat = 16 // 增加事件行高度以适应更大字体
+        let moreIndicatorHeight: CGFloat = 14
 
-            let availableForEvents = max(0, cellHeight - reservedSpace)
+        let availableForEvents = max(0, cellHeight - reservedSpace)
 
-            if events.count <= 1 {
-                cachedMaxVisibleEvents = max(1, Int(availableForEvents / eventRowHeight))
-            } else {
-                // 如果有多个事件，需要为"还有X项"指示器预留空间
-                let spaceForEventsAndIndicator = max(0, availableForEvents - moreIndicatorHeight)
-                cachedMaxVisibleEvents = max(1, Int(spaceForEventsAndIndicator / eventRowHeight))
-            }
-
-            cachedCellHeight = cellHeight
+        if eventCount <= 1 {
+            return max(1, Int(availableForEvents / eventRowHeight))
+        } else {
+            // 如果有多个事件，需要为"还有X项"指示器预留空间
+            let spaceForEventsAndIndicator = max(0, availableForEvents - moreIndicatorHeight)
+            return max(1, Int(spaceForEventsAndIndicator / eventRowHeight))
         }
-
-        return cachedMaxVisibleEvents ?? 1 // 提供默认值，避免强制解包崩溃
     }
 
     var body: some View {
@@ -3547,6 +3531,18 @@ struct MonthDayCell: View {
                 )
         )
         .contentShape(Rectangle())
+        .onAppear {
+            // 初始化时计算maxVisibleEvents
+            maxVisibleEvents = calculateMaxVisibleEvents(for: cellHeight, eventCount: events.count)
+        }
+        .onChange(of: cellHeight) { newHeight in
+            // 当单元格高度变化时重新计算
+            maxVisibleEvents = calculateMaxVisibleEvents(for: newHeight, eventCount: events.count)
+        }
+        .onChange(of: events.count) { newCount in
+            // 当事件数量变化时重新计算
+            maxVisibleEvents = calculateMaxVisibleEvents(for: cellHeight, eventCount: newCount)
+        }
     }
 
     // 事件行视图
