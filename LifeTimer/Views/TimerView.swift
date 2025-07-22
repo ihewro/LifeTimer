@@ -968,11 +968,12 @@ struct TaskSelectorPopoverView: View {
     private func processTaskDataInBackground(eventManager: EventManager) async -> ([String], [String: Int]) {
         // 使用 EventManager 的线程安全方法
         async let recentTasks = eventManager.getRecentTasksAsync(limit: 10)
-        async let taskFrequency = eventManager.getTaskFrequencyAsync()
+        // async let taskFrequency = eventManager.getTaskFrequencyAsync()
 
         let tasks = await recentTasks
-        let frequency = await taskFrequency
+        // let frequency = await taskFrequency
 
+        var frequency: [String: Int] = [:]
         return (tasks, frequency)
     }
 
