@@ -1,4 +1,4 @@
-# PomodoroTimer 编译修复指南
+# LifeTimer 编译修复指南
 
 ## ✅ 已修复的问题
 
@@ -33,7 +33,7 @@
 
 1. **打开项目**（已自动打开）:
    ```bash
-   open -a Xcode /Users/hewro/Documents/life/PomodoroTimer.xcodeproj
+   open -a Xcode /Users/hewro/Documents/life/LifeTimer.xcodeproj
    ```
 
 2. **在 Xcode 中**:
@@ -45,11 +45,11 @@
 
 ```bash
 # 清理缓存
-rm -rf ~/Library/Developer/Xcode/DerivedData/PomodoroTimer-*
+rm -rf ~/Library/Developer/Xcode/DerivedData/LifeTimer-*
 
 # 编译项目
 cd /Users/hewro/Documents/life
-xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination "platform=macOS" clean build
+xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -destination "platform=macOS" clean build
 ```
 
 ## 📋 项目结构验证
@@ -57,7 +57,7 @@ xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination "
 所有关键文件都已确认存在：
 
 ```
-PomodoroTimer/
+LifeTimer/
 ├── PomodoroTimerApp.swift          ✅ 主应用文件
 ├── Views/
 │   ├── ContentView.swift           ✅ 主视图

@@ -4,8 +4,8 @@ echo "=== 调试编译问题 ==="
 echo
 
 # 设置项目路径
-PROJECT_PATH="/Users/hewro/Documents/life/PomodoroTimer.xcodeproj"
-SOURCE_DIR="/Users/hewro/Documents/life/PomodoroTimer"
+PROJECT_PATH="/Users/hewro/Documents/life/LifeTimer.xcodeproj"
+SOURCE_DIR="/Users/hewro/Documents/life/LifeTimer"
 
 echo "1. 检查项目文件结构..."
 ls -la "$SOURCE_DIR"
@@ -22,13 +22,13 @@ done
 echo
 
 echo "3. 尝试清理构建缓存..."
-rm -rf ~/Library/Developer/Xcode/DerivedData/PomodoroTimer-*
+rm -rf ~/Library/Developer/Xcode/DerivedData/LifeTimer-*
 echo "构建缓存已清理"
 echo
 
 echo "4. 尝试编译项目..."
 cd /Users/hewro/Documents/life
-xcodebuild -project "$PROJECT_PATH" -scheme PomodoroTimer -destination "platform=macOS" clean build 2>&1 | head -50
+xcodebuild -project "$PROJECT_PATH" -scheme LifeTimer -destination "platform=macOS" clean build 2>&1 | head -50
 echo
 
 echo "5. 检查语法错误..."

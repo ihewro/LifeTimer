@@ -9,7 +9,7 @@
 ## 单元测试最佳实践
 ```swift
 import XCTest
-@testable import PomodoroTimer
+@testable import LifeTimer
 
 class TimerModelTests: XCTestCase {
     var timerModel: TimerModel!

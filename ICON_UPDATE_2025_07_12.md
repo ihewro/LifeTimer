@@ -17,7 +17,7 @@
 使用 `generate_app_icons.sh` 脚本生成了25个不同尺寸的图标文件：
 - 16x16, 32x32, 128x128, 256x256, 512x512, 1024x1024
 - 包含 @2x 和 @3x 高分辨率版本
-- 所有文件保存在 `PomodoroTimer/Assets.xcassets/AppIcon.appiconset/`
+- 所有文件保存在 `LifeTimer/Assets.xcassets/AppIcon.appiconset/`
 
 ### 3. 系统缓存清理
 - 清理了 Xcode DerivedData

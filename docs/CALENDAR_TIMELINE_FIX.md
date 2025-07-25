@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 PomodoroTimer 应用的日历日视图（Day View）中，时间轴显示存在布局问题：00:00 时间标签距离视图顶部有过多的空白间距。
+在 LifeTimer 应用的日历日视图（Day View）中，时间轴显示存在布局问题：00:00 时间标签距离视图顶部有过多的空白间距。
 
 ## 问题分析
 
@@ -87,7 +87,7 @@ HStack(alignment: .top) {  // 顶部对齐
 
 ## 文件修改记录
 
-- **文件**：`PomodoroTimer/Views/CalendarView.swift`
+- **文件**：`LifeTimer/Views/CalendarView.swift`
 - **行数**：428-440
 - **修改类型**：布局对齐优化
 - **影响范围**：仅限时间轴视觉布局，不影响功能逻辑

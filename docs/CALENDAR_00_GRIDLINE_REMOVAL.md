@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 PomodoroTimer 应用的日历日视图（Day View）中，00:00 时间标签下方显示了一条横线，但由于上方已经有一个 Divider 分割线，这条横线显得多余，需要将其移除以改善视觉效果。
+在 LifeTimer 应用的日历日视图（Day View）中，00:00 时间标签下方显示了一条横线，但由于上方已经有一个 Divider 分割线，这条横线显得多余，需要将其移除以改善视觉效果。
 
 ## 问题分析
 
@@ -74,7 +74,7 @@ ForEach(hours, id: \.self) { (hour: Int) in
 
 ## 文件修改记录
 
-- **文件**：`PomodoroTimer/Views/CalendarView.swift`
+- **文件**：`LifeTimer/Views/CalendarView.swift`
 - **修改位置**：第 435-445 行
 - **修改类型**：条件渲染优化
 - **影响范围**：仅限 00:00 位置的网格线显示，不影响其他功能

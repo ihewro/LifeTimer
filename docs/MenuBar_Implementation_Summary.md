@@ -2,7 +2,7 @@
 
 ## 🎯 功能概述
 
-成功为 PomodoroTimer 应用添加了 macOS 系统菜单栏集成功能，实现了以下特性：
+成功为 LifeTimer 应用添加了 macOS 系统菜单栏集成功能，实现了以下特性：
 
 ### ✅ 已实现功能
 
@@ -65,7 +65,7 @@
 
 ## 🚀 使用方法
 
-1. 启动 PomodoroTimer 应用
+1. 启动 LifeTimer 应用
 2. 在系统菜单栏右侧查看计时器图标和时间
 3. 点击菜单栏图标快速打开应用
 4. 通过图标变化了解计时器状态
@@ -73,7 +73,7 @@
 ## 📝 代码结构
 
 ```
-PomodoroTimer/
+LifeTimer/
 ├── Managers/
 │   └── MenuBarManager.swift    # 菜单栏管理核心类
 └── PomodoroTimerApp.swift      # 应用入口点集成

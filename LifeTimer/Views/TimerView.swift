@@ -1,6 +1,6 @@
 //
 //  TimerView.swift
-//  PomodoroTimer
+//  LifeTimer
 //
 //  Created by Developer on 2024.
 //

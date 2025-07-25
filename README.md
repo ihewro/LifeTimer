@@ -1,4 +1,4 @@
-# 番茄钟应用 (PomodoroTimer)
+# 番茄钟应用 (LifeTimer)
 
 一个基于 SwiftUI 开发的跨平台番茄钟应用，支持 iOS、iPadOS 和 macOS。
 
@@ -31,7 +31,7 @@
 ## 项目结构
 
 ```
-PomodoroTimer/
+LifeTimer/
 ├── PomodoroTimerApp.swift          # 应用入口
 ├── Models/
 │   ├── TimerModel.swift            # 计时器数据模型
@@ -45,7 +45,7 @@ PomodoroTimer/
 │   └── AudioManager.swift          # 音频管理器
 ├── Assets.xcassets/                # 资源文件
 ├── Preview Content/                # 预览资源
-└── PomodoroTimer.entitlements      # 应用权限配置
+└── LifeTimer.entitlements      # 应用权限配置
 ```
 
 ## 技术架构
@@ -78,7 +78,7 @@ PomodoroTimer/
 1. **打开项目**
    ```bash
    cd /Users/hewro/Documents/life
-   open PomodoroTimer.xcodeproj
+   open LifeTimer.xcodeproj
    ```
 
 2. **选择目标平台**
@@ -93,13 +93,13 @@ PomodoroTimer/
 
 ```bash
 # 编译 macOS 版本
-xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination 'platform=macOS' build
+xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -destination 'platform=macOS' build
 
 # 编译 iOS 版本
-xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination 'platform=iOS Simulator,name=iPhone 15' build
+xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -destination 'platform=iOS Simulator,name=iPhone 15' build
 
 # 编译 iPadOS 版本
-xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination 'platform=iOS Simulator,name=iPad Pro (12.9-inch) (6th generation)' build
+xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -destination 'platform=iOS Simulator,name=iPad Pro (12.9-inch) (6th generation)' build
 ```
 
 ## 使用说明
@@ -256,7 +256,7 @@ xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination '
 ## 联系方式
 
 - 邮箱：feedback@example.com
-- 项目地址：https://github.com/yourname/PomodoroTimer
+- 项目地址：https://github.com/yourname/LifeTimer
 
 ---
 

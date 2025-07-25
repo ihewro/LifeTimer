@@ -1,6 +1,6 @@
 //
 //  ActivitySettingsView.swift
-//  PomodoroTimer
+//  LifeTimer
 //
 //  Created by Assistant on 2024
 //
@@ -499,7 +499,7 @@ struct ActivitySettingsView: View {
             Text("版本信息")
                 .font(.headline)
 
-            Text("PomodoroTimer 系统监控模块")
+            Text("LifeTimer 系统监控模块")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 

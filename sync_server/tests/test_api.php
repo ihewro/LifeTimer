@@ -128,7 +128,7 @@ $sync_data = [
                     'uuid' => '123e4567-e89b-12d3-a456-426614174001',
                     'event_type' => 'app_activated',
                     'timestamp' => $current_timestamp,
-                    'data' => ['app' => 'PomodoroTimer'],
+                    'data' => ['app' => 'LifeTimer'],
                     'created_at' => $current_timestamp
                 ]
             ]

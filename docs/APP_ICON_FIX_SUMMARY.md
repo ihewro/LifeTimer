@@ -48,7 +48,7 @@
 - `fix_app_icon_final.sh` - 最终修复脚本
 
 ### 图标文件
-在 `PomodoroTimer/Assets.xcassets/AppIcon.appiconset/` 目录中生成了 25 个 PNG 文件：
+在 `LifeTimer/Assets.xcassets/AppIcon.appiconset/` 目录中生成了 25 个 PNG 文件：
 - icon_16x16.png, icon_16x16@2x.png
 - icon_32x32.png, icon_32x32@2x.png
 - icon_128x128.png, icon_128x128@2x.png
@@ -60,8 +60,8 @@
 
 1. **构建验证**
    ```bash
-   xcodebuild clean -project PomodoroTimer.xcodeproj -scheme PomodoroTimer
-   xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -destination "platform=macOS" build
+   xcodebuild clean -project LifeTimer.xcodeproj -scheme LifeTimer
+   xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -destination "platform=macOS" build
    ```
 
 2. **图标检查**

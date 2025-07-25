@@ -1,8 +1,8 @@
-# PomodoroTimer iOS 平台适配成果报告
+# LifeTimer iOS 平台适配成果报告
 
 ## 项目概述
 
-本报告记录了将 PomodoroTimer macOS 应用成功适配到 iOS 平台的完整过程和成果。
+本报告记录了将 LifeTimer macOS 应用成功适配到 iOS 平台的完整过程和成果。
 
 ## 适配前状态
 
@@ -134,7 +134,7 @@ struct VisualEffectView: View {
 
 ## 🎉 总结
 
-**PomodoroTimer 应用已成功完成 iOS 平台适配！**
+**LifeTimer 应用已成功完成 iOS 平台适配！**
 
 - ✅ **编译状态**: 从 20+ 个错误到完全编译成功
 - ✅ **跨平台兼容**: 保持 macOS 功能完整性的同时支持 iOS

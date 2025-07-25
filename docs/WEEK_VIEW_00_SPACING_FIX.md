@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 PomodoroTimer 应用的日历周视图（Week View）中，时间轴的 00:00 时间标签顶部存在空白高度问题，与日视图类似，第一个时间标签距离顶部有过多的空白间距。
+在 LifeTimer 应用的日历周视图（Week View）中，时间轴的 00:00 时间标签顶部存在空白高度问题，与日视图类似，第一个时间标签距离顶部有过多的空白间距。
 
 ## 问题分析
 
@@ -77,7 +77,7 @@ HStack(alignment: .top) {  // 顶部对齐
 
 ## 文件修改记录
 
-- **文件**：`PomodoroTimer/Views/CalendarView.swift`
+- **文件**：`LifeTimer/Views/CalendarView.swift`
 - **修改位置**：第 1289 行和第 1297 行
 - **修改内容**：
   1. HStack 添加 `alignment: .top` 参数

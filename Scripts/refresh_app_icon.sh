@@ -6,14 +6,14 @@
 echo "=== 刷新应用程序图标 ==="
 
 # 1. 停止正在运行的应用程序
-echo "1. 停止正在运行的 PomodoroTimer..."
-pkill -f "PomodoroTimer" 2>/dev/null
+echo "1. 停止正在运行的 LifeTimer..."
+pkill -f "LifeTimer" 2>/dev/null
 sleep 2
 
 # 2. 清理 Xcode 构建缓存
 echo "2. 清理 Xcode 构建缓存..."
-if [ -d "/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy" ]; then
-    rm -rf "/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy"
+if [ -d "/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy" ]; then
+    rm -rf "/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy"
     echo "✓ 已清理 Xcode DerivedData"
 else
     echo "- DerivedData 目录不存在"
@@ -21,7 +21,7 @@ fi
 
 # 3. 重新构建应用程序
 echo "3. 重新构建应用程序..."
-xcodebuild -project PomodoroTimer.xcodeproj -scheme PomodoroTimer -configuration Debug clean build > /tmp/xcode_build.log 2>&1
+xcodebuild -project LifeTimer.xcodeproj -scheme LifeTimer -configuration Debug clean build > /tmp/xcode_build.log 2>&1
 
 if [ $? -eq 0 ]; then
     echo "✓ 应用程序构建成功"
@@ -56,7 +56,7 @@ sleep 3
 
 # 6. 重新注册应用程序
 echo "6. 重新注册应用程序..."
-BUILD_APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/PomodoroTimer.app"
+BUILD_APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/LifeTimer.app"
 
 if [ -d "$BUILD_APP_PATH" ]; then
     /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R -trusted "$BUILD_APP_PATH"

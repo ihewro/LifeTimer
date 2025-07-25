@@ -1,7 +1,7 @@
 # 番茄钟项目修复指南
 
 ## 问题描述
-项目文件 `PomodoroTimer.xcodeproj` 损坏，无法在 Xcode 中打开，出现解析错误。
+项目文件 `LifeTimer.xcodeproj` 损坏，无法在 Xcode 中打开，出现解析错误。
 
 ## 已执行的修复操作
 
@@ -27,26 +27,26 @@
 - ✅ Models/EventModel.swift
 - ✅ Managers/AudioManager.swift
 - ✅ Assets.xcassets
-- ✅ PomodoroTimer.entitlements
+- ✅ LifeTimer.entitlements
 
 ## 如何打开项目
 
 ### 方法 1：使用 Finder
 1. 打开 Finder
 2. 导航到 `/Users/hewro/Documents/life/`
-3. 双击 `PomodoroTimer.xcodeproj` 文件
+3. 双击 `LifeTimer.xcodeproj` 文件
 4. Xcode 应该会自动打开项目
 
 ### 方法 2：使用 Xcode
 1. 打开 Xcode
 2. 选择 "File" > "Open"
-3. 导航到项目文件夹并选择 `PomodoroTimer.xcodeproj`
+3. 导航到项目文件夹并选择 `LifeTimer.xcodeproj`
 4. 点击 "Open"
 
 ### 方法 3：使用终端（如果可用）
 ```bash
 cd /Users/hewro/Documents/life
-open PomodoroTimer.xcodeproj
+open LifeTimer.xcodeproj
 ```
 
 ## 编译和运行
@@ -90,7 +90,7 @@ open PomodoroTimer.xcodeproj
 ### 问题 4：权限问题
 **症状**: 音频或文件访问权限错误
 **解决方案**:
-1. 检查 `PomodoroTimer.entitlements` 文件
+1. 检查 `LifeTimer.entitlements` 文件
 2. 确保在系统设置中授予了必要权限
 
 ## 项目特性

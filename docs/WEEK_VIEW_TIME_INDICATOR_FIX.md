@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 PomodoroTimer 应用的日历周视图（Week View）中，当前时间指示器的样式存在以下问题：
+在 LifeTimer 应用的日历周视图（Week View）中，当前时间指示器的样式存在以下问题：
 
 1. **红色横线宽度不足**：没有正确跨越整个周视图的宽度，只在单个日期列内显示
 2. **红色圆点位置不准确**：固定在每个日期列的左侧，而不是精确定位在当天日期列
@@ -155,7 +155,7 @@ ScrollView {
 
 ## 文件修改记录
 
-- **文件**：`PomodoroTimer/Views/CalendarView.swift`
+- **文件**：`LifeTimer/Views/CalendarView.swift`
 - **主要修改**：
   1. **移除旧组件调用**（第 1362-1366 行）：删除在日期列内的 `WeekCurrentTimeIndicator` 调用
   2. **添加新覆盖层组件**（第 163-251 行）：创建 `WeekTimeIndicatorOverlay` 组件
