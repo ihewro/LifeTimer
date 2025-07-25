@@ -103,13 +103,13 @@ enum SyncMode: String, Codable {
 ## 📝 相关文件
 
 修改的文件：
-- `PomodoroTimer/Managers/SyncManager.swift`
+- `LifeTimer/Managers/SyncManager.swift`
   - 新增`SyncMode.autoIncremental`
   - 修改`performSync(isFullSync: Bool)`方法
   - 删除不再使用的`performIncrementalSyncInternal()`方法
 
 显示同步历史的文件：
-- `PomodoroTimer/Views/SyncView.swift`
+- `LifeTimer/Views/SyncView.swift`
   - `syncHistorySection`：显示最近同步记录
   - `syncHistoryDetailView`：显示完整同步历史
   - `syncHistoryRow`：单条同步记录的显示格式

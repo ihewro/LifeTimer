@@ -12,7 +12,7 @@ fi
 # 源 PNG 文件
 SOURCE_PNG="icons/icon.png"
 # 目标目录
-ICON_DIR="PomodoroTimer/Assets.xcassets/AppIcon.appiconset"
+ICON_DIR="LifeTimer/Assets.xcassets/AppIcon.appiconset"
 
 # 检查源文件是否存在
 if [ ! -f "$SOURCE_PNG" ]; then

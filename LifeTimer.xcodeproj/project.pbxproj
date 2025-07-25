@@ -88,7 +88,7 @@
 		1A2B3C4D5E6F7890ABCD124B /* */ = {
 			isa = PBXGroup;
 			children = (
-				1A2B3C4D5E6F7890ABCD124C /* PomodoroTimer */,
+				1A2B3C4D5E6F7890ABCD124C /* LifeTimer */,
 				1A2B3C4D5E6F7890ABCD124D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,7 +101,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		1A2B3C4D5E6F7890ABCD124C /* PomodoroTimer */ = {
+		1A2B3C4D5E6F7890ABCD124C /* LifeTimer */ = {
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7890ABCD1235 /* PomodoroTimerApp.swift */,

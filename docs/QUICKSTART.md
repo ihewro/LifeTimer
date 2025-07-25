@@ -5,7 +5,7 @@
 ### 1. 打开项目
 ```bash
 cd /Users/hewro/Documents/life
-open PomodoroTimer.xcodeproj
+open LifeTimer.xcodeproj
 ```
 
 ### 2. 选择目标设备
@@ -76,7 +76,7 @@ open PomodoroTimer.xcodeproj
 ## 📂 项目结构说明
 
 ```
-PomodoroTimer/
+LifeTimer/
 ├── 📱 PomodoroTimerApp.swift     # 应用入口点
 ├── 📊 Models/                    # 数据模型层
 │   ├── TimerModel.swift          # 计时器逻辑

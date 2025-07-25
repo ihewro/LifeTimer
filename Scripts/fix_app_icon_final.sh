@@ -22,7 +22,7 @@ echo "3️⃣ 清理 Launch Services 数据库..."
 
 # 4. 重新注册应用
 echo "4️⃣ 重新注册应用..."
-APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/PomodoroTimer.app"
+APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/LifeTimer.app"
 if [ -d "$APP_PATH" ]; then
     /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R -trusted "$APP_PATH"
     echo "✅ 应用重新注册完成"

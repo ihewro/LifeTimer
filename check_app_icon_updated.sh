@@ -17,7 +17,7 @@ echo ""
 
 # 检查生成的图标文件
 echo "2. 检查生成的图标文件:"
-ICON_DIR="PomodoroTimer/Assets.xcassets/AppIcon.appiconset"
+ICON_DIR="LifeTimer/Assets.xcassets/AppIcon.appiconset"
 if [ -d "$ICON_DIR" ]; then
     echo "✓ 图标目录存在: $ICON_DIR"
     echo "图标文件数量: $(ls -1 $ICON_DIR/*.png 2>/dev/null | wc -l)"
@@ -30,7 +30,7 @@ echo ""
 
 # 检查构建产物中的图标
 echo "3. 检查构建产物中的图标:"
-BUILD_APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/PomodoroTimer.app"
+BUILD_APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/LifeTimer.app"
 if [ -f "$BUILD_APP_PATH/Contents/Resources/AppIcon.icns" ]; then
     echo "✓ 构建产物中的图标文件存在"
     echo "文件大小: $(ls -lh $BUILD_APP_PATH/Contents/Resources/AppIcon.icns | awk '{print $5}')"
@@ -44,12 +44,12 @@ echo ""
 
 # 检查应用程序是否在运行
 echo "4. 检查应用程序运行状态:"
-if pgrep -f "PomodoroTimer" > /dev/null; then
-    echo "✓ PomodoroTimer 应用程序正在运行"
+if pgrep -f "LifeTimer" > /dev/null; then
+    echo "✓ LifeTimer 应用程序正在运行"
     echo "进程信息:"
-    ps aux | grep PomodoroTimer | grep -v grep | head -2
+    ps aux | grep LifeTimer | grep -v grep | head -2
 else
-    echo "✗ PomodoroTimer 应用程序未运行"
+    echo "✗ LifeTimer 应用程序未运行"
 fi
 
 echo ""

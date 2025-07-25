@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在日历功能的月视图中，当用户切换日期时应用会崩溃。崩溃发生在 `PomodoroTimer/Managers/SystemEventStore.swift` 文件中的 `appStatsCache[key]` 这一行，错误信息为：`Thread 4: EXC_BAD_ACCESS (code=1, address=0x10)`。
+在日历功能的月视图中，当用户切换日期时应用会崩溃。崩溃发生在 `LifeTimer/Managers/SystemEventStore.swift` 文件中的 `appStatsCache[key]` 这一行，错误信息为：`Thread 4: EXC_BAD_ACCESS (code=1, address=0x10)`。
 
 ## 根本原因分析
 
@@ -110,13 +110,13 @@ print("🗑️ SystemEventStore: 清除所有缓存")
 
 ## 修复的文件列表
 
-1. **PomodoroTimer/Managers/SystemEventStore.swift**
+1. **LifeTimer/Managers/SystemEventStore.swift**
    - 添加 `cacheLock` 线程安全锁
    - 修复所有缓存访问方法的线程安全性
    - 新增批量查询方法 `getAppUsageStatsForDates`
    - 添加调试日志
 
-2. **PomodoroTimer/Managers/ActivityMonitorManager.swift**
+2. **LifeTimer/Managers/ActivityMonitorManager.swift**
    - 优化 `getAppUsageStatsForDates` 方法使用批量查询
 
 3. **PomodoroTimerTests/SystemEventStoreThreadSafetyTests.swift**（新增）
@@ -135,7 +135,7 @@ print("🗑️ SystemEventStore: 清除所有缓存")
 ### 1. 单元测试
 运行 `SystemEventStoreThreadSafetyTests` 中的测试用例：
 ```bash
-xcodebuild test -scheme PomodoroTimer -destination 'platform=macOS' -only-testing:PomodoroTimerTests/SystemEventStoreThreadSafetyTests
+xcodebuild test -scheme LifeTimer -destination 'platform=macOS' -only-testing:PomodoroTimerTests/SystemEventStoreThreadSafetyTests
 ```
 
 ### 2. 压力测试

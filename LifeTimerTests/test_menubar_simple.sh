@@ -3,14 +3,14 @@
 echo "🔍 测试菜单栏功能..."
 
 # 检查应用是否在运行
-if pgrep -f "PomodoroTimer" > /dev/null; then
-    echo "✅ PomodoroTimer 应用正在运行"
+if pgrep -f "LifeTimer" > /dev/null; then
+    echo "✅ LifeTimer 应用正在运行"
     
     # 检查最近的日志中是否有菜单栏相关活动
     echo "📊 检查最近的菜单栏活动..."
     
     # 查看最近30秒的日志
-    recent_logs=$(log show --predicate 'process == "PomodoroTimer"' --last 30s 2>/dev/null | grep -E "(trackMouse|sendAction|StatusBar)" | wc -l)
+    recent_logs=$(log show --predicate 'process == "LifeTimer"' --last 30s 2>/dev/null | grep -E "(trackMouse|sendAction|StatusBar)" | wc -l)
     
     if [ "$recent_logs" -gt 0 ]; then
         echo "✅ 检测到 $recent_logs 个菜单栏相关事件"
@@ -21,7 +21,7 @@ if pgrep -f "PomodoroTimer" > /dev/null; then
     fi
     
     # 检查菜单栏创建日志
-    creation_log=$(log show --predicate 'process == "PomodoroTimer" AND eventMessage CONTAINS "Menu bar status item created successfully"' --last 5m 2>/dev/null | wc -l)
+    creation_log=$(log show --predicate 'process == "LifeTimer" AND eventMessage CONTAINS "Menu bar status item created successfully"' --last 5m 2>/dev/null | wc -l)
     
     if [ "$creation_log" -gt 0 ]; then
         echo "✅ 菜单栏状态项创建成功"
@@ -30,7 +30,7 @@ if pgrep -f "PomodoroTimer" > /dev/null; then
     fi
     
 else
-    echo "❌ PomodoroTimer 应用未运行"
+    echo "❌ LifeTimer 应用未运行"
     echo "💡 请先启动应用"
 fi
 

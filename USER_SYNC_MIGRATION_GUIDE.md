@@ -136,7 +136,7 @@ php test_user_sync.php verify
 ### 客户端测试
 ```bash
 # 运行单元测试
-xcodebuild test -scheme PomodoroTimer -destination 'platform=macOS'
+xcodebuild test -scheme LifeTimer -destination 'platform=macOS'
 
 # 或在Xcode中运行UserSyncTests
 ```

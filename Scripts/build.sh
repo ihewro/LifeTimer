@@ -13,9 +13,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 项目配置
-PROJECT_NAME="PomodoroTimer"
-SCHEME_NAME="PomodoroTimer"
-PROJECT_PATH="./PomodoroTimer.xcodeproj"
+PROJECT_NAME="LifeTimer"
+SCHEME_NAME="LifeTimer"
+PROJECT_PATH="./LifeTimer.xcodeproj"
 
 # 函数：打印带颜色的消息
 print_message() {
@@ -52,7 +52,7 @@ build_macos() {
                   -configuration Release \
                   build; then
         print_message "✓ macOS 版本构建完成" $GREEN
-        print_message "应用位置: $(find ~/Library/Developer/Xcode/DerivedData -name "PomodoroTimer.app" -path "*/Release/*" 2>/dev/null | head -1)" $BLUE
+        print_message "应用位置: $(find ~/Library/Developer/Xcode/DerivedData -name "LifeTimer.app" -path "*/Release/*" 2>/dev/null | head -1)" $BLUE
     else
         print_message "✗ macOS 版本构建失败" $RED
         exit 1
@@ -149,7 +149,7 @@ test_macos() {
     build_macos
 
     # 查找构建的应用
-    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "PomodoroTimer.app" -path "*/Release/*" 2>/dev/null | head -1)
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "LifeTimer.app" -path "*/Release/*" 2>/dev/null | head -1)
 
     if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
         print_message "启动应用: $APP_PATH" $BLUE

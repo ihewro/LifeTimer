@@ -1,6 +1,6 @@
 //
 //  EventModel.swift
-//  PomodoroTimer
+//  LifeTimer
 //
 //  Created by Developer on 2024.
 //
@@ -142,7 +142,7 @@ class EventManager: ObservableObject {
 
     var dataFilePath: String {
         let libraryPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first!
-        return "\(libraryPath)/Preferences/\(Bundle.main.bundleIdentifier ?? "PomodoroTimer").plist"
+        return "\(libraryPath)/Preferences/\(Bundle.main.bundleIdentifier ?? "LifeTimer").plist"
     }
 
     init() {

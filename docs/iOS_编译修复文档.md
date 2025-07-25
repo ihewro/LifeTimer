@@ -2,7 +2,7 @@
 
 ## 修复概述
 
-本文档记录了将 PomodoroTimer macOS 应用适配到 iOS 平台的所有修复内容和解决方案。
+本文档记录了将 LifeTimer macOS 应用适配到 iOS 平台的所有修复内容和解决方案。
 
 ## 主要问题分析
 

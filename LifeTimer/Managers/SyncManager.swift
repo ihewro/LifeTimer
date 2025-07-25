@@ -1,6 +1,6 @@
 //
 //  SyncManager.swift
-//  PomodoroTimer
+//  LifeTimer
 //
 //  Created by Assistant on 2024
 //

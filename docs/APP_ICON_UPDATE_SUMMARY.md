@@ -4,7 +4,7 @@
 2025年7月5日 20:38
 
 ## 更新内容
-使用 `icons/icon.png` 文件重新生成了 PomodoroTimer 应用的所有图标尺寸。
+使用 `icons/icon.png` 文件重新生成了 LifeTimer 应用的所有图标尺寸。
 
 ## 执行步骤
 
@@ -39,7 +39,7 @@
 
 ### 图标文件位置
 ```
-PomodoroTimer/Assets.xcassets/AppIcon.appiconset/
+LifeTimer/Assets.xcassets/AppIcon.appiconset/
 ├── Contents.json
 ├── icon_16x16.png
 ├── icon_16x16@2x.png
@@ -70,7 +70,7 @@ PomodoroTimer/Assets.xcassets/AppIcon.appiconset/
 
 ### 构建产物
 ```
-Build/Products/Debug/PomodoroTimer.app/Contents/Resources/
+Build/Products/Debug/LifeTimer.app/Contents/Resources/
 ├── AppIcon.icns (59,100 bytes)
 └── Assets.car (405,416 bytes)
 ```

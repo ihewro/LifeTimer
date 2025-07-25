@@ -3,7 +3,7 @@
 # 检查应用图标脚本
 # 验证应用图标是否正确配置和显示
 
-APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/PomodoroTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/PomodoroTimer.app"
+APP_PATH="/Users/hewro/Library/Developer/Xcode/DerivedData/LifeTimer-bmuykvdpmsswvxfxkvszshtiscsy/Build/Products/Debug/LifeTimer.app"
 
 echo "🔍 检查应用图标配置..."
 echo ""
@@ -46,7 +46,7 @@ fi
 # 检查原始图标文件
 echo ""
 echo "🎨 原始图标文件:"
-ICON_DIR="PomodoroTimer/Assets.xcassets/AppIcon.appiconset"
+ICON_DIR="LifeTimer/Assets.xcassets/AppIcon.appiconset"
 if [ -d "$ICON_DIR" ]; then
     echo "图标文件数量: $(ls "$ICON_DIR"/*.png 2>/dev/null | wc -l)"
     echo "最大图标尺寸: $(ls "$ICON_DIR"/*1024*.png 2>/dev/null | head -1)"
