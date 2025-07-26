@@ -116,7 +116,6 @@ class SmartReminderManager: ObservableObject {
 
         self.timerModel = timerModel
         startListening()
-        showReminder()
     }
 
     /// 开始监听计时器状态变化

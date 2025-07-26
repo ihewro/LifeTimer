@@ -85,9 +85,8 @@ struct ContentView: View {
                     SettingsView()
                 }
             }
-            .frame(minWidth: 600, minHeight: 500)
+            .frame(minWidth: 600, minHeight: 550)
         }
-        .frame(minWidth: 800, minHeight: 600)
         .navigationTitle("")
         .toolbar {
             // 隐藏默认的标题视图
