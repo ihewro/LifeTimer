@@ -576,6 +576,7 @@ struct CalendarView: View {
     @State private var searchResults: [PomodoroEvent] = []
     @State private var showingSearchResults = false
     @State private var highlightedEventId: UUID?
+    @State private var searchTask: Task<Void, Never>? // 搜索任务管理
 
     // MARK: - 性能优化：预加载和缓存管理
     @State private var preloadTask: Task<Void, Never>?
@@ -648,17 +649,17 @@ struct CalendarView: View {
         }
         .toolbar {
             // 左侧：添加事件按钮
-            ToolbarItem(placement: .navigation) {
-                Button(action: {
-                    showingAddEvent = true
-                }) {
-                    Image(systemName: "plus")
-                }
-                .help("添加事件")
-            }
+            // ToolbarItem(placement: .navigation) {
+            //     Button(action: {
+            //         showingAddEvent = true
+            //     }) {
+            //         Image(systemName: "plus")
+            //     }
+            //     .help("添加事件")
+            // }
 
             // 中间：完整的工具栏布局
-            ToolbarItem(placement: .principal) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 HStack {
                     // 视图模式选择器
                     Picker("视图模式", selection: $currentViewMode) {
@@ -675,29 +676,30 @@ struct CalendarView: View {
 
                 }
             }
-            // 中间：占位符确保 toolbar 铺满宽度
-            ToolbarItem(placement: .principal) {
-                Spacer()
+        }
+        // 使用SwiftUI原生的.searchable修饰符
+        .searchable(text: $searchText, placement: .toolbar, prompt: "搜索事件")
+        .onSubmit(of: .search) {
+            Task {
+                await performSearchAsync()
             }
-            ToolbarItem(placement: .confirmationAction) {
-                // 搜索框
-                HStack(spacing: 6) {
-                        // Image(systemName: "magnifyingglass")
-                        //     .foregroundColor(.secondary)
-                        //     .font(.system(size: 13))
+        }
+        .onChange(of: searchText) { newValue in
+            // 取消之前的搜索任务
+            searchTask?.cancel()
 
-                        TextField("搜索事件", text: $searchText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 13))
-                            .frame(width: 140)
-                            .onSubmit {
-                                performSearch()
-                            }
-                            .onChange(of: searchText) { newValue in
-                                if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    closeSearchResults()
-                                }
-                            }
+            if newValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty {
+                closeSearchResults()
+            } else {
+                // 异步实时搜索：防抖处理，避免频繁搜索
+                searchTask = Task {
+                    // 防抖延迟300ms
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+
+                    // 检查任务是否被取消
+                    guard !Task.isCancelled else { return }
+
+                    await performSearchAsync()
                 }
             }
         }
@@ -710,8 +712,9 @@ struct CalendarView: View {
             triggerPreloading(for: currentViewMode, selectedDate: newDate)
         }
         .onDisappear {
-            // 清理预加载任务
+            // 清理预加载任务和搜索任务
             preloadTask?.cancel()
+            searchTask?.cancel()
         }
     }
 
@@ -798,9 +801,9 @@ struct CalendarView: View {
 
     // MARK: - 搜索相关方法
 
-    /// 执行搜索
+    /// 执行搜索（同步版本，用于回车键触发）
     private func performSearch() {
-        let trimmedText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedText = searchText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
             closeSearchResults()
             return
@@ -808,6 +811,37 @@ struct CalendarView: View {
 
         searchResults = eventManager.searchEvents(trimmedText)
         showingSearchResults = true
+    }
+
+    /// 执行搜索（异步版本，用于实时搜索）
+    @MainActor
+    private func performSearchAsync() async {
+        let trimmedText = searchText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            closeSearchResults()
+            return
+        }
+
+        #if DEBUG
+        let startTime = CFAbsoluteTimeGetCurrent()
+        #endif
+
+        // 在后台线程执行搜索
+        let results = await Task.detached { [eventManager] in
+            return eventManager.searchEvents(trimmedText)
+        }.value
+
+        // 检查任务是否被取消
+        guard !Task.isCancelled else { return }
+
+        // 在主线程更新UI
+        searchResults = results
+        showingSearchResults = true
+
+        #if DEBUG
+        let endTime = CFAbsoluteTimeGetCurrent()
+        print("🔍 CalendarView: 搜索完成 '\(trimmedText)'，耗时: \(String(format: "%.2f", (endTime - startTime) * 1000))ms，结果: \(results.count) 个")
+        #endif
     }
 
     /// 关闭搜索结果
