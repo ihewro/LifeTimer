@@ -75,17 +75,15 @@ class AppIconManager: ObservableObject {
     }
     
     /// 调整图片大小
+    #if canImport(Cocoa)
     private func resizeImage(_ image: NSImage, to size: NSSize) -> NSImage {
-        #if canImport(Cocoa)
         let resizedImage = NSImage(size: size)
         resizedImage.lockFocus()
         image.draw(in: NSRect(origin: .zero, size: size))
         resizedImage.unlockFocus()
         return resizedImage
-        #else
-        return image
-        #endif
     }
+    #endif
     
     /// 保存当前图标路径
     private func saveCurrentIconPath() {
