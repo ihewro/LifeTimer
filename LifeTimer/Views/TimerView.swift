@@ -238,7 +238,7 @@ struct TimerView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
-                            .tint(.gray)
+                            // .tint(.gray)
                         }
                     }
                     // 番茄模式暂停时只显示继续按钮

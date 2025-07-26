@@ -79,7 +79,7 @@ struct SmartReminderDialog: View {
                 Spacer()
             }
         }
-        .frame(width: 480)
+        .frame(width: 380)
         .padding(24)
         .background(backgroundView)
         .cornerRadius(12)
