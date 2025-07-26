@@ -175,7 +175,11 @@ struct SettingsView: View {
             }
     }
 
-
+    /// 测试智能提醒弹窗
+    private func testSmartReminder() {
+        // 手动触发智能提醒显示
+        smartReminderManager.testShowReminder()
+    }
 
     private var contentView: some View {
         Group {
@@ -265,6 +269,18 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                                     .font(.caption)
                             }
+                        }
+                        .padding(.horizontal, 20)
+
+                        // 测试按钮
+                        HStack {
+                            Text("测试智能提醒弹窗")
+                                .font(.subheadline)
+                            Spacer()
+                            Button("测试显示") {
+                                testSmartReminder()
+                            }
+                            .buttonStyle(.bordered)
                         }
                         .padding(.horizontal, 20)
                     }
@@ -1450,4 +1466,5 @@ struct StatisticsSidebarView: View {
             .prefix(10)
             .map { $0 }
     }
+
 }

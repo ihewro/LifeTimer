@@ -182,7 +182,13 @@ class SmartReminderManager: ObservableObject {
     func setCurrentTask(_ task: String) {
         currentSelectedTask = task
     }
-    
+
+    /// 测试方法：手动触发智能提醒弹窗（用于调试和测试）
+    func testShowReminder() {
+        print("🔔 测试显示智能提醒弹窗")
+        showReminder()
+    }
+
     // MARK: - Private Methods
     
     /// 加载设置
