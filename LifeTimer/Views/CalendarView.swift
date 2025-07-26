@@ -398,7 +398,7 @@ struct SearchResultsSidebar: View {
                 .background(Color.systemBackground)
             }
         }
-        .frame(width: 280)
+        .frame(width: min(280, max(250, UIScreen.main.bounds.width * 0.4)))
         .background(GlassEffectBackground())
     }
 }
@@ -668,7 +668,7 @@ struct CalendarView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: min(180, UIScreen.main.bounds.width * 0.3))
                     .onChange(of: currentViewMode) { newMode in
                         // 视图模式切换时触发预加载
                         triggerPreloading(for: newMode)
@@ -891,6 +891,10 @@ struct DayView: View {
     
     var body: some View {
         GeometryReader { geo in
+            // 智能布局检测：考虑屏幕宽度和设备类型
+            let isCompact = geo.size.width < 800 || (geo.size.width < 1000 && geo.size.height > geo.size.width)
+            let sidebarWidth = isCompact ? min(280, max(200, geo.size.width * 0.35)) : 240
+
             HStack(spacing: 0) {
                 // 左侧时间轴区域
                 TimelineView(
@@ -907,23 +911,25 @@ struct DayView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.systemBackground)
 
-                // 右侧面板 - 恢复日历模块和事件详情
-                VStack(spacing: 0) {
-                    MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
-                        .padding()
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                // 右侧面板 - 响应式宽度
+                if !isCompact || geo.size.width > 600 {
+                    VStack(spacing: 0) {
+                        MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
+                            .padding(isCompact ? 8 : 16)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                    Divider()
+                        Divider()
 
-                    DayStatsPanel(selectedDate: $selectedDate)
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
-                        .frame(maxHeight: .infinity)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        DayStatsPanel(selectedDate: $selectedDate)
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .frame(maxHeight: .infinity)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                    .frame(width: sidebarWidth)
+                    .background(GlassEffectBackground())
+                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
                 }
-                .frame(width: 240)
-                .background(GlassEffectBackground())
-                .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -2065,8 +2071,11 @@ struct WeekView: View {
                     Divider()
 
                     // 星期标题行
-                    weekHeaderView
-                        .frame(height: 60)
+                    let isCompact = geometry.size.width < 800
+                    let timeAxisWidth: CGFloat = isCompact ? 50 : 60
+
+                    weekHeaderView(timeAxisWidth: timeAxisWidth)
+                        .frame(height: isCompact ? 50 : 60)
 
                     Divider()
 
@@ -2074,10 +2083,13 @@ struct WeekView: View {
                     ScrollView {
                         GeometryReader { scrollGeometry in
                             ZStack(alignment: .topLeading) {
+                                let isCompact = geometry.size.width < 800
+                                let timeAxisWidth: CGFloat = isCompact ? 50 : 60
+
                                 HStack(alignment: .top, spacing: 0) {
                                     // 左侧时间标签
                                     timeLabelsView
-                                        .frame(width: 60)
+                                        .frame(width: timeAxisWidth)
 
                                     // 周事件网格
                                     weekGridView
@@ -2096,23 +2108,28 @@ struct WeekView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // 右侧面板（类似日视图）
-                VStack(spacing: 0) {
-                    // 小日历
-                    MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
-                        .padding()
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                // 右侧面板（类似日视图）- 响应式宽度
+                let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
+                let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
 
-                    Divider()
+                if !isCompact || geometry.size.width > 600 {
+                    VStack(spacing: 0) {
+                        // 小日历
+                        MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
+                            .padding(isCompact ? 8 : 16)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                    // 周统计信息
-                    weekStatsPanel
-                        .frame(maxHeight: .infinity)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        Divider()
+
+                        // 周统计信息
+                        weekStatsPanel
+                            .frame(maxHeight: .infinity)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                    .frame(width: sidebarWidth)
+                    .background(GlassEffectBackground())
+                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
                 }
-                .frame(width: 240)
-                .background(GlassEffectBackground())
-                .animation(.easeInOut(duration: 0.3), value: selectedDate)
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -2131,12 +2148,12 @@ struct WeekView: View {
     }
 
     // 星期标题视图
-    private var weekHeaderView: some View {
+    private func weekHeaderView(timeAxisWidth: CGFloat = 60) -> some View {
         HStack(spacing: 0) {
             // 左侧空白区域（对应时间标签）
             Rectangle()
                 .fill(Color.clear)
-                .frame(width: 60)
+                .frame(width: timeAxisWidth)
 
             // 星期标题
             ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
@@ -2819,25 +2836,30 @@ struct MonthView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // 右侧面板
-                VStack(spacing: 0) {
-                    VStack(spacing: 6) {
-                        CalendarNavigationToolbar(
-                            viewMode: viewMode,
-                            selectedDate: $selectedDate
-                        )
-                        .padding()
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                // 右侧面板 - 响应式宽度
+                let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
+                let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
 
-                        // 月度统计
-                        monthStatsPanel
-                            .frame(maxHeight: .infinity)
+                if !isCompact || geometry.size.width > 600 {
+                    VStack(spacing: 0) {
+                        VStack(spacing: 6) {
+                            CalendarNavigationToolbar(
+                                viewMode: viewMode,
+                                selectedDate: $selectedDate
+                            )
+                            .padding(isCompact ? 8 : 16)
                             .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                            // 月度统计
+                            monthStatsPanel
+                                .frame(maxHeight: .infinity)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
                     }
+                    .frame(width: sidebarWidth)
+                    .background(GlassEffectBackground())
+                    .animation(.easeInOut(duration: 0.3), value: displayMonth)
                 }
-                .frame(width: 240)
-                .background(GlassEffectBackground())
-                .animation(.easeInOut(duration: 0.3), value: displayMonth)
             }
         }
         .onAppear {
@@ -4000,7 +4022,7 @@ struct DayEventsPopover: View {
             }
         }
         .padding()
-        .frame(width: 280)
+        .frame(width: min(280, UIScreen.main.bounds.width * 0.4))
     }
 
     // 空状态视图 - 预构建避免重复创建
