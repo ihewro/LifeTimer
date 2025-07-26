@@ -209,8 +209,10 @@ class MenuBarManager: ObservableObject {
         // 策略1: 查找主应用窗口（改进的过滤逻辑）
         let mainWindows = findMainApplicationWindows()
 
+        NSLog("MenuBarManager: Found \(mainWindows.count) main windows")
+
         // 首先尝试找到可见的窗口
-        if let visibleWindow = mainWindows.first(where: { $0.isVisible }) {
+        if let visibleWindow = mainWindows.first(where: { $0.isVisible && !$0.isMiniaturized }) {
             NSLog("MenuBarManager: Found visible window: \(visibleWindow.title)")
             bringWindowToFront(visibleWindow)
             return true
@@ -227,7 +229,21 @@ class MenuBarManager: ObservableObject {
         // 如果有任何主窗口（即使不可见），尝试显示它
         if let anyMainWindow = mainWindows.first {
             NSLog("MenuBarManager: Found hidden window: \(anyMainWindow.title)")
+            // 强制显示隐藏的窗口
+            anyMainWindow.setIsVisible(true)
             bringWindowToFront(anyMainWindow)
+            return true
+        }
+
+        // 如果智能提醒窗口正在显示，尝试通过通知来显示主窗口
+        let smartReminderWindows = NSApp.windows.filter { window in
+            window.title.contains("智能提醒") || window.className.contains("SmartReminder")
+        }
+
+        if !smartReminderWindows.isEmpty {
+            NSLog("MenuBarManager: Smart reminder window is showing, trying to show main window")
+            // 发送通知请求显示主窗口
+            NotificationCenter.default.post(name: .init("ShowMainWindowFromMenuBar"), object: nil)
             return true
         }
 
@@ -239,18 +255,27 @@ class MenuBarManager: ObservableObject {
         return NSApp.windows.filter { window in
             // 更严格的过滤条件
             let className = window.className
+            let windowTitle = window.title
+
+            // 排除系统窗口
             let isSystemWindow = className.contains("NSStatusBarWindow") ||
                                className.contains("NSMenuWindow") ||
                                className.contains("NSPopover") ||
                                className.contains("NSAlert") ||
                                className.contains("NSPanel")
 
-            // 检查窗口是否属于我们的应用
-            let isOurWindow = window.canBecomeMain || window.canBecomeKey
+            // 排除智能提醒窗口
+            let isSmartReminderWindow = windowTitle.contains("智能提醒") ||
+                                      className.contains("SmartReminder")
 
-            NSLog("MenuBarManager: Window check - \(className), canBecomeMain: \(window.canBecomeMain), isSystemWindow: \(isSystemWindow)")
+            // 检查窗口是否属于我们的应用主窗口
+            let isMainWindow = window.canBecomeMain &&
+                             (windowTitle.contains("LifeTimer") ||
+                              className.contains("AppKitWindow"))
 
-            return isOurWindow && !isSystemWindow
+            NSLog("MenuBarManager: Window check - \(className), title: '\(windowTitle)', canBecomeMain: \(window.canBecomeMain), isSystemWindow: \(isSystemWindow), isSmartReminderWindow: \(isSmartReminderWindow), isMainWindow:\(isMainWindow)")
+
+            return isMainWindow && !isSystemWindow && !isSmartReminderWindow
         }
     }
 
