@@ -53,8 +53,11 @@ class SmartReminderManager: ObservableObject {
     /// 剩余提醒时间（秒）
     @Published var remainingTime: TimeInterval = 0
     
-    /// 是否显示提醒弹窗
+    /// 是否显示提醒弹窗（保留用于兼容性，但在 macOS 上使用独立窗口）
     @Published var showingReminderDialog: Bool = false
+
+    /// 当前选中的任务（用于传递给弹窗）
+    private var currentSelectedTask: String = ""
     
     // MARK: - Private Properties
     
@@ -113,6 +116,7 @@ class SmartReminderManager: ObservableObject {
 
         self.timerModel = timerModel
         startListening()
+        showReminder()
     }
 
     /// 开始监听计时器状态变化
@@ -149,6 +153,11 @@ class SmartReminderManager: ObservableObject {
         reminderState = .idle
         remainingTime = 0
         showingReminderDialog = false
+
+        // 关闭独立窗口（macOS）
+        #if os(macOS)
+        SmartReminderWindowManager.shared.closeReminderDialog()
+        #endif
     }
     
     /// 用户开始计时时调用（重置提醒状态）
@@ -162,6 +171,16 @@ class SmartReminderManager: ObservableObject {
         reminderState = .counting
         remainingTime = TimeInterval(minutes * 60)
         startReminderTimer()
+
+        // 关闭独立窗口（macOS）
+        #if os(macOS)
+        SmartReminderWindowManager.shared.closeReminderDialog()
+        #endif
+    }
+
+    /// 设置当前选中的任务（用于传递给弹窗）
+    func setCurrentTask(_ task: String) {
+        currentSelectedTask = task
     }
     
     // MARK: - Private Methods
@@ -295,7 +314,20 @@ class SmartReminderManager: ObservableObject {
         reminderTimer = nil
         reminderState = .showing
         remainingTime = 0
+
+        #if os(macOS)
+        // macOS 使用独立窗口
+        if let timerModel = timerModel {
+            SmartReminderWindowManager.shared.showReminderDialog(
+                timerModel: timerModel,
+                reminderManager: self,
+                selectedTask: currentSelectedTask
+            )
+        }
+        #else
+        // iOS 使用 sheet
         showingReminderDialog = true
+        #endif
     }
     
     /// 格式化剩余时间显示

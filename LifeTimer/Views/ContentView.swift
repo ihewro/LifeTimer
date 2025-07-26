@@ -147,15 +147,7 @@ struct ContentView: View {
                 // .frame(minWidth: 500, minHeight: 300)
                 // .interactiveDismissDisabled(true) // 禁止通过手势关闭，确保用户必须做出选择
         }
-        // 智能提醒弹窗 - 全局显示，无论在哪个页面都能弹出
-        .sheet(isPresented: $smartReminderManager.showingReminderDialog) {
-            SmartReminderDialog(
-                isPresented: $smartReminderManager.showingReminderDialog,
-                timerModel: timerModel,
-                reminderManager: smartReminderManager,
-                selectedTask: selectedTask
-            )
-        }
+        // 智能提醒弹窗 - macOS 使用独立窗口，不需要 sheet
         #else
         // iOS 版本使用 TabView
         TabView(selection: $selectedView) {
@@ -206,6 +198,13 @@ struct ContentView: View {
             if timerModel.timerState == .idle && !timerModel.hasUserSetCustomTask {
                 setDefaultTaskFromRecentEvent()
             }
+
+            // 设置智能提醒管理器的当前任务
+            smartReminderManager.setCurrentTask(selectedTask)
+        }
+        .onChange(of: selectedTask) { newTask in
+            // 当选中任务变化时，更新智能提醒管理器
+            smartReminderManager.setCurrentTask(newTask)
         }
     }
 

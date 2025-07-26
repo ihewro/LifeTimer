@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(Cocoa)
+import Cocoa
+#endif
 
 /// 智能提醒弹窗
 struct SmartReminderDialog: View {
@@ -13,15 +16,29 @@ struct SmartReminderDialog: View {
     @ObservedObject var timerModel: TimerModel
     @ObservedObject var reminderManager: SmartReminderManager
     let selectedTask: String
-    
+
     @State private var customFocusMinutes: String = ""
     @State private var customBreakMinutes: String = ""
     @State private var customSnoozeMinutes: String = ""
-    
+
     @FocusState private var isFocusInputFocused: Bool
     @FocusState private var isBreakInputFocused: Bool
     @FocusState private var isSnoozeInputFocused: Bool
-    
+
+    @State private var isClosing: Bool = false
+
+    /// 背景视图
+    @ViewBuilder
+    private var backgroundView: some View {
+        #if os(macOS)
+        // macOS 使用毛玻璃效果
+        GlassEffectBackground()
+        #else
+        // iOS 使用系统背景
+        Color.systemBackground
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 24) {
             // 标题区域
@@ -62,11 +79,10 @@ struct SmartReminderDialog: View {
                 Spacer()
             }
         }
-        .padding(24)
         .frame(width: 480)
-        .background(Color.systemBackground)
-        .cornerRadius(16)
-        .shadow(radius: 20)
+        .padding(24)
+        .background(backgroundView)
+        .cornerRadius(12)
     }
     
     // MARK: - 开始专注区域
@@ -86,7 +102,7 @@ struct SmartReminderDialog: View {
                             .font(.title3)
                             .fontWeight(.medium)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -131,7 +147,7 @@ struct SmartReminderDialog: View {
                             .font(.title3)
                             .fontWeight(.medium)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -176,7 +192,7 @@ struct SmartReminderDialog: View {
                             .font(.title3)
                             .fontWeight(.medium)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -207,12 +223,14 @@ struct SmartReminderDialog: View {
     // MARK: - 操作方法
     
     private func startFocus(minutes: Int) {
+        // 防止在关闭过程中执行操作
+        guard !isClosing else { return }
+
         timerModel.resetTimer()
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .singlePomodoro
         timerModel.startTimer(with: selectedTask)
         reminderManager.onUserStartedTimer()
-        isPresented = false
     }
     
     private func startCustomFocus() {
@@ -221,12 +239,14 @@ struct SmartReminderDialog: View {
     }
 
     private func startBreak(minutes: Int) {
+        // 防止在关闭过程中执行操作
+        guard !isClosing else { return }
+
         timerModel.resetTimer()
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .pureRest
         timerModel.startTimer(with: "休息")
         reminderManager.onUserStartedTimer()
-        isPresented = false
     }
 
     private func startCustomBreak() {
@@ -235,14 +255,17 @@ struct SmartReminderDialog: View {
     }
 
     private func snooze(minutes: Int) {
+        // 防止在关闭过程中执行操作
+        guard !isClosing else { return }
+
         reminderManager.snoozeReminder(minutes: minutes)
-        isPresented = false
     }
 
     private func snoozeCustom() {
         guard let minutes = Int(customSnoozeMinutes), minutes > 0, minutes <= 99 else { return }
         snooze(minutes: minutes)
     }
+
 }
 
 // MARK: - 预览
