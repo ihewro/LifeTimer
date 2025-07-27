@@ -12,70 +12,68 @@
 		1A2B3C4D5E6F7890ABCD1238 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1239 /* TimerView.swift */; };
 		1A2B3C4D5E6F7890ABCD123A /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123B /* CalendarView.swift */; };
 		1A2B3C4D5E6F7890ABCD123C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123D /* SettingsView.swift */; };
-		1A2B3C4D5E6F7890ABCD1260 /* EventEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */; };
 		1A2B3C4D5E6F7890ABCD123E /* TimerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1240 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */; };
-		SOUND001122334455667788 /* SoundEffectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SOUND001122334455667799 /* SoundEffectManager.swift */; };
-		APPICON001122334455667788 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPICON001122334455667799 /* AppIconManager.swift */; };
-		MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBAR001122334455667799 /* MenuBarManager.swift */; };
-		SMART001122334455667788 /* SmartReminderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMART001122334455667799 /* SmartReminderManager.swift */; };
-		SMARTW01122334455667788 /* SmartReminderWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTW01122334455667799 /* SmartReminderWindowManager.swift */; };
-		WINDOW01122334455667788 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = WINDOW01122334455667799 /* WindowManager.swift */; };
-		SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTD01122334455667799 /* SmartReminderDialog.swift */; };
 		1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */; };
 		1A2B3C4D5E6F7890ABCD1244 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */; };
 		1A2B3C4D5E6F7890ABCD1246 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */; };
-
+		1A2B3C4D5E6F7890ABCD1260 /* EventEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */; };
 		A24C640CC4FC40E796D84059 /* SystemEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004107185AAF4BDA9CCB5836 /* SystemEvent.swift */; };
-		FB93F2FB28B44882B2A81A29 /* SystemEventStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */; };
-		CF68A3113A0F4840B711F051 /* SystemEventMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */; };
 		A3435E05B21C4C38A4423D0F /* ActivityMonitorManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D069E42CBED4E2781ECAE2E /* ActivityMonitorManager.swift */; };
+		APPICON001122334455667788 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPICON001122334455667799 /* AppIconManager.swift */; };
+		AUTH001122334455667788AA /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTH001122334455667788BB /* AuthManager.swift */; };
+		AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHV01122334455667788BB /* AuthenticationView.swift */; };
 		BC37C01153C14ED6B4BAACF8 /* ActivityStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60283F027D8544698FF2E487 /* ActivityStatsView.swift */; };
 		BEAC969A37E845D78BCE206B /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FA65102F254A899C99BA8B /* ActivitySettingsView.swift */; };
+		CF68A3113A0F4840B711F051 /* SystemEventMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */; };
+		COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = COLEXT1122334455667788BB /* Color+CrossPlatform.swift */; };
+		FB93F2FB28B44882B2A81A29 /* SystemEventStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */; };
+		MENUBAR001122334455667788 /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUBAR001122334455667799 /* MenuBarManager.swift */; };
 		PERM001122334455667788AA /* PermissionRequestAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = PERM001122334455667788BB /* PermissionRequestAlert.swift */; };
+		SMART001122334455667788 /* SmartReminderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMART001122334455667799 /* SmartReminderManager.swift */; };
+		SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTD01122334455667799 /* SmartReminderDialog.swift */; };
+		SMARTW01122334455667788 /* SmartReminderWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMARTW01122334455667799 /* SmartReminderWindowManager.swift */; };
+		SOUND001122334455667788 /* SoundEffectManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SOUND001122334455667799 /* SoundEffectManager.swift */; };
 		SYNC001122334455667788AA /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNC001122334455667788BB /* SyncManager.swift */; };
 		SYNC001122334455667788CC /* SyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNC001122334455667788DD /* SyncView.swift */; };
 		SYNC001122334455667788EE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNC001122334455667788FF /* APIClient.swift */; };
-		AUTH001122334455667788AA /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTH001122334455667788BB /* AuthManager.swift */; };
-		AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUTHV01122334455667788BB /* AuthenticationView.swift */; };
-		COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = COLEXT1122334455667788BB /* Color+CrossPlatform.swift */; };
+		WINDOW01122334455667788 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = WINDOW01122334455667799 /* WindowManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeTimer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		004107185AAF4BDA9CCB5836 /* SystemEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEvent.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1235 /* LifeTimerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeTimerApp.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1237 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1239 /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD123B /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD123D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1241 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
-		SOUND001122334455667799 /* SoundEffectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEffectManager.swift; sourceTree = "<group>"; };
-		APPICON001122334455667799 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
-		MENUBAR001122334455667799 /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
-		SMART001122334455667799 /* SmartReminderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderManager.swift; sourceTree = "<group>"; };
-		SMARTW01122334455667799 /* SmartReminderWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderWindowManager.swift; sourceTree = "<group>"; };
-		WINDOW01122334455667799 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
-		SMARTD01122334455667799 /* SmartReminderDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderDialog.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1245 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeTimer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A2B3C4D5E6F7890ABCD1249 /* LifeTimer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LifeTimer.entitlements; sourceTree = "<group>"; };
-
-		004107185AAF4BDA9CCB5836 /* SystemEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEvent.swift; sourceTree = "<group>"; };
-		893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventStore.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditView.swift; sourceTree = "<group>"; };
 		458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventMonitor.swift; sourceTree = "<group>"; };
-		7D069E42CBED4E2781ECAE2E /* ActivityMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorManager.swift; sourceTree = "<group>"; };
 		60283F027D8544698FF2E487 /* ActivityStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStatsView.swift; sourceTree = "<group>"; };
 		78FA65102F254A899C99BA8B /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
-		PERM001122334455667788BB /* PermissionRequestAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestAlert.swift; sourceTree = "<group>"; };
-		SYNC001122334455667788BB /* SyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
-		SYNC001122334455667788DD /* SyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncView.swift; sourceTree = "<group>"; };
-		SYNC001122334455667788FF /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		7D069E42CBED4E2781ECAE2E /* ActivityMonitorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorManager.swift; sourceTree = "<group>"; };
+		893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventStore.swift; sourceTree = "<group>"; };
+		APPICON001122334455667799 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		AUTH001122334455667788BB /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		AUTHV01122334455667788BB /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		COLEXT1122334455667788BB /* Color+CrossPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+CrossPlatform.swift"; sourceTree = "<group>"; };
+		MENUBAR001122334455667799 /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
+		PERM001122334455667788BB /* PermissionRequestAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestAlert.swift; sourceTree = "<group>"; };
+		SMART001122334455667799 /* SmartReminderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderManager.swift; sourceTree = "<group>"; };
+		SMARTD01122334455667799 /* SmartReminderDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderDialog.swift; sourceTree = "<group>"; };
+		SMARTW01122334455667799 /* SmartReminderWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderWindowManager.swift; sourceTree = "<group>"; };
+		SOUND001122334455667799 /* SoundEffectManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEffectManager.swift; sourceTree = "<group>"; };
+		SYNC001122334455667788BB /* SyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
+		SYNC001122334455667788DD /* SyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncView.swift; sourceTree = "<group>"; };
+		SYNC001122334455667788FF /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		WINDOW01122334455667799 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,7 +87,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		1A2B3C4D5E6F7890ABCD124B /* */ = {
+		1A2B3C4D5E6F7890ABCD124B = {
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7890ABCD124C /* LifeTimer */,
@@ -97,18 +95,10 @@
 			);
 			sourceTree = "<group>";
 		};
-		1A2B3C4D5E6F7890ABCD124D /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		1A2B3C4D5E6F7890ABCD124C /* LifeTimer */ = {
 			isa = PBXGroup;
 			children = (
-				1A2B3C4D5E6F7890ABCD1235 /* PomodoroTimerApp.swift */,
+				1A2B3C4D5E6F7890ABCD1235 /* LifeTimerApp.swift */,
 				1A2B3C4D5E6F7890ABCD124E /* Views */,
 				1A2B3C4D5E6F7890ABCD124F /* Models */,
 				1A2B3C4D5E6F7890ABCD1250 /* Managers */,
@@ -120,6 +110,14 @@
 			path = LifeTimer;
 			sourceTree = "<group>";
 		};
+		1A2B3C4D5E6F7890ABCD124D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1A2B3C4D5E6F7890ABCD1248 /* LifeTimer.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		1A2B3C4D5E6F7890ABCD124E /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -129,7 +127,6 @@
 				1A2B3C4D5E6F7890ABCD123D /* SettingsView.swift */,
 				1A2B3C4D5E6F7890ABCD1261 /* EventEditView.swift */,
 				SMARTD01122334455667799 /* SmartReminderDialog.swift */,
-
 				60283F027D8544698FF2E487 /* ActivityStatsView.swift */,
 				78FA65102F254A899C99BA8B /* ActivitySettingsView.swift */,
 				PERM001122334455667788BB /* PermissionRequestAlert.swift */,
@@ -144,7 +141,6 @@
 			children = (
 				1A2B3C4D5E6F7890ABCD123F /* TimerModel.swift */,
 				1A2B3C4D5E6F7890ABCD1243 /* EventModel.swift */,
-			
 				004107185AAF4BDA9CCB5836 /* SystemEvent.swift */,
 			);
 			path = Models;
@@ -160,7 +156,6 @@
 				SMART001122334455667799 /* SmartReminderManager.swift */,
 				SMARTW01122334455667799 /* SmartReminderWindowManager.swift */,
 				WINDOW01122334455667799 /* WindowManager.swift */,
-
 				893D3210DAE24EB3B76D4D5B /* SystemEventStore.swift */,
 				458E31C0939E43B3A7E61D11 /* SystemEventMonitor.swift */,
 				7D069E42CBED4E2781ECAE2E /* ActivityMonitorManager.swift */,
@@ -171,20 +166,20 @@
 			path = Managers;
 			sourceTree = "<group>";
 		};
-		EXTENS1122334455667788CC /* Extensions */ = {
-			isa = PBXGroup;
-			children = (
-				COLEXT1122334455667788BB /* Color+CrossPlatform.swift */,
-			);
-			path = Extensions;
-			sourceTree = "<group>";
-		};
 		1A2B3C4D5E6F7890ABCD1251 /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7890ABCD1247 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		EXTENS1122334455667788CC /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				COLEXT1122334455667788BB /* Color+CrossPlatform.swift */,
+			);
+			path = Extensions;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -230,7 +225,7 @@
 				en,
 				Base,
 			);
-			mainGroup = 1A2B3C4D5E6F7890ABCD124B /* */;
+			mainGroup = 1A2B3C4D5E6F7890ABCD124B;
 			productRefGroup = 1A2B3C4D5E6F7890ABCD124D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -272,8 +267,7 @@
 				WINDOW01122334455667788 /* WindowManager.swift in Sources */,
 				SMARTD01122334455667788 /* SmartReminderDialog.swift in Sources */,
 				1A2B3C4D5E6F7890ABCD1242 /* EventModel.swift in Sources */,
-				1A2B3C4D5E6F7890ABCD1234 /* PomodoroTimerApp.swift in Sources */,
-			
+				1A2B3C4D5E6F7890ABCD1234 /* LifeTimerApp.swift in Sources */,
 				A24C640CC4FC40E796D84059 /* SystemEvent.swift in Sources */,
 				FB93F2FB28B44882B2A81A29 /* SystemEventStore.swift in Sources */,
 				CF68A3113A0F4840B711F051 /* SystemEventMonitor.swift in Sources */,
@@ -412,6 +406,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LifeTimer/LifeTimer.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"LifeTimer/Preview Content\"";
@@ -419,10 +414,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "LifeTimer";
+				INFOPLIST_KEY_CFBundleDisplayName = LifeTimer;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -433,7 +428,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.LifeTimer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihewro.LifeTimer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -450,6 +445,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LifeTimer/LifeTimer.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"LifeTimer/Preview Content\"";
@@ -457,10 +453,10 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "LifeTimer";
+				INFOPLIST_KEY_CFBundleDisplayName = LifeTimer;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -471,7 +467,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.LifeTimer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihewro.LifeTimer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -485,20 +481,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "LifeTimer" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1A2B3C4D5E6F7890ABCD1258 /* Debug */,
-				1A2B3C4D5E6F7890ABCD1259 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		1A2B3C4D5E6F7890ABCD1253 /* Build configuration list for PBXNativeTarget "LifeTimer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1A2B3C4D5E6F7890ABCD125A /* Debug */,
 				1A2B3C4D5E6F7890ABCD125B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A2B3C4D5E6F7890ABCD1257 /* Build configuration list for PBXProject "LifeTimer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A2B3C4D5E6F7890ABCD1258 /* Debug */,
+				1A2B3C4D5E6F7890ABCD1259 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
