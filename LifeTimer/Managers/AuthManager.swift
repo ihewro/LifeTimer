@@ -34,7 +34,7 @@ class AuthManager: ObservableObject {
     private let userInfoKey = "UserInfo"
     
     // Device Info
-    private let deviceUUID: String
+    public let deviceUUID: String
     
     // MARK: - Initialization
     init(serverURL: String? = nil) {

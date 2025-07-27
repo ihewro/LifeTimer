@@ -16,7 +16,7 @@ DerivedData/
 sync_server.zip
 pomodoro_sync.db
 sync_server/归档.zip
-
+*.zip
 # 数据库文件
 *.db
 *.sqlite

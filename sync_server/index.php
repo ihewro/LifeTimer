@@ -45,6 +45,7 @@ $routes = [
 
     // 统计和健康检查
     'GET /get_week_statistic' => 'statistic.php',
+    'GET /get_day_statistic' => 'statistic.php',
     'GET /api/health' => function() {
         return ['status' => 'ok', 'timestamp' => time() * 1000];
     }

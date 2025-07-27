@@ -2495,6 +2495,28 @@ extension SyncView {
                         Spacer()
                     }
 
+                    HStack {
+                        Text("设备ID：")
+                            .foregroundColor(.secondary)
+                        Text(authManager.deviceUUID)
+                            .font(.monospaced(.caption)())
+                            .textSelection(.enabled)
+
+                        Button(action: {
+                            #if canImport(AppKit)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(authManager.deviceUUID, forType: .string)
+                            #endif
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+
+                        Spacer()
+                    }
+
+
                     if let email = user.email {
                         HStack {
                             Text("邮箱：")

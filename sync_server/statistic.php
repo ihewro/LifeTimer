@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once 'config/database.php';
 require_once 'api/base.php';
+require_once 'includes/auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -20,6 +21,8 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 try {
     if ($method === 'GET' && strpos($path, 'get_week_statistic') !== false) {
         handleWeekStatistic();
+    } elseif ($method === 'GET' && strpos($path, 'get_day_statistic') !== false) {
+        handleDayStatistic();
     } else {
         throw new Exception('Invalid statistic endpoint');
     }
@@ -55,6 +58,8 @@ function sendStatisticSuccess($data) {
 
 // 处理周统计请求
 function handleWeekStatistic() {
+    // 获取用户信息（支持device_id参数或Bearer token认证）
+    $userInfo = getUserInfoForStatistic();
     $db = getDB();
 
     // 检查是否开启debug模式
@@ -73,12 +78,12 @@ function handleWeekStatistic() {
 
         if ($debug) {
             // Debug模式：获取详细事件信息
-            $dayData = calculateDayFocusTimeWithDebug($db, $date);
+            $dayData = calculateDayFocusTimeWithDebug($db, $date, $userInfo['user_id']);
             $focusMinutes = $dayData['totalMinutes'];
             $debugInfo[] = $dayData['debugInfo'];
         } else {
             // 正常模式：只获取总时间
-            $focusMinutes = calculateDayFocusTime($db, $date);
+            $focusMinutes = calculateDayFocusTime($db, $date, $userInfo['user_id']);
         }
 
         // 格式化时间显示
@@ -174,23 +179,22 @@ function getDayName($date) {
 }
 
 // 计算指定日期的专注时间（分钟）
-function calculateDayFocusTime($db, $date) {
+function calculateDayFocusTime($db, $date, $userId) {
     // 将日期转换为时间戳范围（毫秒）
     $startOfDay = strtotime($date . ' 00:00:00') * 1000;
     $endOfDay = strtotime($date . ' 23:59:59') * 1000;
 
-    // 查询番茄时间和正计时事件
+    // 查询番茄时间和正计时事件（支持中英文事件类型）
     $sql = "SELECT start_time, end_time, event_type
             FROM pomodoro_events
             WHERE start_time >= ? AND start_time <= ?
-            AND (event_type = '番茄时间' OR event_type = '正计时')
+            AND (event_type IN ('番茄时间', 'pomodoro', '正计时', 'positive_timer'))
             AND deleted_at IS NULL
             AND is_completed = 1
-            AND device_uuid = 5BCB91C4-62F1-4DCD-B927-642545156FF7"
-            ;
+            AND user_id = ?";
 
     $stmt = $db->prepare($sql);
-    $stmt->execute([$startOfDay, $endOfDay]);
+    $stmt->execute([$startOfDay, $endOfDay, $userId]);
     $events = $stmt->fetchAll();
 
     $totalMinutes = 0;
@@ -205,23 +209,23 @@ function calculateDayFocusTime($db, $date) {
 }
 
 // 计算指定日期的专注时间（带调试信息）
-function calculateDayFocusTimeWithDebug($db, $date) {
+function calculateDayFocusTimeWithDebug($db, $date, $userId) {
     // 将日期转换为时间戳范围（毫秒）
     $startOfDay = strtotime($date . ' 00:00:00') * 1000;
     $endOfDay = strtotime($date . ' 23:59:59') * 1000;
 
-    // 查询番茄时间和正计时事件
+    // 查询番茄时间和正计时事件（支持中英文事件类型）
     $sql = "SELECT title, start_time, end_time, event_type
             FROM pomodoro_events
             WHERE start_time >= ? AND start_time <= ?
-            AND (event_type != 'rest')
+            AND (event_type NOT IN ('rest', '休息', 'short_break', 'long_break'))
             AND deleted_at IS NULL
             -- AND is_completed = 1
-            AND device_uuid = '5BCB91C4-62F1-4DCD-B927-642545156FF7'
+            AND user_id = ?
             ORDER BY start_time";
 
     $stmt = $db->prepare($sql);
-    $stmt->execute([$startOfDay, $endOfDay]);
+    $stmt->execute([$startOfDay, $endOfDay, $userId]);
     $events = $stmt->fetchAll();
 
     $totalMinutes = 0;
@@ -290,8 +294,155 @@ function calculatePercentChange($previousValue, $currentValue) {
     if ($previousValue == 0) {
         return $currentValue > 0 ? 100 : 0;
     }
-    
+
     $change = (($currentValue - $previousValue) / $previousValue) * 100;
     return round($change);
+}
+
+// 获取统计接口的用户信息（支持device_id参数或Bearer token认证）
+function getUserInfoForStatistic() {
+    $db = getDB();
+
+    // 方式1：通过device_id参数获取用户信息
+    if (isset($_GET['device_id']) && !empty($_GET['device_id'])) {
+        $deviceId = $_GET['device_id'];
+
+        // 验证device_id格式（UUID）
+        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $deviceId)) {
+            throw new Exception('Invalid device_id format');
+        }
+
+        // 根据device_uuid查询用户信息
+        $stmt = $db->prepare('
+            SELECT
+                u.id as user_id,
+                u.user_uuid,
+                u.user_name,
+                d.id as device_id,
+                d.device_uuid,
+                d.device_name,
+                d.platform
+            FROM devices d
+            JOIN users u ON d.user_id = u.id
+            WHERE d.device_uuid = ? AND d.is_active = 1
+        ');
+        $stmt->execute([$deviceId]);
+        $result = $stmt->fetch();
+
+        if (!$result) {
+            throw new Exception('Device not found or inactive');
+        }
+
+        logMessage("Statistic access via device_id: $deviceId for user: {$result['user_name']}");
+        return $result;
+    }
+
+    // 方式2：通过Bearer token认证（原有方式）
+    $token = getAuthTokenFromHeader();
+    if ($token) {
+        $userInfo = validateSessionToken($token);
+        if ($userInfo) {
+            logMessage("Statistic access via Bearer token for user: {$userInfo['user_name']}");
+            return $userInfo;
+        }
+    }
+
+    // 如果两种方式都失败，返回错误
+    throw new Exception('Authentication required. Please provide either device_id parameter or Authorization header');
+}
+
+// 处理单日统计请求
+function handleDayStatistic() {
+    // 获取用户信息（支持device_id参数或Bearer token认证）
+    $userInfo = getUserInfoForStatistic();
+    $db = getDB();
+
+    // 获取日期参数，默认为今天
+    $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+
+    // 验证日期格式
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        throw new Exception('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // 计算统计数据
+    $stats = calculateDayStatistics($db, $date, $userInfo['user_id']);
+
+    $response = [
+        'title' => '🎉 今日专注信息 ψ(｀∇´)ψ',
+        'metrics' => [
+            [
+                'title' => '⏳ 总时间',
+                'value' => $stats['totalTime'] . 'min',
+                'subValue' => '——',
+                'subValueColor' => '#7D7D7E'
+            ],
+            [
+                'title' => '🍅 总番茄',
+                'value' => $stats['totalPomodoros'] . '个',
+                'subValue' => '——',
+                'subValueColor' => '#7D7D7E'
+            ],
+            [
+                'title' => '🚥 休息次数',
+                'value' => $stats['totalBreaks'] . '次',
+                'subValue' => '——',
+                'subValueColor' => '#7D7D7E'
+            ]
+        ],
+        'footnote' => ' Copyright @ hewro. life notice'
+    ];
+
+    logMessage("Day statistic completed for date: $date, user: {$userInfo['user_uuid']}");
+    sendStatisticSuccess($response);
+}
+
+// 计算指定日期的统计数据
+function calculateDayStatistics($db, $date, $userId) {
+    // 将日期转换为时间戳范围（毫秒）
+    $startOfDay = strtotime($date . ' 00:00:00') * 1000;
+    $endOfDay = strtotime($date . ' 23:59:59') * 1000;
+
+    // 查询所有事件（支持中英文事件类型）
+    $sql = "SELECT start_time, end_time, event_type
+            FROM pomodoro_events
+            WHERE start_time >= ? AND start_time <= ?
+            AND deleted_at IS NULL
+            AND is_completed = 1
+            AND user_id = ?";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute([$startOfDay, $endOfDay, $userId]);
+    $events = $stmt->fetchAll();
+
+    $totalTime = 0;
+    $totalPomodoros = 0;
+    $totalBreaks = 0;
+
+    foreach ($events as $event) {
+        $eventType = $event['event_type'];
+
+        // 判断是否为专注事件（番茄时间或正计时）
+        if (in_array($eventType, ['番茄时间', 'pomodoro', '正计时', 'positive_timer'])) {
+            // 计算专注时间
+            $durationMs = $event['end_time'] - $event['start_time'];
+            $durationMinutes = round($durationMs / (1000 * 60));
+            $totalTime += $durationMinutes;
+
+            // 统计番茄数量
+            if (in_array($eventType, ['番茄时间', 'pomodoro'])) {
+                $totalPomodoros++;
+            }
+        } elseif (in_array($eventType, ['休息', 'rest', 'short_break', 'long_break'])) {
+            // 统计休息次数
+            $totalBreaks++;
+        }
+    }
+
+    return [
+        'totalTime' => $totalTime,
+        'totalPomodoros' => $totalPomodoros,
+        'totalBreaks' => $totalBreaks
+    ];
 }
 ?>
