@@ -87,7 +87,7 @@ struct LifeTimerApp: App {
                 }
         }
         #if os(macOS)
-        .windowStyle(.titleBar)
+        .windowStyle(windowStyleForCurrentOS())
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unified)
         #endif
@@ -99,6 +99,17 @@ struct LifeTimerApp: App {
         // 使用单例模式确保只注册一次
         WindowNotificationManager.shared.setupNotifications { windowId in
             openWindow(id: windowId)
+        }
+    }
+
+    /// 根据系统版本返回合适的窗口样式
+    private func windowStyleForCurrentOS() -> some WindowStyle {
+        if #available(macOS 26.0, *) {
+            // macOS 15.0+ (对应系统版本 >= 26)
+            return .hiddenTitleBar
+        } else {
+            // 较旧的系统版本
+            return .titleBar
         }
     }
     #endif
