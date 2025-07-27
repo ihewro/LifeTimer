@@ -28,19 +28,24 @@ struct TimerView: View {
         Group {
             // 当窗口宽度小于 900px 时隐藏智能提醒状态显示
             if windowWidth >= 650 && smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
-                HStack(spacing: 6) {
-                    Image(systemName: "bell")
-                        .font(.caption)
-                        // .foregroundColor(.orange)
+                Button(action: {
+//                    showingTaskSelector = true
+                }){
+                    HStack(spacing: 6) {
+                        Image(systemName: "bell")
+                            .font(.caption)
+                             .foregroundColor(.orange)
+//                             .help("\(smartReminderManager.formatRemainingTime())后提醒")
 
-                    Text("\(smartReminderManager.formatRemainingTime())后提醒")
-                        .font(.caption.monospaced())
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                // .background(Color.orange.opacity(0.1))
-                .cornerRadius(6)
+                        Text("\(smartReminderManager.formatRemainingTime())后提醒")
+                            .font(.caption.monospaced())
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    // .background(Color.orange.opacity(0.1))
+//                    .cornerRadius(6)
+                }.buttonStyle(.borderless)
             } else {
                 // 空白占位，保持布局一致
                 Spacer()
@@ -124,7 +129,6 @@ struct TimerView: View {
                                 print("🔧 editingMinutes值: \(editingMinutes)")
                                timeEditorView = TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
                                               timerModel.setCustomTime(minutes: newMinutes)
-                                              showingTimeEditor = false
                                               timeEditorView = nil // 清除缓存
                                }
                                 showingTimeEditor = true
@@ -142,7 +146,6 @@ struct TimerView: View {
                            }else {
                                TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
                                               timerModel.setCustomTime(minutes: newMinutes)
-                                              showingTimeEditor = false
                                               timeEditorView = nil // 清除缓存
                                }
                            }
@@ -501,7 +504,7 @@ struct TimerView: View {
                         .font(.title2)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(PlainButtonStyle())
+//                .buttonStyle(PlainButtonStyle())
             }
         }
         // 番茄钟完成选择弹窗
@@ -615,7 +618,6 @@ struct TimerView: View {
 struct TimeEditorPopoverView: View {
     @Binding var minutes: Int
     let onConfirm: (Int) -> Void
-    @State private var tempMinutes: Int
     @State private var inputText: String
     @FocusState private var isInputFocused: Bool
     @EnvironmentObject var timerModel: TimerModel
@@ -623,7 +625,7 @@ struct TimeEditorPopoverView: View {
     init(minutes: Binding<Int>, onConfirm: @escaping (Int) -> Void) {
         self._minutes = minutes
         self.onConfirm = onConfirm
-        self._tempMinutes = State(initialValue: minutes.wrappedValue)
+        // 直接显示当前计时器的实际时间值，不使用智能计算
         self._inputText = State(initialValue: String(minutes.wrappedValue))
         print("📝 TimeEditorPopoverView 初始化 - 接收到的minutes值: \(minutes.wrappedValue)")
     }
@@ -642,15 +644,21 @@ struct TimeEditorPopoverView: View {
                         validateAndUpdateMinutes()
                     }
                     .onChange(of: inputText) { newValue in
-                        // 实时验证输入
-                        if let value = Int(newValue), value >= 1, value <= 99 {
-                            tempMinutes = value
+                        // 限制只能输入数字，并实时更新计时器时间
+                        let filteredValue = newValue.filter { $0.isNumber }
+                        if filteredValue != newValue {
+                            inputText = filteredValue
+                        }
+
+                        if let value = Int(filteredValue), value >= 1, value <= 99 {
+                            minutes = value
+                            onConfirm(value)
                         }
                     }
 
-                // 减少按钮
+                // 减少按钮（改为减5分钟）
                 Button(action: {
-                    adjustMinutes(by: -1)
+                    adjustMinutes(by: -5)
                 }) {
                     Image(systemName: "minus")
                         .font(.system(size: 12, weight: .medium))
@@ -659,9 +667,9 @@ struct TimeEditorPopoverView: View {
                 .controlSize(.small)
                 .frame(width: 28, height: 28)
 
-                // 增加按钮
+                // 增加按钮（改为加5分钟）
                 Button(action: {
-                    adjustMinutes(by: 1)
+                    adjustMinutes(by: 5)
                 }) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
@@ -707,61 +715,42 @@ struct TimeEditorPopoverView: View {
                     .controlSize(.small)
                 }
             }
-
-            // 按钮区域
-            HStack(spacing: 12) {
-                Button("取消") {
-                    // Popover 会自动关闭，不需要调用 dismiss
-                }
-                .controlSize(.small)
-
-                Button("确定") {
-                    validateAndUpdateMinutes()
-                    minutes = tempMinutes
-                    onConfirm(tempMinutes)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
         }
         .padding(16)
         .frame(width: 260)
-        .onAppear {
-            // 智能选择初始时间
-            let smartMinutes = calculateSmartInitialTime()
-            tempMinutes = smartMinutes
-            inputText = String(smartMinutes)
-            print("📝 TimeEditorPopoverView 智能初始化 - 原始值: \(minutes), 距离整点: \(minutesToNextHour()), 智能选择: \(smartMinutes)")
-        }
     }
 
     // 验证并更新分钟数
     private func validateAndUpdateMinutes() {
         if let value = Int(inputText) {
             let clampedValue = max(1, min(99, value))
-            tempMinutes = clampedValue
             inputText = String(clampedValue)
+            minutes = clampedValue
+            onConfirm(clampedValue)
         } else {
             // 如果输入无效，恢复到当前值
-            inputText = String(tempMinutes)
+            inputText = String(minutes)
         }
     }
 
     // 调整分钟数
     private func adjustMinutes(by delta: Int) {
-        let newValue = max(1, min(99, tempMinutes + delta))
-        tempMinutes = newValue
+        let currentValue = Int(inputText) ?? minutes
+        let newValue = max(1, min(99, currentValue + delta))
         inputText = String(newValue)
+        minutes = newValue
+        onConfirm(newValue)
     }
 
     // 设置快捷时间
     private func setQuickTime(_ minutes: Int) {
         let clampedValue = max(1, min(99, minutes))
-        tempMinutes = clampedValue
         inputText = String(clampedValue)
+        self.minutes = clampedValue
+        onConfirm(clampedValue)
     }
 
-    // MARK: - 智能时间选择
+    // MARK: - 时间计算辅助方法
 
     /// 计算距离下一个整点的分钟数
     private func minutesToNextHour() -> Int {
@@ -778,19 +767,6 @@ struct TimeEditorPopoverView: View {
         // 计算距离下一个整点的分钟数
         let minutesToNext = 60 - currentMinute
         return minutesToNext
-    }
-
-    /// 智能计算初始时间
-    /// 比较传入的minutes值和距离下一个整点的时间，选择较大的值
-    private func calculateSmartInitialTime() -> Int {
-        let candidateA = minutes  // 传入的minutes参数值
-        let candidateB = minutesToNextHour()   // 距离下一个整点的分钟数
-
-        // 选择较大的值，但确保在合理范围内（1-99分钟）
-        let smartChoice = max(candidateA, candidateB)
-        let clampedChoice = max(1, min(99, smartChoice))
-
-        return clampedChoice
     }
 }
 

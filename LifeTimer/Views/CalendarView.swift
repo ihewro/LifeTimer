@@ -660,7 +660,7 @@ struct CalendarView: View {
         }
         .toolbar {
             // 左侧：添加事件按钮
-            ToolbarItem(placement: .navigation) {
+            ToolbarItemGroup(placement: .navigation) {
                 Button(action: {
                     showingAddEvent = true
                 }) {
@@ -670,7 +670,7 @@ struct CalendarView: View {
             }
 
             // 中间：完整的工具栏布局
-            ToolbarItemGroup(placement: .primary) {
+            ToolbarItemGroup(placement: .principal) {
                 HStack {
                     // 视图模式选择器
                     Picker("视图模式", selection: $currentViewMode) {
@@ -923,7 +923,7 @@ struct DayView: View {
                 .background(Color.systemBackground)
 
                 // 右侧面板 - 响应式宽度
-                if !isCompact || geo.size.width > 600 {
+                if !isCompact || geo.size.width > 580 {
                     VStack(spacing: 0) {
                         MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
                             .padding(isCompact ? 8 : 16)
@@ -2123,7 +2123,7 @@ struct WeekView: View {
                 let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
                 let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
 
-                if !isCompact || geometry.size.width > 600 {
+                if !isCompact || geometry.size.width > 580 {
                     VStack(spacing: 0) {
                         // 小日历
                         MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
@@ -2851,7 +2851,7 @@ struct MonthView: View {
                 let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
                 let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
 
-                if !isCompact || geometry.size.width > 600 {
+                if !isCompact || geometry.size.width > 580 {
                     VStack(spacing: 0) {
                         VStack(spacing: 6) {
                             CalendarNavigationToolbar(
