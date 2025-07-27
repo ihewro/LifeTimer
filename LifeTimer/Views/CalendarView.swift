@@ -8,6 +8,17 @@
 import SwiftUI
 import Foundation
 
+// MARK: - 跨平台屏幕尺寸获取
+private func getScreenWidth() -> CGFloat {
+    #if os(iOS)
+    return UIScreen.main.bounds.width
+    #elseif os(macOS)
+    return NSScreen.main?.frame.width ?? 1200
+    #else
+    return 800 // 默认值
+    #endif
+}
+
 // MARK: - 事件位置缓存管理器
 class EventPositionCache: ObservableObject {
     private var cache: [String: (y: CGFloat, height: CGFloat)] = [:]
@@ -398,7 +409,7 @@ struct SearchResultsSidebar: View {
                 .background(Color.systemBackground)
             }
         }
-        .frame(width: min(280, max(250, UIScreen.main.bounds.width * 0.4)))
+        .frame(width: min(280, max(250, getScreenWidth() * 0.4)))
         .background(GlassEffectBackground())
     }
 }
@@ -668,7 +679,7 @@ struct CalendarView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: min(180, UIScreen.main.bounds.width * 0.3))
+                    .frame(width: min(180, getScreenWidth() * 0.3))
                     .onChange(of: currentViewMode) { newMode in
                         // 视图模式切换时触发预加载
                         triggerPreloading(for: newMode)
@@ -4022,7 +4033,7 @@ struct DayEventsPopover: View {
             }
         }
         .padding()
-        .frame(width: min(280, UIScreen.main.bounds.width * 0.4))
+        .frame(width: min(280, getScreenWidth() * 0.4))
     }
 
     // 空状态视图 - 预构建避免重复创建
