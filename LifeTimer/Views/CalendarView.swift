@@ -3908,9 +3908,8 @@ struct GlassEffectBackground: View {
         // macOS 使用材质效果，为未来的 glassEffect 做准备
         if #available(macOS 26.0, *) {
             // 未来版本可以使用 glassEffect (当 API 可用时)
-            // Color.clear.background(.regularMaterial).glassEffect(.regular, in:Rectangle())
-            Color.clear
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 0))
+            // Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
+            Color.clear.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 0))
         } else {
             // 当前版本使用增强的材质效果，模拟玻璃效果
             Color.clear
