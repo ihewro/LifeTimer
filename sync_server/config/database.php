@@ -144,4 +144,9 @@ class Database {
 function getDB() {
     return Database::getInstance()->getConnection();
 }
+
+// 别名函数，用于向后兼容
+function getDatabaseConnection() {
+    return getDB();
+}
 ?>

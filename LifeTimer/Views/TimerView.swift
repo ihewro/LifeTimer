@@ -618,6 +618,7 @@ struct TimeEditorPopoverView: View {
     @State private var tempMinutes: Int
     @State private var inputText: String
     @FocusState private var isInputFocused: Bool
+    @EnvironmentObject var timerModel: TimerModel
 
     init(minutes: Binding<Int>, onConfirm: @escaping (Int) -> Void) {
         self._minutes = minutes
@@ -629,11 +630,6 @@ struct TimeEditorPopoverView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // 当前时间显示
-            Text("\(tempMinutes) 分钟")
-                .font(.title2)
-                .fontWeight(.medium)
-
             // 数字输入框和调整按钮
             HStack(spacing: 8) {
                 // 数字输入框
@@ -675,6 +671,43 @@ struct TimeEditorPopoverView: View {
                 .frame(width: 28, height: 28)
             }
 
+            // 快捷时间按钮
+            VStack(spacing: 8) {
+                Text("快捷选择")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                HStack(spacing: 8) {
+                    // 整点时间按钮
+                    Button("\(minutesToNextHour())分钟") {
+                        setQuickTime(minutesToNextHour())
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    // 10分钟按钮
+                    Button("10分钟") {
+                        setQuickTime(10)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    // 20分钟按钮
+                    Button("20分钟") {
+                        setQuickTime(20)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    // 默认值按钮
+                    Button("\(Int(timerModel.pomodoroTime / 60))分钟") {
+                        setQuickTime(Int(timerModel.pomodoroTime / 60))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+
             // 按钮区域
             HStack(spacing: 12) {
                 Button("取消") {
@@ -692,7 +725,7 @@ struct TimeEditorPopoverView: View {
             }
         }
         .padding(16)
-        .frame(width: 220)
+        .frame(width: 260)
         .onAppear {
             // 智能选择初始时间
             let smartMinutes = calculateSmartInitialTime()
@@ -719,6 +752,13 @@ struct TimeEditorPopoverView: View {
         let newValue = max(1, min(99, tempMinutes + delta))
         tempMinutes = newValue
         inputText = String(newValue)
+    }
+
+    // 设置快捷时间
+    private func setQuickTime(_ minutes: Int) {
+        let clampedValue = max(1, min(99, minutes))
+        tempMinutes = clampedValue
+        inputText = String(clampedValue)
     }
 
     // MARK: - 智能时间选择
