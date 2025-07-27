@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS devices (
 -- 番茄事件表
 CREATE TABLE IF NOT EXISTS pomodoro_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    uuid VARCHAR(36) UNIQUE NOT NULL,
+    uuid VARCHAR(36) NOT NULL,
     user_id INTEGER NOT NULL, -- 主要关联：用户ID
     device_id INTEGER, -- 辅助信息：创建设备（用于冲突解决和审计）
     title VARCHAR(200) NOT NULL,
@@ -44,13 +44,14 @@ CREATE TABLE IF NOT EXISTS pomodoro_events (
     last_modified_device_id INTEGER, -- 最后修改的设备
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL,
-    FOREIGN KEY (last_modified_device_id) REFERENCES devices(id) ON DELETE SET NULL
+    FOREIGN KEY (last_modified_device_id) REFERENCES devices(id) ON DELETE SET NULL,
+    UNIQUE(uuid, user_id) -- 组合唯一约束：同一用户下uuid唯一，但不同用户间可以有相同uuid
 );
 
 -- 系统事件表
 CREATE TABLE IF NOT EXISTS system_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    uuid VARCHAR(36) UNIQUE NOT NULL,
+    uuid VARCHAR(36) NOT NULL,
     user_id INTEGER NOT NULL,
     device_id INTEGER,
     event_type VARCHAR(30) NOT NULL,
@@ -59,7 +60,8 @@ CREATE TABLE IF NOT EXISTS system_events (
     created_at BIGINT NOT NULL,
     deleted_at BIGINT DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL
+    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL,
+    UNIQUE(uuid, user_id) -- 组合唯一约束：同一用户下uuid唯一，但不同用户间可以有相同uuid
 );
 
 -- 计时器设置表 (key-value格式)
@@ -98,10 +100,12 @@ CREATE INDEX IF NOT EXISTS idx_devices_uuid ON devices(device_uuid);
 CREATE INDEX IF NOT EXISTS idx_pomodoro_events_user_updated ON pomodoro_events(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_pomodoro_events_uuid ON pomodoro_events(uuid);
 CREATE INDEX IF NOT EXISTS idx_pomodoro_events_device ON pomodoro_events(device_id);
+CREATE INDEX IF NOT EXISTS idx_pomodoro_events_uuid_user ON pomodoro_events(uuid, user_id);
 
 CREATE INDEX IF NOT EXISTS idx_system_events_user_timestamp ON system_events(user_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_system_events_uuid ON system_events(uuid);
 CREATE INDEX IF NOT EXISTS idx_system_events_device ON system_events(device_id);
+CREATE INDEX IF NOT EXISTS idx_system_events_uuid_user ON system_events(uuid, user_id);
 
 CREATE INDEX IF NOT EXISTS idx_timer_settings_user ON timer_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_timer_settings_device ON timer_settings(device_id);

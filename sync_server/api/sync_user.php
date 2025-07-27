@@ -153,6 +153,7 @@ function handleIncrementalSync() {
     $db = getDB();
     $db->beginTransaction();
 
+    error_log("lastSyncTimestamp:$lastSyncTimestamp");
     try {
         $conflicts = [];
 
@@ -552,7 +553,9 @@ function getUserTimerSettingsAfter($db, $userId, $timestamp) {
  */
 function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $lastSyncTimestamp) {
     $conflicts = [];
-    
+
+    $data = json_encode($changes);
+    error_log("processUserPomodoroEventChanges:$data");
     // 处理新创建的事件
     if (isset($changes['created'])) {
         foreach ($changes['created'] as $event) {
@@ -576,6 +579,8 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
                     $deviceId
                 ]);
             } catch (PDOException $e) {
+                $data = json_encode($e);
+                error_log("get error!!!:$data");
                 if ($e->getCode() == 23000) { // UNIQUE constraint failed
                     $conflicts[] = [
                         'type' => 'pomodoro_event',

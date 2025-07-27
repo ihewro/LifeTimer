@@ -80,8 +80,6 @@ struct LifeTimerApp: App {
                     #if canImport(Cocoa)
                     _ = AppIconManager.shared
 
-                    // 监听从菜单栏显示主窗口的通知
-                    setupMainWindowNotifications()
 
                     // 监听创建新窗口的通知
                     setupNewWindowNotifications()
@@ -92,33 +90,6 @@ struct LifeTimerApp: App {
         .windowStyle(.titleBar)
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unified)
-        #endif
-    }
-
-    /// 设置主窗口通知监听
-    private func setupMainWindowNotifications() {
-        #if canImport(Cocoa)
-        NotificationCenter.default.addObserver(
-            forName: .init("ShowMainWindowFromMenuBar"),
-            object: nil,
-            queue: .main
-        ) { _ in
-            // 强制显示主窗口
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-
-                // 查找主窗口并显示
-                if let mainWindow = NSApp.windows.first(where: { window in
-                    window.canBecomeMain &&
-                    !window.title.contains("智能提醒") &&
-                    !window.className.contains("SmartReminder")
-                }) {
-                    mainWindow.setIsVisible(true)
-                    mainWindow.makeKeyAndOrderFront(nil)
-                    mainWindow.orderFrontRegardless()
-                }
-            }
-        }
         #endif
     }
 
@@ -153,6 +124,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // 处理应用重新激活（比如点击Dock图标或菜单栏图标）
     func applicationShouldHandleReopen(_ app: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if (!flag) {
+            // 一个窗口都没有的时候走系统逻辑，否则在新版本上会持续多个窗口的情况
+            return true;
+        }
         NSLog("AppDelegate: applicationShouldHandleReopen - hasVisibleWindows: \(flag)")
 
         // 使用 WindowManager 来处理窗口显示逻辑

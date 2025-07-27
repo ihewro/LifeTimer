@@ -280,7 +280,9 @@ function requireAuth() {
     }
 
     $userInfo = validateSessionToken($token);
+    $data = json_encode($userInfo);
 
+    error_log("requireAuth: token: $token, user_info:$data");
     if (!$userInfo) {
         logMessage("Authentication failed: Invalid session token (token: " . substr($token, 0, 8) . "...)", 'WARNING');
         http_response_code(401);
