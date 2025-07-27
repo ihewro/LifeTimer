@@ -1,0 +1,413 @@
+<style>
+        #foucus_day {
+            margin: 0 auto;
+            width: 100%;
+            max-width: 400px;
+            height: 100px;
+            max-height: 100%;
+            background: #000;
+            border-radius: 5px;
+            padding: 12px 0px;
+            -moz-user-select: none;
+            /*火狐*/
+            -webkit-user-select: none;
+            /*webkit浏览器*/
+            -ms-user-select: none;
+            /*IE10*/
+            -khtml-user-select: none;
+            /*早期浏览器*/
+            user-select: none;
+            position: relative;
+            transition: height 0.3s ease;
+        }
+
+        /* 周视图模式下的高度 - 动态计算 */
+        #foucus_day.week-view {
+            /* 高度将通过JavaScript动态设置 */
+            transition: height 0.3s ease;
+        }
+
+        /* 确保footer在底部且没有过多空白 */
+        .week-view .footer {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            font-size: 12px;
+        }
+
+        .head_title {
+            color: #D0D0D0;
+            text-align: center;
+            font-size: 14px;
+            margin-right: 20px;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #333;
+            color: #D0D0D0;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            background: #444;
+            color: #fff;
+        }
+
+        .HStack {
+            display: flex;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .metricBlock {
+            flex: 1;
+            text-align: center;
+            margin: 5px 2px;
+        }
+
+        /* 周视图模式下的指标块样式 */
+        .week-view .metricBlock {
+            flex: 0 0 calc(33.33% - 10px);
+            margin-bottom: 10px;
+        }
+
+        .metricBlock .title {
+            color: #D0D0D0;
+            font-size: 12px;
+
+        }
+
+        .metricBlock .value {
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 3px 0;
+        }
+
+        .metricBlock .sub_value {
+            font-size: 12px;
+        }
+
+        /* 周视图模式下的值样式 */
+        .week-view .metricBlock .value {
+            font-size: 12px;
+        }
+
+        .metricBlock .sub_value {
+            color: red;
+        }
+
+        #foucus_day .footer {
+            color: #323232;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        /*骨架屏*/
+        @-webkit-keyframes skeleton-ani {
+            to {
+                background-position: 350% 0;
+            }
+        }
+
+        @keyframes skeleton-ani {
+            to {
+                background-position: 350% 0;
+            }
+        } 
+
+
+        .skt-loading .skeleton {
+            position: relative;
+            overflow: hidden;
+            border: none !important;
+            border-radius: 5px;
+            background-color: rgba(0, 0, 0, 0) !important;
+            background-image: none !important;
+            pointer-events: none;
+        }
+
+        .skt-loading .skeleton:after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 9;
+            width: 100%;
+            height: 100%;
+            /*background-color: #ebf1f8;*/
+            background-color: #f9f9f9;
+            display: block
+        }
+
+        .skt-loading .skeleton:not(.not-round):after {
+            border-radius: 4px
+        }
+
+        .format_time {
+            display: inline;
+        }
+
+        #foucus_day.skt-loading .skeleton:not(.not-before):before {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            content: "";
+            background-image: linear-gradient(90deg, rgba(211, 211, 211, 0) 0, rgb(236 236 236 / 80%) 50%, rgba(211, 211, 211, 0) 100%);
+            background-size: 75% 100%;
+            background-position: -200% 0;
+            background-repeat: no-repeat;
+            z-index: 99;
+            /*animation: skeleton-ani 1.5s infinite;*/
+            display: block;
+            -webkit-animation: loading 1s infinite;
+            animation: loading 1s infinite;
+        }
+
+        @-webkit-keyframes loading {
+            to {
+                background-position: 350% 0;
+            }
+        }
+
+        @keyframes loading {
+            to {
+                background-position: 350% 0;
+            }
+        }
+
+        /*dm下*/
+        #foucus_day.skt-loading .skeleton:not(.not-before):before {
+            background-image: linear-gradient(90deg, rgba(211, 211, 211, 0) 0, #1f1f1f 50%, rgba(211, 211, 211, 0) 100%);
+
+        }
+
+        #foucus_day.skt-loading .skeleton:after {
+            background-color: #2b2b2b
+        }
+    </style>
+    <h5 class="widget-title m-t-none"><a href="https://www.ihewro.com/cross.html?tag=41"
+            class="highlightlink">番茄钟</a></h5>
+    <div id="foucus_day" class="skt-loading">
+        <div class="head_title"> 🎉 今日专注信息</div>
+        <button class="toggle-btn" id="toggleView">周视图</button>
+        <div class="HStack skeleton">
+            <div class="metricBlock">
+                <div class="title">⏳ 时间</div>
+                <div class="value">7h20min</div>
+                <div class="sub_value" style="color: red">↑20%</div>
+            </div>
+            <div class="metricBlock">
+                <div class="title">🍅 番茄</div>
+                <div class="value">10个</div>
+                <div class="sub_value" style="color: #04B921">↑15%</div>
+            </div>
+            <div class="metricBlock">
+                <div class="title">🚥 中断</div>
+                <div class="value">5次</div>
+                <div class="sub_value" style="color: red">↓20%</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 当前视图模式：day(日视图) 或 week(周视图)
+        let currentView = 'day';
+        let weekData = null;
+        let dayData = null;
+
+        // 获取并显示数据
+        function fetchAndDisplayData() {
+            var xhr = new XMLHttpRequest();
+            const url = currentView === 'day'
+                ? "http://localhost:8080/get_day_statistic?device_id=EC2CE75A-D92A-42EA-8C5D-DD5D4CD1F970"
+                : "http://localhost:8080/get_week_statistic?device_id=EC2CE75A-D92A-42EA-8C5D-DD5D4CD1F970";
+
+            xhr.open('GET', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencode;charset=utf-8');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var element = document.getElementsByClassName("skeleton")[0];
+                    element.classList.remove("skeleton");
+
+                    const data = JSON.parse(xhr.responseText).data;
+
+                    if (currentView === 'week' && !weekData) {
+                        weekData = data;
+                    } else if (currentView === 'day' && !dayData) {
+                        dayData = data;
+                    }
+
+                    updateUI(data);
+                }
+            };
+            xhr.send();
+        }
+
+        // 计算周视图的动态高度
+        function calculateWeekViewHeight(metricsCount) {
+            // 基础高度包含：顶部标题区域(约40px) + 底部页脚(约30px) + 上下内边距(24px)
+            const baseHeight = 85;
+
+            // 每个指标块的高度(包含标题、值、子值和边距)
+            const metricBlockHeight = 55;
+
+            // 每行最多显示3个指标块
+            const itemsPerRow = 3;
+
+            // 计算需要多少行来显示所有指标
+            const rowsNeeded = Math.ceil(metricsCount / itemsPerRow);
+
+            // 计算总高度 = 基础高度 + 行数 * 每个指标块高度
+            return baseHeight + (rowsNeeded * metricBlockHeight);
+        }
+
+        // 更新UI显示
+        function updateUI(data) {
+            const root = document.getElementById('foucus_day');
+
+            // 更新标题和页脚
+            // root.getElementsByClassName("head_title")[0].innerHTML = data.title;
+            // root.getElementsByClassName("footer")[0].innerHTML = data.footnote;
+
+            // 获取指标容器
+            const hstack = root.getElementsByClassName("HStack")[0];
+
+            // 周视图模式下，需要重新创建所有指标块以显示完整的一周数据
+            if (currentView === 'week') {
+                root.getElementsByClassName("head_title")[0].innerHTML = "本周专注信息";
+
+                // 清空现有的指标块
+                hstack.innerHTML = '';
+
+                // 为每个指标创建一个块
+                if (data.metrics && data.metrics.length > 0) {
+                    data.metrics.forEach(function (metric) {
+                        // 创建新的指标块
+                        const metricBlock = document.createElement('div');
+                        metricBlock.className = 'metricBlock';
+
+                        // 创建标题
+                        const title = document.createElement('div');
+                        title.className = 'title';
+                        title.innerHTML = metric.title;
+
+                        // 创建值
+                        const value = document.createElement('div');
+                        value.className = 'value';
+                        value.innerHTML = metric.value;
+
+                        // 创建子值
+                        const subValue = document.createElement('div');
+                        subValue.className = 'sub_value';
+                        subValue.innerHTML = metric.subValue;
+                        subValue.style.color = metric.subValueColor;
+
+                        // 组装指标块
+                        metricBlock.appendChild(title);
+                        metricBlock.appendChild(value);
+                        metricBlock.appendChild(subValue);
+
+                        // 添加到容器
+                        hstack.appendChild(metricBlock);
+                    });
+
+                    // 根据指标数量动态设置卡片高度
+                    if (currentView === 'week') {
+                        const dynamicHeight = calculateWeekViewHeight(data.metrics.length);
+                        root.style.height = dynamicHeight + 'px';
+                    }
+                }
+            } else {
+                const root = document.getElementById('foucus_day');
+                root.getElementsByClassName("head_title")[0].innerHTML = "今日专注信息";
+                // 日视图模式下，使用固定的三个指标块
+                const els = root.getElementsByClassName("metricBlock");
+                Array.prototype.forEach.call(els, function (el, index) {
+                    if (data.metrics && data.metrics[index]) {
+                        el.getElementsByClassName("title")[0].innerHTML = data.metrics[index].title;
+                        el.getElementsByClassName("value")[0].innerHTML = data.metrics[index].value;
+                        el.getElementsByClassName("sub_value")[0].innerHTML = data.metrics[index].subValue;
+                        el.getElementsByClassName("sub_value")[0].style.color = data.metrics[index].subValueColor;
+                    }
+                });
+                root.style.height = 'auto';
+
+            }
+        }
+
+        // 切换视图
+        document.getElementById('toggleView').addEventListener('click', function () {
+            if (currentView === 'day') {
+                currentView = 'week';
+                this.textContent = '日视图';
+                // 切换到周视图时添加类名
+                document.getElementById('foucus_day').classList.add('week-view');
+                // 如果已经有周数据，直接使用并计算高度，否则获取
+                if (weekData) {
+                    updateUI(weekData);
+                    // 确保在使用缓存数据时也应用动态高度
+                    const dynamicHeight = calculateWeekViewHeight(weekData.metrics.length);
+                    document.getElementById('foucus_day').style.height = dynamicHeight + 'px';
+                } else {
+                    // 添加骨架屏效果
+                    document.getElementsByClassName("HStack")[0].classList.add("skeleton");
+                    fetchAndDisplayData();
+                }
+            } else {
+                currentView = 'day';
+                this.textContent = '周视图';
+                // 切换回日视图时恢复卡片高度
+                document.getElementById('foucus_day').classList.remove('week-view');
+                document.getElementById('foucus_day').style.height = 'auto';
+                // 重置为日视图的默认结构
+                const hstack = document.getElementsByClassName("HStack")[0];
+                hstack.innerHTML = `
+                        <div class="metricBlock">
+                            <div class="title">⏳ 时间</div>
+                            <div class="value">7h20min</div>
+                            <div class="sub_value" style="color: red">↑20%</div>
+                        </div>
+                        <div class="metricBlock">
+                            <div class="title">🍅 番茄</div>
+                            <div class="value">10个</div>
+                            <div class="sub_value" style="color: #04B921">↑15%</div>
+                        </div>
+                        <div class="metricBlock">
+                            <div class="title">🚥 中断</div>
+                            <div class="value">5次</div>
+                            <div class="sub_value" style="color: red">↓20%</div>
+                        </div>
+                    `;
+                if (dayData) {
+                    updateUI(dayData);
+                } else {
+                    // 添加骨架屏效果
+                    document.getElementsByClassName("HStack")[0].classList.add("skeleton");
+
+                    fetchAndDisplayData();
+                }
+            }
+        });
+
+        // 初始加载
+        fetchAndDisplayData();
+
+        // 确保初始状态下视图模式正确
+        if (currentView === 'day') {
+            document.getElementById('foucus_day').classList.remove('week-view');
+        } else {
+            document.getElementById('foucus_day').classList.add('week-view');
+        }
+    </script>
