@@ -660,17 +660,17 @@ struct CalendarView: View {
         }
         .toolbar {
             // 左侧：添加事件按钮
-            // ToolbarItem(placement: .navigation) {
-            //     Button(action: {
-            //         showingAddEvent = true
-            //     }) {
-            //         Image(systemName: "plus")
-            //     }
-            //     .help("添加事件")
-            // }
+            ToolbarItem(placement: .navigation) {
+                Button(action: {
+                    showingAddEvent = true
+                }) {
+                    Image(systemName: "plus")
+                }
+                .help("添加事件")
+            }
 
             // 中间：完整的工具栏布局
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primary) {
                 HStack {
                     // 视图模式选择器
                     Picker("视图模式", selection: $currentViewMode) {
