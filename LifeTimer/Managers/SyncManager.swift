@@ -228,7 +228,7 @@ class SyncManager: ObservableObject {
         // 加载同步系统事件设置（默认为true）
         self.syncSystemEvents = userDefaults.object(forKey: syncSystemEventsKey) as? Bool ?? false
 
-        // setupAutoSync()
+        setupAutoSync()
 
         // 初始化时计算待同步数据数量
         updatePendingSyncCount()
@@ -417,7 +417,7 @@ class SyncManager: ObservableObject {
     
     /// 启用自动同步
     func enableAutoSync() {
-//        setupAutoSync()
+        setupAutoSync()
     }
     
     /// 禁用自动同步

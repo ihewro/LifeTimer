@@ -141,9 +141,9 @@ struct SyncView: View {
             // 左侧：同步图标和标题
             ToolbarItem(placement: .navigation) {
                 HStack {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.title2)
-                        .foregroundColor(.accentColor)
+                    // Image(systemName: "arrow.triangle.2.circlepath")
+                    //     .font(.title2)
+                    //     .foregroundColor(.accentColor)
                     Text("数据同步")
                         .font(.title2)
                         .fontWeight(.semibold)
@@ -155,12 +155,12 @@ struct SyncView: View {
                 Spacer()
             }
 
-            // 右侧：Debug模式切换
-            ToolbarItem(placement: .primaryAction) {
-                Toggle("Debug", isOn: $debugMode)
-                    .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                    .controlSize(.small)
-            }
+            // // 右侧：Debug模式切换
+            // ToolbarItem(placement: .primaryAction) {
+            //     Toggle("Debug", isOn: $debugMode)
+            //         .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+            //         .controlSize(.small)
+            // }
         }
         .onAppear {
             serverURL = syncManager.serverURL
@@ -250,30 +250,30 @@ struct SyncView: View {
             Divider()
 
             // 同步设置
-            VStack(alignment: .leading, spacing: 8) {
-                Text("同步设置")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            // VStack(alignment: .leading, spacing: 8) {
+            //     Text("同步设置")
+            //         .font(.caption)
+            //         .foregroundColor(.secondary)
 
-                HStack {
-                    Toggle("同步系统事件", isOn: $syncManager.syncSystemEvents)
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        .controlSize(.small)
-                        .onChange(of: syncManager.syncSystemEvents) { newValue in
-                            syncManager.updateSyncSystemEvents(newValue)
-                            // 重新生成同步工作区以反映设置变更
-                            Task {
-                                await syncManager.generateSyncWorkspace()
-                            }
-                        }
+            //     HStack {
+            //         Toggle("同步系统事件", isOn: $syncManager.syncSystemEvents)
+            //             .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+            //             .controlSize(.small)
+            //             .onChange(of: syncManager.syncSystemEvents) { newValue in
+            //                 syncManager.updateSyncSystemEvents(newValue)
+            //                 // 重新生成同步工作区以反映设置变更
+            //                 Task {
+            //                     await syncManager.generateSyncWorkspace()
+            //                 }
+            //             }
 
-                    Spacer()
+            //         Spacer()
 
-                    Text("包含活动监控数据")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
+            //         Text("包含活动监控数据")
+            //             .font(.caption)
+            //             .foregroundColor(.secondary)
+            //     }
+            // }
         }
         .padding()
         .background(Color.systemBackground)
