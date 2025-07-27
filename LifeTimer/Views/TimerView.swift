@@ -17,6 +17,7 @@ struct TimerView: View {
     @State private var showingTaskSelector = false
     @Binding var selectedTask: String
     @State private var editingMinutes = 30
+    @State private var timeEditorView: TimeEditorPopoverView?
     @State private var isHoveringTimeCircle = false
     @State private var showingCompletionDialog = false
     @State private var customMinutes: String = ""
@@ -101,17 +102,31 @@ struct TimerView: View {
                         Button(action: {
                             // 正计时模式下不允许编辑时间
                             if timerModel.timerState == .idle && timerModel.currentMode != .countUp {
-                                // 根据当前模式获取对应的分钟数
+                                // 根据当前模式获取对应的分钟数，使用实际显示的时间值
+                                let currentMinutes: Int
                                 switch timerModel.currentMode {
                                 case .singlePomodoro:
-                                    editingMinutes = Int(timerModel.pomodoroTime / 60)
+                                    // 使用当前实际使用的番茄钟时间（包括临时调整）
+                                    currentMinutes = Int(timerModel.getCurrentPomodoroTime() / 60)
                                 case .pureRest:
-                                    editingMinutes = Int(timerModel.shortBreakTime / 60)
+                                    // 使用当前实际使用的休息时间（包括临时调整）
+                                    currentMinutes = Int(timerModel.getCurrentBreakTime() / 60)
                                 case .custom(let minutes):
-                                    editingMinutes = minutes
+                                    currentMinutes = minutes
                                 case .countUp:
-                                    break // 不应该到这里
+                                    currentMinutes = 30 // 不应该到这里，但提供默认值
                                 }
+
+                                print("🔧 按钮点击 - 当前时间: \(currentMinutes) 分钟")
+
+                                // 设置 editingMinutes 并创建时间编辑器视图
+                                editingMinutes = currentMinutes
+                                print("🔧 editingMinutes值: \(editingMinutes)")
+                               timeEditorView = TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
+                                              timerModel.setCustomTime(minutes: newMinutes)
+                                              showingTimeEditor = false
+                                              timeEditorView = nil // 清除缓存
+                               }
                                 showingTimeEditor = true
                             }
                         }) {
@@ -122,10 +137,15 @@ struct TimerView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         .popover(isPresented: $showingTimeEditor, arrowEdge: .bottom) {
-                            TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
-                                timerModel.setCustomTime(minutes: newMinutes)
-                                showingTimeEditor = false
-                            }
+                           if let cachedView = timeEditorView {
+                               cachedView
+                           }else {
+                               TimeEditorPopoverView(minutes: $editingMinutes) { newMinutes in
+                                              timerModel.setCustomTime(minutes: newMinutes)
+                                              showingTimeEditor = false
+                                              timeEditorView = nil // 清除缓存
+                               }
+                           }
                         }
 
                         // 其他信息显示区域（使用绝对定位，不影响时间居中）
@@ -588,6 +608,7 @@ struct TimerView: View {
             timerModel.resetTimer()
         }
     }
+
 }
 
 // MARK: - 时间编辑器 Popover
@@ -603,6 +624,7 @@ struct TimeEditorPopoverView: View {
         self.onConfirm = onConfirm
         self._tempMinutes = State(initialValue: minutes.wrappedValue)
         self._inputText = State(initialValue: String(minutes.wrappedValue))
+        print("📝 TimeEditorPopoverView 初始化 - 接收到的minutes值: \(minutes.wrappedValue)")
     }
 
     var body: some View {
@@ -672,8 +694,11 @@ struct TimeEditorPopoverView: View {
         .padding(16)
         .frame(width: 220)
         .onAppear {
-            // 确保输入框显示正确的初始值
-            inputText = String(tempMinutes)
+            // 智能选择初始时间
+            let smartMinutes = calculateSmartInitialTime()
+            tempMinutes = smartMinutes
+            inputText = String(smartMinutes)
+            print("📝 TimeEditorPopoverView 智能初始化 - 原始值: \(minutes), 距离整点: \(minutesToNextHour()), 智能选择: \(smartMinutes)")
         }
     }
 
@@ -694,6 +719,38 @@ struct TimeEditorPopoverView: View {
         let newValue = max(1, min(99, tempMinutes + delta))
         tempMinutes = newValue
         inputText = String(newValue)
+    }
+
+    // MARK: - 智能时间选择
+
+    /// 计算距离下一个整点的分钟数
+    private func minutesToNextHour() -> Int {
+        let now = Date()
+        let calendar = Calendar.current
+        let currentMinute = calendar.component(.minute, from: now)
+        let currentSecond = calendar.component(.second, from: now)
+
+        // 如果当前时间刚好是整点（分钟和秒都是0），返回60分钟
+        if currentMinute == 0 && currentSecond == 0 {
+            return 60
+        }
+
+        // 计算距离下一个整点的分钟数
+        let minutesToNext = 60 - currentMinute
+        return minutesToNext
+    }
+
+    /// 智能计算初始时间
+    /// 比较传入的minutes值和距离下一个整点的时间，选择较大的值
+    private func calculateSmartInitialTime() -> Int {
+        let candidateA = minutes  // 传入的minutes参数值
+        let candidateB = minutesToNextHour()   // 距离下一个整点的分钟数
+
+        // 选择较大的值，但确保在合理范围内（1-99分钟）
+        let smartChoice = max(candidateA, candidateB)
+        let clampedChoice = max(1, min(99, smartChoice))
+
+        return clampedChoice
     }
 }
 
@@ -1126,60 +1183,6 @@ struct UnifiedButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - 原生按钮样式（类似 UIButton 效果）
-struct NativeButtonStyle: ButtonStyle {
-    let color: Color
-    let isProminent: Bool
-
-    init(color: Color = .accentColor, isProminent: Bool = false) {
-        self.color = color
-        self.isProminent = isProminent
-    }
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13))
-            .fontWeight(.medium)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: configuration.isPressed ? color.opacity(0.8) : color.opacity(0.9), location: 0),
-                                .init(color: configuration.isPressed ? color.opacity(0.6) : color.opacity(0.7), location: 1)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(
-                                LinearGradient(
-                                    gradient: Gradient(stops: [
-                                        .init(color: Color.black.opacity(0.2), location: 0),
-                                        .init(color: Color.black.opacity(0.1), location: 1)
-                                    ]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 0.5
-                            )
-                    )
-                    .shadow(
-                        color: Color.black.opacity(configuration.isPressed ? 0.1 : 0.2),
-                        radius: configuration.isPressed ? 1 : 2,
-                        x: 0,
-                        y: configuration.isPressed ? 0.5 : 1
-                    )
-            )
-            .foregroundColor(.white)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
-    }
-}
 
 // MARK: - 番茄钟完成选择弹窗
 struct PomodoroCompletionDialog: View {

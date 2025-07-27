@@ -64,6 +64,21 @@ let sidebarWidth = isCompact ? min(280, max(200, geo.size.width * 0.35)) : 240
 - **事件详情面板**: 响应式宽度调整
 - **模式选择器**: 宽度适配，最大不超过屏幕宽度的 30%
 
+#### 跨平台屏幕尺寸适配
+**问题**: `UIScreen.main.bounds.width` 在 macOS 上不可用
+**解决方案**:
+```swift
+private func getScreenWidth() -> CGFloat {
+    #if os(iOS)
+    return UIScreen.main.bounds.width
+    #elseif os(macOS)
+    return NSScreen.main?.frame.width ?? 1200
+    #else
+    return 800 // 默认值
+    #endif
+}
+```
+
 ### 3. 跨平台兼容性
 
 #### ContentView 平台适配
@@ -76,7 +91,8 @@ let sidebarWidth = isCompact ? min(280, max(200, geo.size.width * 0.35)) : 240
 ### ✅ 编译状态
 - **iPhone 模拟器**: 编译成功 ✅
 - **iPad 模拟器**: 编译成功 ✅
-- **macOS**: 保持原有功能完整性 ✅
+- **macOS**: 编译成功，保持原有功能完整性 ✅
+- **跨平台兼容性**: UIScreen/NSScreen API 适配完成 ✅
 
 ### ✅ UI 适配效果
 - **响应式布局**: 支持 iPhone SE 到 iPad Pro 的全系列设备 ✅
