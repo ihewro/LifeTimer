@@ -554,6 +554,9 @@ function getUserTimerSettingsAfter($db, $userId, $timestamp) {
 function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $lastSyncTimestamp) {
     $conflicts = [];
 
+    // 获取服务端当前时间戳，用于统一时间戳管理
+    $serverTimestamp = getCurrentTimestamp();
+
     $data = json_encode($changes);
     error_log("processUserPomodoroEventChanges:$data");
     // 处理新创建的事件
@@ -574,8 +577,8 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
                     $event['end_time'],
                     $event['event_type'],
                     $event['is_completed'] ? 1 : 0,
-                    $event['created_at'],
-                    $event['updated_at'],
+                    $event['created_at'], // 保持客户端的创建时间
+                    $serverTimestamp,    // 使用服务端统一时间戳作为更新时间
                     $deviceId
                 ]);
             } catch (PDOException $e) {
@@ -615,8 +618,8 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
             } else {
                 // 更新事件
                 $stmt = $db->prepare('
-                    UPDATE pomodoro_events 
-                    SET title = ?, start_time = ?, end_time = ?, event_type = ?, 
+                    UPDATE pomodoro_events
+                    SET title = ?, start_time = ?, end_time = ?, event_type = ?,
                         is_completed = ?, updated_at = ?, last_modified_device_id = ?
                     WHERE uuid = ? AND user_id = ?
                 ');
@@ -626,7 +629,7 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
                     $event['end_time'],
                     $event['event_type'],
                     $event['is_completed'] ? 1 : 0,
-                    $event['updated_at'],
+                    $serverTimestamp,    // 使用服务端统一时间戳
                     $deviceId,
                     $event['uuid'],
                     $userId
@@ -638,13 +641,13 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
     // 处理删除的事件
     if (isset($changes['deleted'])) {
         foreach ($changes['deleted'] as $uuid) {
-            $currentTimestamp = getCurrentTimestamp();
+            // 使用服务端统一时间戳进行软删除
             $stmt = $db->prepare('
                 UPDATE pomodoro_events
                 SET deleted_at = ?, updated_at = ?, last_modified_device_id = ?
                 WHERE uuid = ? AND user_id = ? AND deleted_at IS NULL
             ');
-            $stmt->execute([$currentTimestamp, $currentTimestamp, $deviceId, $uuid, $userId]);
+            $stmt->execute([$serverTimestamp, $serverTimestamp, $deviceId, $uuid, $userId]);
         }
     }
     
@@ -655,6 +658,9 @@ function processUserPomodoroEventChanges($db, $userId, $deviceId, $changes, $las
  * 处理用户系统事件变更
  */
 function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
+    // 获取服务端当前时间戳，用于统一时间戳管理
+    $serverTimestamp = getCurrentTimestamp();
+
     if (isset($changes['created'])) {
         foreach ($changes['created'] as $event) {
             try {
@@ -670,7 +676,7 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
                     $event['event_type'],
                     $event['timestamp'],
                     is_array($event['data']) ? json_encode($event['data']) : $event['data'],
-                    $event['created_at']
+                    $serverTimestamp    // 使用服务端统一时间戳作为created_at
                 ]);
             } catch (PDOException $e) {
                 if ($e->getCode() != 23000) { // 忽略重复UUID错误
@@ -685,7 +691,8 @@ function processUserSystemEventChanges($db, $userId, $deviceId, $changes) {
  * 处理用户计时器设置变更 (key-value格式)
  */
 function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $lastSyncTimestamp) {
-    // 直接使用客户端的毫秒时间戳
+    // 获取服务端当前时间戳，用于统一时间戳管理
+    $serverTimestamp = getCurrentTimestamp();
     $clientUpdatedAt = $settings['updated_at'];
 
     // 检查是否有冲突 - 获取最新的设置更新时间
@@ -717,7 +724,7 @@ function processUserTimerSettingsChanges($db, $userId, $deviceId, $settings, $la
     ');
 
     foreach ($settingItems as $key => $value) {
-        $stmt->execute([$userId, $key, (string)$value, $clientUpdatedAt]);
+        $stmt->execute([$userId, $key, (string)$value, $serverTimestamp]);  // 使用服务端统一时间戳
     }
 
     error_log("Timer settings updated for user: $userId, pomodoro: {$settings['pomodoro_time']}s, short_break: {$settings['short_break_time']}s, long_break: {$settings['long_break_time']}s, updated_at: $clientUpdatedAt");
