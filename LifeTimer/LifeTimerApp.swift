@@ -25,6 +25,7 @@ struct LifeTimerApp: App {
     #if canImport(Cocoa)
     @StateObject private var menuBarManager = MenuBarManager()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.openWindow) private var openWindow
     #endif
 
     init() {
@@ -81,6 +82,9 @@ struct LifeTimerApp: App {
 
                     // 监听从菜单栏显示主窗口的通知
                     setupMainWindowNotifications()
+
+                    // 监听创建新窗口的通知
+                    setupNewWindowNotifications()
                     #endif
                 }
         }
@@ -117,6 +121,16 @@ struct LifeTimerApp: App {
         }
         #endif
     }
+
+    #if canImport(Cocoa)
+    /// 设置新窗口创建通知监听
+    private func setupNewWindowNotifications() {
+        // 使用单例模式确保只注册一次
+        WindowNotificationManager.shared.setupNotifications { windowId in
+            openWindow(id: windowId)
+        }
+    }
+    #endif
 }
 
 #if canImport(Cocoa)

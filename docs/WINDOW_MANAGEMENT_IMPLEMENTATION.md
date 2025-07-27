@@ -12,6 +12,11 @@
 
 3. **使用 macOS SwiftUI 最佳实践**：需要采用更可靠的 SwiftUI 窗口管理方法，确保在不同 macOS 版本间的兼容性，避免重复窗口创建和布局问题。
 
+4. **NotificationCenter Observer 生命周期问题**：原始实现在 ContentView 的 onAppear 中注册 observer，但没有在适当时机注销，导致：
+   - 每次窗口重新显示时都会注册新的 observer
+   - 多个 observer 同时监听同一通知，造成重复窗口创建
+   - 内存泄漏和不可预测的行为
+
 ## 解决方案
 
 ### 1. 创建专用的 WindowManager 类
@@ -29,6 +34,17 @@
 - `findMainWindows()`: 查找所有主窗口（包括隐藏和最小化的）
 - `showExistingMainWindow()`: 尝试显示现有的主窗口
 - `createNewMainWindow()`: 创建新的主窗口
+
+### 1.1 创建 WindowNotificationManager 类
+
+**功能**:
+- 解决 NotificationCenter observer 生命周期管理问题
+- 确保通知监听器只注册一次，避免重复窗口创建
+- 提供统一的通知清理机制
+
+**主要方法**:
+- `setupNotifications()`: 设置通知监听（只会执行一次）
+- `cleanup()`: 清理通知监听器
 
 ### 2. 更新 App 结构
 

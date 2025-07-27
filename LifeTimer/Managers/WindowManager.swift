@@ -97,13 +97,13 @@ class WindowManager: ObservableObject {
             object: nil
         )
         
-        // 备用方案：如果通知系统失败，尝试其他方法
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if !self.hasVisibleMainWindow {
-                NSLog("WindowManager: Notification method failed, trying fallback")
-                self.createWindowFallback()
-            }
-        }
+//        // 备用方案：如果通知系统失败，尝试其他方法
+//        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+//            if !self.hasVisibleMainWindow {
+//                NSLog("WindowManager: Notification method failed, trying fallback")
+//                self.createWindowFallback()
+//            }
+//        }
     }
     
     /// 备用窗口创建方法
@@ -154,16 +154,74 @@ class WindowManager: ObservableObject {
     }
 }
 
+/// 窗口通知管理器 - 确保通知监听器只注册一次
+class WindowNotificationManager {
+    static let shared = WindowNotificationManager()
+
+    private var newWindowObserver: NSObjectProtocol?
+    private var isSetup = false
+
+    private init() {}
+
+    /// 设置通知监听（只会执行一次）
+    func setupNotifications(_ openWindow: @escaping (String) -> Void) {
+        // 防止重复设置
+        guard !isSetup else {
+            NSLog("WindowNotificationManager: Notifications already setup, skipping")
+            return
+        }
+
+        NSLog("WindowNotificationManager: Setting up notifications")
+
+        // 注册新窗口创建通知
+        newWindowObserver = NotificationCenter.default.addObserver(
+            forName: .init("CreateNewMainWindow"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            NSLog("WindowNotificationManager: Received CreateNewMainWindow notification")
+            openWindow(WindowManager.mainWindowID)
+        }
+
+        isSetup = true
+        NSLog("WindowNotificationManager: Notifications setup completed")
+    }
+
+    /// 清理通知监听器
+    func cleanup() {
+        if let observer = newWindowObserver {
+            NotificationCenter.default.removeObserver(observer)
+            newWindowObserver = nil
+        }
+        isSetup = false
+        NSLog("WindowNotificationManager: Notifications cleaned up")
+    }
+}
+
 #else
 // iOS 版本的空实现
 class WindowManager: ObservableObject {
     static let shared = WindowManager()
-    
+
     private init() {}
-    
+
     var hasVisibleMainWindow: Bool { return true }
-    
+
     func showOrCreateMainWindow() {
+        // iOS 上不需要实现
+    }
+}
+
+class WindowNotificationManager {
+    static let shared = WindowNotificationManager()
+
+    private init() {}
+
+    func setupNotifications(_ openWindow: @escaping (String) -> Void) {
+        // iOS 上不需要实现
+    }
+
+    func cleanup() {
         // iOS 上不需要实现
     }
 }
