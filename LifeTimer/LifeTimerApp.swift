@@ -41,7 +41,7 @@ struct LifeTimerApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("LifeTimer", id: "main") {
             ContentView()
                 .environmentObject(timerModel)
                 .environmentObject(audioManager)
@@ -139,87 +139,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // 处理应用重新激活（比如点击Dock图标或菜单栏图标）
     func applicationShouldHandleReopen(_ app: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // 检查是否有主窗口可见
-        let hasMainWindow = NSApp.windows.contains { window in
-            window.isVisible &&
-            window.canBecomeMain &&
-            !window.title.contains("智能提醒") &&
-            window.className.contains("AppKitWindow")
-        }
+        NSLog("AppDelegate: applicationShouldHandleReopen - hasVisibleWindows: \(flag)")
 
-        NSLog("AppDelegate: applicationShouldHandleReopen - hasVisibleWindows: \(flag), hasMainWindow: \(hasMainWindow)")
+        // 使用 WindowManager 来处理窗口显示逻辑
+        let windowManager = WindowManager.shared
 
-        if !hasMainWindow {
+        NSLog("AppDelegate: hasVisibleMainWindow: \(windowManager.hasVisibleMainWindow)")
+
+        if !windowManager.hasVisibleMainWindow {
             // 如果没有主窗口可见，尝试显示或创建主窗口
-            showOrCreateMainWindow()
+            windowManager.showOrCreateMainWindow()
         }
         return true
     }
 
-    // 显示或创建主窗口的辅助方法
-    private func showOrCreateMainWindow() {
-        // 首先尝试找到隐藏的主窗口并显示
-        let hiddenMainWindows = NSApp.windows.filter { window in
-            window.canBecomeMain &&
-            !window.title.contains("智能提醒") &&
-            window.className.contains("AppKitWindow")
-        }
 
-        if let hiddenWindow = hiddenMainWindows.first {
-            NSLog("AppDelegate: Found hidden main window, showing it")
-            DispatchQueue.main.async {
-                hiddenWindow.setIsVisible(true)
-                hiddenWindow.makeKeyAndOrderFront(nil)
-                hiddenWindow.orderFrontRegardless()
-                NSApp.activate(ignoringOtherApps: true)
-            }
-            return
-        }
-
-        // 如果没有找到隐藏的主窗口，创建新窗口
-        NSLog("AppDelegate: No hidden main window found, creating new window")
-        createNewWindow()
-    }
-
-    // 创建新窗口的辅助方法
-    private func createNewWindow() {
-        // 方法1：尝试通过菜单项创建新窗口
-//        if let fileMenu = NSApp.mainMenu?.item(withTitle: "File"),
-//           let newMenuItem = fileMenu.submenu?.item(withTitle: "New") {
-//            NSApp.sendAction(newMenuItem.action!, to: newMenuItem.target, from: nil)
-//            return
-//        }
-        
-        // NSApp.sendAction(Selector(("newWindow:")), to: nil, from: nil)
-
-
-        // 方法2：尝试通过Window菜单创建新窗口
-//            if let windowMenu = NSApp.mainMenu?.item(withTitle: "Window") {
-//                // 查找可能的新窗口菜单项
-//                for item in windowMenu.submenu?.items ?? [] {
-//                    if item.title.contains("New") || item.keyEquivalent == "n" {
-//                        NSApp.sendAction(item.action!, to: item.target, from: nil)
-//                        return
-//                    }
-//                }
-//            }
-
-       // 方法3：发送 Cmd+N 键盘事件
-       let event = NSEvent.keyEvent(
-           with: .keyDown,
-           location: NSPoint.zero,
-           modifierFlags: .command,
-           timestamp: 0,
-           windowNumber: 0,
-           context: nil,
-           characters: "n",
-           charactersIgnoringModifiers: "n",
-           isARepeat: false,
-           keyCode: 45 // 'n' key code
-       )
-       if let event = event {
-           NSApp.sendEvent(event)
-       }
-    }
 }
 #endif

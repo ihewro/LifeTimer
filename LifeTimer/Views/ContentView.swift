@@ -53,6 +53,11 @@ struct ContentView: View {
     @EnvironmentObject var syncManager: SyncManager
     @EnvironmentObject var smartReminderManager: SmartReminderManager
 
+    #if canImport(Cocoa)
+    @EnvironmentObject var menuBarManager: MenuBarManager
+    @Environment(\.openWindow) private var openWindow
+    #endif
+
     @State private var selectedView: SidebarItem = .timer
     @State private var isSidebarVisible: NavigationSplitViewVisibility = .all
     @State private var selectedTask = "无标题"
@@ -200,6 +205,11 @@ struct ContentView: View {
 
             // 设置智能提醒管理器的当前任务
             smartReminderManager.setCurrentTask(selectedTask)
+
+            #if canImport(Cocoa)
+            // 监听创建新窗口的通知
+            setupNewWindowNotifications()
+            #endif
         }
         .onChange(of: selectedTask) { newTask in
             // 当选中任务变化时，更新智能提醒管理器
@@ -219,6 +229,20 @@ struct ContentView: View {
             selectedTask = mostRecentEvent.title
         }
     }
+
+    #if canImport(Cocoa)
+    /// 设置新窗口创建通知监听
+    private func setupNewWindowNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: .init("CreateNewMainWindow"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            // 使用 SwiftUI 的 openWindow 环境值创建新窗口
+            openWindow(id: WindowManager.mainWindowID)
+        }
+    }
+    #endif
 }
 
 #Preview {
