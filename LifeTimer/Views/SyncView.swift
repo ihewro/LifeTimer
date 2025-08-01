@@ -145,7 +145,7 @@ struct SyncView: View {
                     //     .font(.title2)
                     //     .foregroundColor(.accentColor)
                     Text("数据同步")
-                        .font(.title2)
+                        // .font(.title2)
                         .fontWeight(.semibold)
                 }
             }

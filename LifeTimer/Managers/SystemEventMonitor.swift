@@ -254,8 +254,12 @@ extension SystemEventMonitor {
         }
         
         // 每5秒检查一次浏览器URL
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            self?.checkBrowserURL()
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            self.checkBrowserURL()
         }
     }
     

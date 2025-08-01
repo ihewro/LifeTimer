@@ -23,7 +23,18 @@ class MenuBarManager: ObservableObject {
     }
     
     deinit {
+        // 清理订阅
+        cancellables.removeAll()
+
+        // 清理状态栏项
+        if let statusItem = statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
         statusItem = nil
+
+        #if DEBUG
+        print("MenuBarManager: 已清理资源")
+        #endif
     }
     
     func setTimerModel(_ timerModel: TimerModel) {
@@ -75,47 +86,69 @@ class MenuBarManager: ObservableObject {
     
     private func setupTimerObservers() {
         guard let timerModel = timerModel else { return }
-        
+
+        // 清除之前的订阅，避免重复订阅
+        cancellables.removeAll()
+
         // 监听计时器状态变化
         timerModel.$timerState
             .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main) // 防抖处理
             .sink { [weak self] _ in
-                self?.updateMenuBarDisplay()
+                guard let self = self else { return }
+                self.updateMenuBarDisplay()
             }
             .store(in: &cancellables)
-        
+
         // 监听时间变化
         timerModel.$timeRemaining
             .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main) // 防抖处理
             .sink { [weak self] _ in
-                self?.updateMenuBarDisplay()
+                guard let self = self else { return }
+                self.updateMenuBarDisplay()
             }
             .store(in: &cancellables)
-        
+
         // 监听正计时时间变化
         timerModel.$currentTime
             .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main) // 防抖处理
             .sink { [weak self] _ in
-                self?.updateMenuBarDisplay()
+                guard let self = self else { return }
+                self.updateMenuBarDisplay()
             }
             .store(in: &cancellables)
-        
+
         // 监听模式变化
         timerModel.$currentMode
             .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main) // 防抖处理
             .sink { [weak self] _ in
-                self?.updateMenuBarDisplay()
+                guard let self = self else { return }
+                self.updateMenuBarDisplay()
             }
             .store(in: &cancellables)
     }
     
     private func updateMenuBarDisplay() {
+        // 确保在主线程执行
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateMenuBarDisplay()
+            }
+            return
+        }
+
         guard let statusItem = statusItem,
               let button = statusItem.button,
               let timerModel = timerModel else { return }
-        
+
+        // 防止在对象释放过程中更新UI
+        guard !cancellables.isEmpty else { return }
+
         let timeString = formatTimeForMenuBar()
-        
+
         // 更新图标（根据状态变化）
         let iconName: String
         switch timerModel.timerState {
@@ -128,22 +161,25 @@ class MenuBarManager: ObservableObject {
         case .completed:
             iconName = "checkmark.circle"
         }
-        
-        button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "计时器")
-        button.image?.size = NSSize(width: 16, height: 16)
-        button.image?.isTemplate = true
-        
-        // 更新标题文本，使用等宽字体
-        let attributedString = NSAttributedString(
-            string: timeString,
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            ]
-        )
-        button.attributedTitle = attributedString
-        
-        // 设置工具提示
-        button.toolTip = "计时器 - \(timerModel.currentMode.rawValue) - \(getStateDescription())"
+
+        // 安全地更新UI元素
+        autoreleasepool {
+            button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "计时器")
+            button.image?.size = NSSize(width: 16, height: 16)
+            button.image?.isTemplate = true
+
+            // 更新标题文本，使用等宽字体
+            let attributedString = NSAttributedString(
+                string: timeString,
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+                ]
+            )
+            button.attributedTitle = attributedString
+
+            // 设置工具提示
+            button.toolTip = "计时器 - \(timerModel.currentMode.rawValue) - \(getStateDescription())"
+        }
     }
     
     private func formatTimeForMenuBar() -> String {

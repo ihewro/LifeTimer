@@ -171,17 +171,21 @@ class TimerModel: ObservableObject {
             audioManager?.startTimerPlayback()
         }
 
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
-                self.updateTimer()
+                self?.updateTimer()
             }
         }
     }
     
     func pauseTimer() {
         timerState = .paused
-        timer?.invalidate()
-        timer = nil
+
+        // 安全地停止定时器
+        if let currentTimer = timer {
+            currentTimer.invalidate()
+            timer = nil
+        }
 
         // 暂停计时器时暂停音乐
         audioManager?.pauseTimerPlayback()
@@ -189,8 +193,12 @@ class TimerModel: ObservableObject {
 
     func resetTimer() {
         timerState = .idle
-        timer?.invalidate()
-        timer = nil
+
+        // 安全地停止定时器
+        if let currentTimer = timer {
+            currentTimer.invalidate()
+            timer = nil
+        }
         sessionStartTime = nil
 
 //        // 重置用户自定义任务状态

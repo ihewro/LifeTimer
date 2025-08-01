@@ -231,8 +231,8 @@
         function fetchAndDisplayData() {
             var xhr = new XMLHttpRequest();
             const url = currentView === 'day'
-                ? "http://localhost:8080/get_day_statistic?device_id=EC2CE75A-D92A-42EA-8C5D-DD5D4CD1F970"
-                : "http://localhost:8080/get_week_statistic?device_id=EC2CE75A-D92A-42EA-8C5D-DD5D4CD1F970";
+                ? "https://sync.ihewro.com/get_day_statistic?device_id=41BD2DDF-D0A1-4113-A88D-D38A466503C2"
+                : "https://sync.ihewro.com/get_week_statistic?device_id=41BD2DDF-D0A1-4113-A88D-D38A466503C2";
 
             xhr.open('GET', url, true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencode;charset=utf-8');

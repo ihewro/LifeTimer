@@ -113,8 +113,12 @@ class AudioManager: NSObject, ObservableObject {
 
             // 10秒后自动停止
             previewTimer?.invalidate()
-            previewTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+            previewTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] timer in
                 DispatchQueue.main.async {
+                    guard let self = self else {
+                        timer.invalidate()
+                        return
+                    }
                     self.stopPreview()
                 }
             }

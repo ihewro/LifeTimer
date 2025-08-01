@@ -954,6 +954,7 @@ struct TaskSelectorPopoverView: View {
         .onDisappear {
             // 取消正在进行的数据加载任务
             dataLoadingTask?.cancel()
+            dataLoadingTask = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EventDataChanged"))) { _ in
             // 当事件数据发生变化时，智能刷新缓存

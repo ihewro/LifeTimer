@@ -725,7 +725,9 @@ struct CalendarView: View {
         .onDisappear {
             // 清理预加载任务和搜索任务
             preloadTask?.cancel()
+            preloadTask = nil
             searchTask?.cancel()
+            searchTask = nil
         }
     }
 
