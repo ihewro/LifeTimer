@@ -89,11 +89,7 @@ struct TimerView: View {
                         Circle()
                             .trim(from: 0, to: timerModel.progress())
                             .stroke(
-                                LinearGradient(
-                                    colors: [.blue, .purple],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
+                                Color.accentColor,
                                 style: StrokeStyle(lineWidth: 6, lineCap: .round)
                             )
                             .frame(width: 400, height: 400)
