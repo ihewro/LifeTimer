@@ -650,24 +650,68 @@ struct CalendarView: View {
                 let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
                 let sidebarWidth = isCompact ? min(280, max(200, rootGeo.size.width * 0.35)) : 240
 
-                if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults && currentViewMode == .day {
-                    VStack(spacing: 0) {
-                        MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
-                            .padding(isCompact ? 8 : 16)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults {
+                    switch currentViewMode {
+                    case .day:
+                        VStack(spacing: 0) {
+                            MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
+                                .padding(isCompact ? 8 : 16)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                        Divider()
+                            Divider()
 
-                        DayStatsPanel(selectedDate: $selectedDate)
-                            .environmentObject(eventManager)
-                            .environmentObject(activityMonitor)
-                            .frame(maxHeight: .infinity)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                            DayStatsPanel(selectedDate: $selectedDate)
+                                .environmentObject(eventManager)
+                                .environmentObject(activityMonitor)
+                                .frame(maxHeight: .infinity)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                        .padding(.top, 48)
+                        .frame(width: sidebarWidth)
+                        .background(GlassEffectBackground())
+                        .ignoresSafeArea(.container, edges: .top)
+                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+
+                    case .week:
+                        VStack(spacing: 0) {
+                            MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
+                                .padding(isCompact ? 8 : 16)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                            Divider()
+
+                            WeekSidebarStats(selectedDate: $selectedDate)
+                                .environmentObject(eventManager)
+                                .environmentObject(activityMonitor)
+                                .frame(maxHeight: .infinity)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                        .padding(.top, 48)
+                        .frame(width: sidebarWidth)
+                        .background(GlassEffectBackground())
+                        .ignoresSafeArea(.container, edges: .top)
+                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+
+                    case .month:
+                        VStack(spacing: 0) {
+                            MiniCalendarView(viewMode: .month, selectedDate: $selectedDate)
+                                .padding(isCompact ? 8 : 16)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                            Divider()
+
+                            MonthSidebarStats(selectedDate: $selectedDate)
+                                .environmentObject(eventManager)
+                                .environmentObject(activityMonitor)
+                                .frame(maxHeight: .infinity)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                        .padding(.top, 48)
+                        .frame(width: sidebarWidth)
+                        .background(GlassEffectBackground())
+                        .ignoresSafeArea(.container, edges: .top)
+                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
                     }
-                    .frame(width: sidebarWidth)
-                    .background(GlassEffectBackground())
-                    .ignoresSafeArea(.container, edges: .top)
-                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
                 }
             }
         }
@@ -2129,28 +2173,7 @@ struct WeekView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // 右侧面板（类似日视图）- 响应式宽度
-                let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
-                let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
-
-                if !isCompact || geometry.size.width > 580 {
-                    VStack(spacing: 0) {
-                        // 小日历
-                        MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
-                            .padding(isCompact ? 8 : 16)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
-
-                        Divider()
-
-                        // 周统计信息
-                        weekStatsPanel
-                            .frame(maxHeight: .infinity)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    }
-                    .frame(width: sidebarWidth)
-                    .background(GlassEffectBackground())
-                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
-                }
+                // 右侧面板已提升为顶层 overlay
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -2857,30 +2880,9 @@ struct MonthView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // 右侧面板 - 响应式宽度
-                let isCompact = geometry.size.width < 800 || (geometry.size.width < 1000 && geometry.size.height > geometry.size.width)
-                let sidebarWidth = isCompact ? min(280, max(200, geometry.size.width * 0.35)) : 240
-
-                if !isCompact || geometry.size.width > 580 {
-                    VStack(spacing: 0) {
-                        VStack(spacing: 6) {
-                            CalendarNavigationToolbar(
-                                viewMode: viewMode,
-                                selectedDate: $selectedDate
-                            )
-                            .padding(isCompact ? 8 : 16)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
-
-                            // 月度统计
-                            monthStatsPanel
-                                .frame(maxHeight: .infinity)
-                                .transition(.opacity.combined(with: .move(edge: .trailing)))
-                        }
-                    }
-                    .frame(width: sidebarWidth)
-                    .background(GlassEffectBackground())
-                    .animation(.easeInOut(duration: 0.3), value: displayMonth)
-                }
+                // 右侧面板已提升为顶层 overlay（见 CalendarView.overlay）
+                // 此处移除内部侧栏以避免重复显示
+                // 原内部侧栏代码已删除
             }
         }
         .onAppear {

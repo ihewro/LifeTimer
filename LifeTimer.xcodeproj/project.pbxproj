@@ -40,6 +40,8 @@
 		THREAD001122334455667788 /* ThreadSafetyUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = THREAD001122334455667799 /* ThreadSafetyUtils.swift */; };
 		WINDOW01122334455667788 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = WINDOW01122334455667799 /* WindowManager.swift */; };
 		MENUPOP001122334455667788 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUPOP001122334455667799 /* MenuBarPopoverView.swift */; };
+		WEEKSBAR001122334455667788 /* WeekSidebarStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = WEEKSBAR001122334455667799 /* WeekSidebarStats.swift */; };
+		MONTHSBAR001122334455667788 /* MonthSidebarStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = MONTHSBAR001122334455667799 /* MonthSidebarStats.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,6 +80,8 @@
 		THREAD001122334455667799 /* ThreadSafetyUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadSafetyUtils.swift; sourceTree = "<group>"; };
 		WINDOW01122334455667799 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		MENUPOP001122334455667799 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
+		WEEKSBAR001122334455667799 /* WeekSidebarStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekSidebarStats.swift; sourceTree = "<group>"; };
+		MONTHSBAR001122334455667799 /* MonthSidebarStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthSidebarStats.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +142,8 @@
 				SYNC001122334455667788DD /* SyncView.swift */,
 				AUTHV01122334455667788BB /* AuthenticationView.swift */,
 				MENUPOP001122334455667799 /* MenuBarPopoverView.swift */,
+				WEEKSBAR001122334455667799 /* WeekSidebarStats.swift */,
+				MONTHSBAR001122334455667799 /* MonthSidebarStats.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -297,6 +303,8 @@
 				AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */,
 				COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */,
 				MENUPOP001122334455667788 /* MenuBarPopoverView.swift in Sources */,
+				WEEKSBAR001122334455667788 /* WeekSidebarStats.swift in Sources */,
+				MONTHSBAR001122334455667788 /* MonthSidebarStats.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
