@@ -64,11 +64,13 @@ struct LifeTimerApp: App {
 
                     // 设置智能提醒管理器的依赖
                     smartReminderManager.setTimerModel(timerModel)
+                    smartReminderManager.setEventManager(eventManager)
 
                     #if canImport(Cocoa)
                     // 延迟设置 MenuBarManager 的依赖，确保应用完全启动
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         menuBarManager.setTimerModel(timerModel)
+                        menuBarManager.setEventManager(eventManager)
                     }
 
                     #endif

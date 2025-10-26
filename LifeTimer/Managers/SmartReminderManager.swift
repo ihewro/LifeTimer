@@ -67,6 +67,9 @@ class SmartReminderManager: ObservableObject {
     /// 计时器模型引用
     private weak var timerModel: TimerModel?
     
+    /// 事件管理器引用
+    private weak var eventManager: EventManager?
+    
     /// UserDefaults 存储
     private let userDefaults = UserDefaults.standard
     
@@ -116,6 +119,11 @@ class SmartReminderManager: ObservableObject {
 
         self.timerModel = timerModel
         startListening()
+    }
+    
+    /// 设置事件管理器依赖
+    func setEventManager(_ eventManager: EventManager) {
+        self.eventManager = eventManager
     }
 
     /// 开始监听计时器状态变化
@@ -322,11 +330,12 @@ class SmartReminderManager: ObservableObject {
 
         #if os(macOS)
         // macOS 使用独立窗口
-        if let timerModel = timerModel {
+        if let timerModel = timerModel, let eventManager = eventManager {
             SmartReminderWindowManager.shared.showReminderDialog(
                 timerModel: timerModel,
                 reminderManager: self,
-                selectedTask: currentSelectedTask
+                selectedTask: currentSelectedTask,
+                eventManager: eventManager
             )
         }
         #else

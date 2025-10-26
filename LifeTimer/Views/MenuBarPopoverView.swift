@@ -1,5 +1,5 @@
 //
-//  SmartReminderDialog.swift
+//  MenuBarPopoverView.swift
 //  LifeTimer
 //
 //  Created by Developer on 2024.
@@ -10,36 +10,22 @@ import SwiftUI
 import Cocoa
 #endif
 
-/// 智能提醒弹窗
-struct SmartReminderDialog: View {
-    @Binding var isPresented: Bool
+/// 菜单栏弹窗视图，复用SmartReminderDialog的UI和功能
+struct MenuBarPopoverView: View {
     @ObservedObject var timerModel: TimerModel
-    @ObservedObject var reminderManager: SmartReminderManager
-    let selectedTask: String
-    
     @EnvironmentObject var eventManager: EventManager
-
+    
     @State private var currentTask: String = ""
     @State private var showingTaskSelector = false
-    @State private var isClosing: Bool = false
-
-    /// 背景视图
-    @ViewBuilder
-    private var backgroundView: some View {
-        #if os(macOS)
-        // macOS 使用毛玻璃效果
-        GlassEffectBackground()
-        #else
-        // iOS 使用系统背景
-        Color.systemBackground
-        #endif
-    }
-
+    
+    // 关闭弹窗的回调
+    let onClose: () -> Void
+    
     var body: some View {
         VStack(spacing: 16) {
             // 标题区域
             VStack(spacing: 6) {
-                Text("⏰ 该开始计时了！")
+                Text("⏰ 开始计时")
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -57,21 +43,26 @@ struct SmartReminderDialog: View {
 
             // 底部按钮
             HStack(spacing: 12) {
-                Button("稍后提醒") {
-                    snooze(minutes: Int(reminderManager.reminderInterval))
+                Button("打开主窗口") {
+                    openMainWindow()
                 }
                 .buttonStyle(.bordered)
 
                 Spacer()
+                
+                Button("关闭") {
+                    onClose()
+                }
+                .buttonStyle(.bordered)
             }
         }
         .frame(width: 320)
         .padding(20)
-        .background(backgroundView)
+        // .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
         .onAppear {
             // 初始化当前任务
-            currentTask = timerModel.getCurrentDisplayTask(fallback: selectedTask)
+            currentTask = timerModel.getCurrentDisplayTask(fallback: "")
         }
     }
     
@@ -149,42 +140,34 @@ struct SmartReminderDialog: View {
     // MARK: - 操作方法
     
     private func startFocus(minutes: Int) {
-        // 防止在关闭过程中执行操作
-        guard !isClosing else { return }
-
         timerModel.resetTimer()
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .singlePomodoro
         
         // 使用当前选择的任务，如果为空则使用默认任务
-        let taskToUse = currentTask.isEmpty ? selectedTask : currentTask
+        let taskToUse = currentTask.isEmpty ? "专注任务" : currentTask
         timerModel.startTimer(with: taskToUse)
-        reminderManager.onUserStartedTimer()
         
         // 关闭弹窗
-        isPresented = false
+        onClose()
     }
-
-    private func snooze(minutes: Int) {
-        // 防止在关闭过程中执行操作
-        guard !isClosing else { return }
-
-        reminderManager.snoozeReminder(minutes: minutes)
+    
+    private func openMainWindow() {
+        // 打开主窗口
+        let windowManager = WindowManager.shared
+        windowManager.showOrCreateMainWindow()
         
         // 关闭弹窗
-        isPresented = false
+        onClose()
     }
-
 }
 
 // MARK: - 预览
-struct SmartReminderDialog_Previews: PreviewProvider {
+struct MenuBarPopoverView_Previews: PreviewProvider {
     static var previews: some View {
-        SmartReminderDialog(
-            isPresented: .constant(true),
+        MenuBarPopoverView(
             timerModel: TimerModel(),
-            reminderManager: SmartReminderManager(),
-            selectedTask: "示例任务"
+            onClose: {}
         )
         .environmentObject(EventManager())
     }

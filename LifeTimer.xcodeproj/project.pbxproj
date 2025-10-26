@@ -39,6 +39,7 @@
 		SYNC001122334455667788EE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNC001122334455667788FF /* APIClient.swift */; };
 		THREAD001122334455667788 /* ThreadSafetyUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = THREAD001122334455667799 /* ThreadSafetyUtils.swift */; };
 		WINDOW01122334455667788 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = WINDOW01122334455667799 /* WindowManager.swift */; };
+		MENUPOP001122334455667788 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MENUPOP001122334455667799 /* MenuBarPopoverView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,6 +77,7 @@
 		SYNC001122334455667788FF /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		THREAD001122334455667799 /* ThreadSafetyUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadSafetyUtils.swift; sourceTree = "<group>"; };
 		WINDOW01122334455667799 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
+		MENUPOP001122334455667799 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +137,7 @@
 				PERM001122334455667788BB /* PermissionRequestAlert.swift */,
 				SYNC001122334455667788DD /* SyncView.swift */,
 				AUTHV01122334455667788BB /* AuthenticationView.swift */,
+				MENUPOP001122334455667799 /* MenuBarPopoverView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -293,6 +296,7 @@
 				AUTH001122334455667788AA /* AuthManager.swift in Sources */,
 				AUTHV01122334455667788AA /* AuthenticationView.swift in Sources */,
 				COLEXT1122334455667788AA /* Color+CrossPlatform.swift in Sources */,
+				MENUPOP001122334455667788 /* MenuBarPopoverView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

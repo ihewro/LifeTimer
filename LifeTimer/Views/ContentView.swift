@@ -192,6 +192,7 @@ struct ContentView: View {
                 reminderManager: smartReminderManager,
                 selectedTask: selectedTask
             )
+            .environmentObject(eventManager)
         }
         #endif
         }

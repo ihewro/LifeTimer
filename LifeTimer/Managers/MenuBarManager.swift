@@ -10,12 +10,18 @@ import Cocoa
 import SwiftUI
 import Combine
 
-class MenuBarManager: ObservableObject {
+class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var timerModel: TimerModel?
+    private var eventManager: EventManager?
     private var cancellables = Set<AnyCancellable>()
     
-    init() {
+    // 弹窗相关
+    private var popover: NSPopover?
+    private var popoverViewController: NSViewController?
+    
+    override init() {
+        super.init()
         // 延迟初始化状态栏项，确保在主线程和应用完全启动后执行
         DispatchQueue.main.async {
             self.setupStatusItem()
@@ -41,6 +47,10 @@ class MenuBarManager: ObservableObject {
         self.timerModel = timerModel
         setupTimerObservers()
         updateMenuBarDisplay()
+    }
+    
+    func setEventManager(_ eventManager: EventManager) {
+        self.eventManager = eventManager
     }
     
     private func setupStatusItem() {
@@ -230,18 +240,66 @@ class MenuBarManager: ObservableObject {
     @objc private func statusItemClicked() {
         NSLog("MenuBarManager: Status item clicked")
 
-        // 首先激活应用
-        NSApp.activate(ignoringOtherApps: true)
+        // 如果弹窗已经显示，则关闭它
+        if let popover = popover, popover.isShown {
+            closePopover()
+            return
+        }
 
-        // 使用 WindowManager 来处理窗口显示逻辑
-        let windowManager = WindowManager.shared
-        windowManager.showOrCreateMainWindow()
+        // 显示弹窗菜单
+        showPopover()
     }
-
-
-
-
-
+    
+    // MARK: - 弹窗管理
+    
+    private func showPopover() {
+        guard let timerModel = timerModel,
+              let eventManager = eventManager,
+              let statusItem = statusItem,
+              let button = statusItem.button else {
+            NSLog("MenuBarManager: Missing dependencies for popover")
+            return
+        }
+        
+        // 创建弹窗视图
+        let popoverView = MenuBarPopoverView(
+            timerModel: timerModel,
+            onClose: { [weak self] in
+                self?.closePopover()
+            }
+        )
+        .environmentObject(eventManager)
+        
+        // 创建视图控制器
+        let hostingController = NSHostingController(rootView: popoverView)
+        popoverViewController = hostingController
+        
+        // 创建弹窗
+        let newPopover = NSPopover()
+        newPopover.contentViewController = hostingController
+        newPopover.behavior = .transient
+        newPopover.delegate = self
+        popover = newPopover
+        
+        // 显示弹窗
+        newPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        
+        NSLog("MenuBarManager: Popover shown")
+    }
+    
+    private func closePopover() {
+        popover?.performClose(nil)
+        popover = nil
+        popoverViewController = nil
+        NSLog("MenuBarManager: Popover closed")
+    }
+    
+    // MARK: - NSPopoverDelegate
+    
+    func popoverDidClose(_ notification: Notification) {
+        popover = nil
+        popoverViewController = nil
+    }
 
 }
 #else

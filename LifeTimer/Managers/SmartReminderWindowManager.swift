@@ -16,7 +16,7 @@ class SmartReminderWindowManager: ObservableObject {
     static let shared = SmartReminderWindowManager()
 
     private var reminderWindow: NSWindow?
-    private var hostingController: NSHostingController<SmartReminderDialog>?
+    private var hostingController: NSHostingController<AnyView>?
     private var windowCloseObserver: NSObjectProtocol?
     private var isClosing: Bool = false
 
@@ -26,7 +26,8 @@ class SmartReminderWindowManager: ObservableObject {
     func showReminderDialog(
         timerModel: TimerModel,
         reminderManager: SmartReminderManager,
-        selectedTask: String
+        selectedTask: String,
+        eventManager: EventManager
     ) {
         // 如果窗口已经存在，先关闭
         closeReminderDialog()
@@ -35,11 +36,14 @@ class SmartReminderWindowManager: ObservableObject {
         isClosing = false
         
         // 创建 SwiftUI 视图
-        let reminderDialog = SmartReminderDialog(
-            isPresented: .constant(true),
-            timerModel: timerModel,
-            reminderManager: reminderManager,
-            selectedTask: selectedTask
+        let reminderDialog = AnyView(
+            SmartReminderDialog(
+                isPresented: .constant(true),
+                timerModel: timerModel,
+                reminderManager: reminderManager,
+                selectedTask: selectedTask
+            )
+            .environmentObject(eventManager)
         )
         
         // 创建 hosting controller
