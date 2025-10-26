@@ -595,54 +595,80 @@ struct CalendarView: View {
     private let calendar = Calendar.current
     
     var body: some View {
-        HStack(spacing: 0) {
-            // 主要内容区域
-            Group {
-                switch currentViewMode {
-                    case .day:
-                        DayView(
-                            selectedDate: $selectedDate,
-                            selectedEvent: $selectedEvent,
-                            showingAddEvent: $showingAddEvent,
-                            draggedEvent: $draggedEvent,
-                            dragOffset: $dragOffset,
-                            highlightedEventId: $highlightedEventId
-                        )
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
-                        .background(Color.systemBackground)
+        GeometryReader { rootGeo in
+            HStack(spacing: 0) {
+                // 主要内容区域
+                Group {
+                    switch currentViewMode {
+                        case .day:
+                            DayView(
+                                selectedDate: $selectedDate,
+                                selectedEvent: $selectedEvent,
+                                showingAddEvent: $showingAddEvent,
+                                draggedEvent: $draggedEvent,
+                                dragOffset: $dragOffset,
+                                highlightedEventId: $highlightedEventId
+                            )
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .background(Color.systemBackground)
 
-                    case .week:
-                        WeekView(
-                            selectedDate: $selectedDate,
-                            highlightedEventId: $highlightedEventId
-                        )
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
-                        .background(Color.systemBackground)
+                        case .week:
+                            WeekView(
+                                selectedDate: $selectedDate,
+                                highlightedEventId: $highlightedEventId
+                            )
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .background(Color.systemBackground)
 
-                    case .month:
-                        MonthView(
-                            viewMode: currentViewMode,
-                            selectedDate: $selectedDate,
-                            highlightedEventId: $highlightedEventId
-                        )
-                        .environmentObject(eventManager)
-                        .environmentObject(activityMonitor)
-                        .background(Color.systemBackground)
+                        case .month:
+                            MonthView(
+                                viewMode: currentViewMode,
+                                selectedDate: $selectedDate,
+                                highlightedEventId: $highlightedEventId
+                            )
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .background(Color.systemBackground)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // 搜索结果侧边栏
+                if showingSearchResults {
+                    SearchResultsSidebar(
+                        searchResults: searchResults,
+                        onEventSelected: handleEventSelection,
+                        onClose: closeSearchResults
+                    )
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .trailing) {
+                let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
+                let sidebarWidth = isCompact ? min(280, max(200, rootGeo.size.width * 0.35)) : 240
 
-            // 搜索结果侧边栏
-            if showingSearchResults {
-                SearchResultsSidebar(
-                    searchResults: searchResults,
-                    onEventSelected: handleEventSelection,
-                    onClose: closeSearchResults
-                )
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
+                if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults && currentViewMode == .day {
+                    VStack(spacing: 0) {
+                        MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
+                            .padding(isCompact ? 8 : 16)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                        Divider()
+
+                        DayStatsPanel(selectedDate: $selectedDate)
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .frame(maxHeight: .infinity)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                    .frame(width: sidebarWidth)
+                    .background(GlassEffectBackground())
+                    .ignoresSafeArea(.container, edges: .top)
+                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
+                }
             }
         }
         .sheet(isPresented: $showingAddEvent) {
@@ -924,25 +950,7 @@ struct DayView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.systemBackground)
 
-                // 右侧面板 - 响应式宽度
-                if !isCompact || geo.size.width > 580 {
-                    VStack(spacing: 0) {
-                        MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
-                            .padding(isCompact ? 8 : 16)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
-
-                        Divider()
-
-                        DayStatsPanel(selectedDate: $selectedDate)
-                            .environmentObject(eventManager)
-                            .environmentObject(activityMonitor)
-                            .frame(maxHeight: .infinity)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    }
-                    .frame(width: sidebarWidth)
-                    .background(GlassEffectBackground())
-                    .animation(.easeInOut(duration: 0.3), value: selectedDate)
-                }
+                // 右侧面板移除，改为 CalendarView 顶层 overlay
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
