@@ -281,8 +281,16 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
         newPopover.delegate = self
         popover = newPopover
         
+        // 激活应用，确保弹窗获得键盘焦点
+        NSApp.activate(ignoringOtherApps: true)
+        
         // 显示弹窗
         newPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        
+        // 让弹窗窗口成为 key window（异步以确保窗口已创建）
+        DispatchQueue.main.async { [weak hostingController] in
+            hostingController?.view.window?.makeKeyAndOrderFront(nil)
+        }
         
         NSLog("MenuBarManager: Popover shown")
     }
