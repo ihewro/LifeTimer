@@ -645,9 +645,7 @@ struct CalendarView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
                 }
-            }
-            .overlay(alignment: .trailing) {
-                let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
+                                let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
                 let sidebarWidth = isCompact ? min(280, max(200, rootGeo.size.width * 0.35)) : 240
 
                 if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults {
