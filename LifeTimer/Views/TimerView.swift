@@ -371,13 +371,35 @@ struct TimerView: View {
             // 响应窗口宽度变化
             windowWidth = newWidth
         }
-        // 添加空格键支持
+        // 添加空格键支持 + 时间调节快捷键
         .background(
-            Button("Toggle Timer") {
-                handleSpaceKeyPress()
+            Group {
+                Button("Toggle Timer") {
+                    handleSpaceKeyPress()
+                }
+                .keyboardShortcut(.space, modifiers: [])
+                .hidden()
+
+                // 增加当前结束时间（按 + 或 Shift+=）
+                Button("Increase Time (+)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: 5)
+                    }
+                }
+                .keyboardShortcut("=", modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
+
+                // 减少当前结束时间（按 -）
+                Button("Decrease Time (-)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: -5)
+                    }
+                }
+                .keyboardShortcut("-", modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
             }
-            .keyboardShortcut(.space, modifiers: [])
-            .hidden()
         )
         .onAppear {
             // 设置TimerModel对AudioManager的引用
