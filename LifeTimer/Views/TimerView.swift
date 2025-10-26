@@ -15,6 +15,7 @@ struct TimerView: View {
     @State private var showingModeSelector = false
     @State private var showingTimeEditor = false
     @State private var showingTaskSelector = false
+    @State private var showingSmartReminderDialog = false // 智能提醒弹窗状态
     @Binding var selectedTask: String
     @State private var editingMinutes = 30
     @State private var timeEditorView: TimeEditorPopoverView?
@@ -29,7 +30,7 @@ struct TimerView: View {
             // 当窗口宽度小于 900px 时隐藏智能提醒状态显示
             if windowWidth >= 650 && smartReminderManager.isEnabled && smartReminderManager.reminderState == .counting {
                 Button(action: {
-//                    showingTaskSelector = true
+                    smartReminderManager.testShowReminder()
                 }){
                     HStack(spacing: 6) {
                         Image(systemName: "bell")
