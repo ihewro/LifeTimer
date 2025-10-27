@@ -73,6 +73,16 @@ struct SmartReminderDialog: View {
             // 初始化当前任务
             currentTask = timerModel.getCurrentDisplayTask(fallback: selectedTask)
         }
+        // 当弹窗内选择的任务变化时，同步到计时器模型，保证与主界面一致
+        .onChange(of: currentTask) { newTask in
+            timerModel.setUserCustomTask(newTask)
+        }
+        // 当 TimerView 或其他位置更新了任务（写入 TimerModel）时，这里也同步更新
+        .onChange(of: timerModel.userCustomTaskTitle) { newTitle in
+            if !newTitle.isEmpty {
+                currentTask = newTitle
+            }
+        }
     }
     
     // MARK: - 任务输入框区域

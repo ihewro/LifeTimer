@@ -40,6 +40,16 @@ struct MenuBarPopoverView: View {
             // 初始化当前任务
             currentTask = timerModel.getCurrentDisplayTask(fallback: "")
         }
+        // 当弹窗内选择的任务变化时，同步到计时器模型，保证与主界面一致
+        .onChange(of: currentTask) { newTask in
+            timerModel.setUserCustomTask(newTask)
+        }
+        // 当外部（如 TimerView）更新任务时，弹窗也同步显示
+        .onChange(of: timerModel.userCustomTaskTitle) { newTitle in
+            if !newTitle.isEmpty {
+                currentTask = newTitle
+            }
+        }
     }
     
     // MARK: - 未开始计时时的视图
