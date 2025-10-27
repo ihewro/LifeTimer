@@ -9,6 +9,21 @@ import SwiftUI
 #if canImport(Cocoa)
 import Cocoa
 #endif
+// 轻量按压反馈样式，扩大点击区域并在按下时提供视觉反馈（文件级作用域）
+struct PressableIconButtonStyle: ButtonStyle {
+    var hitSize: CGFloat = 28
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: hitSize, height: hitSize)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: hitSize / 2)
+                    .fill(Color.secondary.opacity(configuration.isPressed ? 0.15 : 0.0))
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
 
 /// 菜单栏弹窗视图，复用SmartReminderDialog的UI和功能
 struct MenuBarPopoverView: View {
@@ -51,6 +66,37 @@ struct MenuBarPopoverView: View {
                 currentTask = newTitle
             }
         }
+        // 添加与主界面一致的键盘快捷键：空格（暂停/继续）、+（增加时间）、-（减少时间）
+        .background(
+            Group {
+                // 空格键：根据当前状态开始/暂停/继续/重置
+                Button("Toggle Timer (Space)") {
+                    handleSpaceKeyPress()
+                }
+                .keyboardShortcut(.space, modifiers: [])
+                .hidden()
+
+                // 增加当前结束时间（按 + 或 Shift+=）
+                Button("Increase Time (+)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: 5)
+                    }
+                }
+                .keyboardShortcut("=", modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
+
+                // 减少当前结束时间（按 -）
+                Button("Decrease Time (-)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: -5)
+                    }
+                }
+                .keyboardShortcut("-", modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
+            }
+        )
     }
     
     // MARK: - 未开始计时时的视图
@@ -103,12 +149,43 @@ struct MenuBarPopoverView: View {
                 taskInputSection
             }
 
-            // 时间显示
+            // 时间显示 + 调节按钮（与主界面逻辑一致）
             VStack(spacing: 8) {
-                Text(timerModel.formattedTime())
-                    .font(.system(size: 48, weight: .light, design: .monospaced))
-                    .foregroundColor(.primary)
-                
+                HStack(spacing: 12) {
+                    // 减少时间（左侧）
+                    Button(action: {
+                        if timerModel.canAdjustTime() {
+                            timerModel.adjustCurrentTime(by: -5)
+                        }
+                    }) {
+                        Image(systemName: "minus")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                            .opacity(timerModel.canAdjustTime() ? 1.0 : 0.35)
+                    }
+                    .buttonStyle(PressableIconButtonStyle(hitSize: 28))
+                    .disabled(!timerModel.canAdjustTime())
+
+                    // 时间文本
+                    Text(timerModel.formattedTime())
+                        .font(.system(size: 48, weight: .light, design: .monospaced))
+                        .foregroundColor(.primary)
+
+                    // 增加时间（右侧）
+                    Button(action: {
+                        if timerModel.canAdjustTime() {
+                            timerModel.adjustCurrentTime(by: 5)
+                        }
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                            .opacity(timerModel.canAdjustTime() ? 1.0 : 0.35)
+                    }
+                    .buttonStyle(PressableIconButtonStyle(hitSize: 28))
+                    .disabled(!timerModel.canAdjustTime())
+                }
+
                 // 状态指示
                 if timerModel.timerState == .paused {
                     Text("已暂停")
@@ -128,6 +205,8 @@ struct MenuBarPopoverView: View {
                         .cornerRadius(4)
                 }
             }
+
+ 
 
             // 控制按钮
             timerControlButtons
@@ -346,7 +425,34 @@ struct MenuBarPopoverView: View {
         // 关闭弹窗
         onClose()
     }
-    
+
+    /// 处理空格键按下事件（与主界面逻辑保持一致）
+    private func handleSpaceKeyPress() {
+        switch timerModel.timerState {
+        case .idle:
+            // 空闲状态：开始计时器
+            timerModel.startTimer(with: currentTask)
+            smartReminderManager.onUserStartedTimer()
+
+        case .running:
+            // 运行状态：纯休息模式直接结束，其他模式暂停
+            if timerModel.currentMode == .pureRest {
+                timerModel.stopTimer()
+            } else {
+                timerModel.pauseTimer()
+            }
+
+        case .paused:
+            // 暂停状态：继续计时器，并恢复音乐播放
+            timerModel.startTimer(with: currentTask)
+            smartReminderManager.onUserStartedTimer()
+
+        case .completed:
+            // 完成状态：重置计时器（为下一次做准备）
+            timerModel.resetTimer()
+        }
+    }
+
     private func openMainWindow() {
         // 打开主窗口
         let windowManager = WindowManager.shared

@@ -60,7 +60,7 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     func setSmartReminderManager(_ smartReminderManager: SmartReminderManager) {
         self.smartReminderManager = smartReminderManager
     }
-    
+
     private func setupStatusItem() {
         // 确保在主线程执行
         guard Thread.isMainThread else {
