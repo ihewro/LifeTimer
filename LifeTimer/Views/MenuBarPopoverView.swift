@@ -98,12 +98,8 @@ struct MenuBarPopoverView: View {
                 Text("⏰ 计时进行中")
                     .font(.title2)
                     .fontWeight(.semibold)
-
-                Text(timerModel.getCurrentDisplayTask(fallback: currentTask))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                // 运行中任务修改 UI 与初始界面保持一致
+                taskInputSection
             }
 
             // 时间显示
@@ -155,49 +151,109 @@ struct MenuBarPopoverView: View {
     // MARK: - 计时控制按钮
     private var timerControlButtons: some View {
         VStack(spacing: 8) {
-            // 番茄钟运行时显示放弃和提前结束按钮
-            if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .running {
-                HStack(spacing: 8) {
+            // 运行中：与主界面逻辑保持一致
+            if timerModel.timerState == .running {
+                // 番茄模式运行中：暂停 / 放弃 / 提前结束
+                if timerModel.currentMode == .singlePomodoro {
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            timerModel.pauseTimer()
+                        }) {
+                            Text("暂停")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .controlSize(.regular)
+
+                        Button(action: {
+                            timerModel.resetTimer()
+                            onClose()
+                        }) {
+                            Text("放弃")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .controlSize(.regular)
+
+                        Button(action: {
+                            timerModel.completeEarly()
+                            onClose()
+                        }) {
+                            Text("提前结束")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .controlSize(.regular)
+                    }
+                }
+                // 正计时运行中：暂停 / 结束
+                else if timerModel.currentMode == .countUp {
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            timerModel.pauseTimer()
+                        }) {
+                            Text("暂停")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .controlSize(.regular)
+
+                        Button(action: {
+                            timerModel.stopTimer()
+                            onClose()
+                        }) {
+                            Text("结束")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .controlSize(.regular)
+                    }
+                }
+                // 纯休息运行中：结束
+                else if timerModel.currentMode == .pureRest {
                     Button(action: {
-                        timerModel.resetTimer()
+                        timerModel.stopTimer()
                         onClose()
                     }) {
-                        Text("放弃")
+                        Text("结束")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                     }
                     .controlSize(.regular)
-                    
+                }
+                // 自定义等其他模式运行中：暂停
+                else {
                     Button(action: {
-                        timerModel.completeEarly()
-                        onClose()
+                        timerModel.pauseTimer()
                     }) {
-                        Text("提前结束")
+                        Text("暂停")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                     }
                     .controlSize(.regular)
                 }
             }
-            // 番茄钟暂停时显示继续按钮
-            else if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .paused {
-                Button("继续") {
+            // 暂停中：继续（与主界面一致）
+            else if timerModel.timerState == .paused {
+                Button(action: {
                     timerModel.startTimer(with: currentTask)
                     onClose()
+                }) {
+                    Text("继续")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .frame(maxWidth: .infinity)
             }
-            // 其他状态的控制按钮
+            // 其他状态：保持原有逻辑
             else {
-                Button("停止计时") {
+                Button(action: {
                     timerModel.resetTimer()
                     onClose()
+                }) {
+                    Text("停止计时")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.secondary)
-                .frame(maxWidth: .infinity)
             }
         }
     }
