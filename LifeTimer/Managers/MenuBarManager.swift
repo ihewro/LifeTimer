@@ -14,6 +14,7 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var timerModel: TimerModel?
     private var eventManager: EventManager?
+    private var smartReminderManager: SmartReminderManager?
     private var cancellables = Set<AnyCancellable>()
     
     // 弹窗相关
@@ -51,6 +52,10 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     
     func setEventManager(_ eventManager: EventManager) {
         self.eventManager = eventManager
+    }
+
+    func setSmartReminderManager(_ smartReminderManager: SmartReminderManager) {
+        self.smartReminderManager = smartReminderManager
     }
     
     private func setupStatusItem() {
@@ -255,6 +260,7 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     private func showPopover() {
         guard let timerModel = timerModel,
               let eventManager = eventManager,
+              let smartReminderManager = smartReminderManager,
               let statusItem = statusItem,
               let button = statusItem.button else {
             NSLog("MenuBarManager: Missing dependencies for popover")
@@ -269,6 +275,7 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
             }
         )
         .environmentObject(eventManager)
+        .environmentObject(smartReminderManager)
         
         // 创建视图控制器
         let hostingController = NSHostingController(rootView: popoverView)
@@ -319,6 +326,14 @@ class MenuBarManager: ObservableObject {
     }
 
     func setTimerModel(_ timerModel: TimerModel) {
+        // iOS 上不需要实现
+    }
+
+    func setEventManager(_ eventManager: EventManager) {
+        // iOS 上不需要实现
+    }
+
+    func setSmartReminderManager(_ smartReminderManager: SmartReminderManager) {
         // iOS 上不需要实现
     }
 }

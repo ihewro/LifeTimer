@@ -14,6 +14,7 @@ import Cocoa
 struct MenuBarPopoverView: View {
     @ObservedObject var timerModel: TimerModel
     @EnvironmentObject var eventManager: EventManager
+    @EnvironmentObject var smartReminderManager: SmartReminderManager
     
     @State private var currentTask: String = ""
     @State private var showingTaskSelector = false
@@ -339,6 +340,8 @@ struct MenuBarPopoverView: View {
         // 使用当前选择的任务，如果为空则使用默认任务
         let taskToUse = currentTask.isEmpty ? "专注任务" : currentTask
         timerModel.startTimer(with: taskToUse)
+        // 通知智能提醒管理器用户已开始计时，关闭提醒并停止倒计时
+        smartReminderManager.onUserStartedTimer()
         
         // 关闭弹窗
         onClose()

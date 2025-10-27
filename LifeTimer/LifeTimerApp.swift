@@ -71,6 +71,7 @@ struct LifeTimerApp: App {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         menuBarManager.setTimerModel(timerModel)
                         menuBarManager.setEventManager(eventManager)
+                        menuBarManager.setSmartReminderManager(smartReminderManager)
                     }
 
                     #endif

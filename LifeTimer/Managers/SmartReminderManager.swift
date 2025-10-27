@@ -82,11 +82,6 @@ class SmartReminderManager: ObservableObject {
     /// Combine订阅管理
     private var cancellables = Set<AnyCancellable>()
 
-    /// 计时器状态监控定时器
-    private var stateMonitorTimer: Timer?
-
-    /// 上次检查的计时器状态
-    private var lastTimerState: TimerState = .idle
     
     // MARK: - Initialization
     
@@ -99,8 +94,6 @@ class SmartReminderManager: ObservableObject {
         stopReminder()
         // 取消所有Combine订阅
         cancellables.removeAll()
-        // 停止状态监控定时器
-        stateMonitorTimer?.invalidate()
         // 移除所有通知监听器
         NotificationCenter.default.removeObserver(self)
         if let observer = appStateObserver {
@@ -155,8 +148,6 @@ class SmartReminderManager: ObservableObject {
     func stopReminder() {
         reminderTimer?.invalidate()
         reminderTimer = nil
-        stateMonitorTimer?.invalidate()
-        stateMonitorTimer = nil
         reminderState = .idle
         remainingTime = 0
         showingReminderDialog = false
@@ -256,34 +247,31 @@ class SmartReminderManager: ObservableObject {
     private func startTimerStateMonitoring() {
         guard let timerModel = timerModel else { return }
 
-        // 记录初始状态
-        lastTimerState = timerModel.timerState
+        // 移除之前的事件订阅，避免重复订阅导致多次回调
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
 
-        // 停止之前的监控定时器
-        stateMonitorTimer?.invalidate()
-
-        // 启动状态监控定时器，每秒检查一次
-        stateMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.checkTimerStateChange()
+        // 使用 Combine 事件驱动订阅计时器状态变化，减少不必要的轮询开销
+        timerModel.$timerState
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newState in
+                self?.onTimerStateChanged(newState)
             }
-        }
+            .store(in: &cancellables)
     }
 
-    /// 检查计时器状态变化
-    private func checkTimerStateChange() {
-        guard let timerModel = timerModel else { return }
-
-        let currentState = timerModel.timerState
-        if currentState != lastTimerState {
-            onTimerStateChanged(currentState)
-            lastTimerState = currentState
-        }
-    }
+    
 
     /// 计时器状态变化时的处理
     private func onTimerStateChanged(_ newState: TimerState) {
         guard isEnabled else { return }
+
+        // 当计时器开始运行时（从任何状态变为running），立即关闭提醒弹窗
+        if newState == .running {
+            stopReminder()
+            return
+        }
 
         // 当计时器变为空闲状态时（包括被重置/放弃），开始提醒倒计时
         if newState == .idle && reminderState == .idle {
