@@ -400,6 +400,26 @@ struct TimerView: View {
                 .keyboardShortcut("-", modifiers: [])
                 .hidden()
                 .disabled(!timerModel.canAdjustTime())
+
+                // 增加当前结束时间（按 →）
+                Button("Increase Time (→)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: 5)
+                    }
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
+
+                // 减少当前结束时间（按 ←）
+                Button("Decrease Time (←)") {
+                    if timerModel.canAdjustTime() {
+                        timerModel.adjustCurrentTime(by: -5)
+                    }
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [])
+                .hidden()
+                .disabled(!timerModel.canAdjustTime())
             }
         )
         .onAppear {

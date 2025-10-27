@@ -99,6 +99,11 @@ struct SettingsView: View {
     @State private var showingRightSidebar = false
     @State private var rightSidebarContent: RightSidebarContent = .musicList
 
+    // 全局快捷键与 Dock 图标设置
+    @AppStorage("GlobalHotKeyEnabled") private var globalHotKeyEnabled: Bool = true
+    @AppStorage("GlobalHotKeyModifier") private var globalHotKeyModifier: String = "control" // control | option | command
+    @AppStorage("ShowDockIcon") private var showDockIcon: Bool = true
+
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -114,6 +119,35 @@ struct SettingsView: View {
                         width: showingRightSidebar ?
                             max(400, geometry.size.width - sidebarWidth(for: geometry.size.width)) : nil
                     )
+                    .onChange(of: globalHotKeyEnabled) { newValue in
+#if os(macOS)
+                        GlobalHotKeyManager.shared.registerHotKey(
+                            enabled: newValue,
+                            modifier: globalHotKeyModifier
+                        )
+#endif
+                    }
+                    .onChange(of: globalHotKeyModifier) { newValue in
+#if os(macOS)
+                        GlobalHotKeyManager.shared.registerHotKey(
+                            enabled: globalHotKeyEnabled,
+                            modifier: newValue
+                        )
+#endif
+                    }
+                    .onChange(of: showDockIcon) { newValue in
+#if os(macOS)
+                        NSApp.setActivationPolicy(newValue ? .regular : .accessory)
+                        // 解决切换为隐藏 Dock 图标时窗口跑到后面的情况：
+                        // 重新激活应用并将主窗口置顶。
+                        if !newValue {
+                            DispatchQueue.main.async {
+                                NSApp.activate(ignoringOtherApps: true)
+                                WindowManager.shared.showOrCreateMainWindow()
+                            }
+                        }
+#endif
+                    }
 
                 // 右侧侧边栏
                 if showingRightSidebar {
@@ -328,6 +362,65 @@ struct SettingsView: View {
                             }
                         }
                         .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.systemBackground)
+                    .cornerRadius(8)
+                .padding(.horizontal, 20)
+                }
+
+                // 全局快捷键设置
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("全局快捷键")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("启用 Ctrl+Space 唤起菜单栏弹窗")
+                            Spacer()
+                            Toggle("", isOn: $globalHotKeyEnabled)
+                        }
+                        .padding(.horizontal, 20)
+
+                        HStack {
+                            Text("修饰键")
+                            Spacer()
+                            Picker("", selection: $globalHotKeyModifier) {
+                                Text("Control").tag("control")
+                                Text("Option").tag("option")
+                                Text("Command").tag("command")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 240)
+                            .disabled(!globalHotKeyEnabled)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.systemBackground)
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                // Dock 图标设置
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Dock 图标")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("在 Dock 中显示应用图标")
+                            Spacer()
+                            Toggle("", isOn: $showDockIcon)
+                        }
+                        .padding(.horizontal, 20)
+
+                        Text("关闭后应用将以菜单栏为主，不在 Dock 显示图标")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
                     .background(Color.systemBackground)

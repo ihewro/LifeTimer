@@ -27,6 +27,9 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
         DispatchQueue.main.async {
             self.setupStatusItem()
         }
+
+        // 监听全局快捷键通知（唤起菜单栏弹窗）
+        NotificationCenter.default.addObserver(self, selector: #selector(handleGlobalHotKey), name: Notification.Name("LTGlobalHotKeyShowPopover"), object: nil)
     }
     
     deinit {
@@ -253,6 +256,13 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
 
         // 显示弹窗菜单
         showPopover()
+    }
+
+    @objc private func handleGlobalHotKey() {
+        // 使用主线程以确保UI操作安全
+        DispatchQueue.main.async {
+            self.showPopover()
+        }
     }
     
     // MARK: - 弹窗管理

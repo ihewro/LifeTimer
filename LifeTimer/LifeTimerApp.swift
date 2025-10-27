@@ -83,6 +83,11 @@ struct LifeTimerApp: App {
                     #if canImport(Cocoa)
                     _ = AppIconManager.shared
 
+                    // 应用全局快捷键和 Dock 图标设置
+                    GlobalHotKeyManager.shared.applyCurrentSettings()
+                    let showDock = UserDefaults.standard.object(forKey: "ShowDockIcon") as? Bool ?? true
+                    NSApp.setActivationPolicy(showDock ? .regular : .accessory)
+
 
                     // 监听创建新窗口的通知
                     setupNewWindowNotifications()
