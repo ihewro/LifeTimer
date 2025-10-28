@@ -436,7 +436,23 @@ struct TimerView: View {
             // 监听番茄钟完成状态
             // 只有在未开启自动休息时才显示完成弹窗
             if newState == .completed && timerModel.currentMode == .singlePomodoro && !timerModel.autoStartBreak {
+                #if os(macOS)
+                SmartReminderWindowManager.shared.showCompletionDialog(
+                    timerModel: timerModel,
+                    smartReminderManager: smartReminderManager,
+                    selectedTask: selectedTask,
+                    eventManager: eventManager
+                )
+                #else
                 showingCompletionDialog = true
+                #endif
+            }
+
+            // 开始新的计时或休息时，关闭窗口级别的完成弹窗
+            if newState == .running {
+                #if os(macOS)
+                SmartReminderWindowManager.shared.closeCompletionDialog()
+                #endif
             }
 
             // 当计时器从运行状态变为空闲状态时，如果用户设置了自定义任务，保持任务显示
@@ -543,7 +559,8 @@ struct TimerView: View {
 //                .buttonStyle(PlainButtonStyle())
             }
         }
-        // 番茄钟完成选择弹窗
+        // iOS 上继续使用 sheet；macOS 使用窗口级弹窗
+        #if !os(macOS)
         .sheet(isPresented: $showingCompletionDialog) {
             PomodoroCompletionDialog(
                 isPresented: $showingCompletionDialog,
@@ -552,6 +569,7 @@ struct TimerView: View {
                 selectedTask: selectedTask
             )
         }
+        #endif
         } // GeometryReader 结束
     }
 

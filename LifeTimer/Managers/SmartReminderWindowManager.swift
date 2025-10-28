@@ -22,6 +22,59 @@ class SmartReminderWindowManager: ObservableObject {
 
     private init() {}
 
+    /// 显示番茄钟完成弹窗（窗口级别）
+    func showCompletionDialog(
+        timerModel: TimerModel,
+        smartReminderManager: SmartReminderManager,
+        selectedTask: String,
+        eventManager: EventManager
+    ) {
+        // 如果窗口已经存在，先关闭以避免冲突
+        closeCompletionDialog()
+
+        isClosing = false
+
+        // 创建完成弹窗内容视图：复用 MenuBarPopoverView 的完成状态 UI
+        let completionView = AnyView(
+            MenuBarPopoverView(
+                timerModel: timerModel,
+                mode: .standard,
+                defaultTaskFallback: selectedTask,
+                onClose: {
+                    SmartReminderWindowManager.shared.closeCompletionDialog()
+                }
+            )
+            .environmentObject(eventManager)
+            .environmentObject(smartReminderManager)
+            .background(GlassEffectBackground())
+            .cornerRadius(12)
+        )
+
+        // 创建 hosting controller
+        hostingController = NSHostingController(rootView: completionView)
+
+        // 创建窗口（与提醒窗口同样的轻量级样式）
+        reminderWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 50, width: 480, height: 600),
+            styleMask: [.titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+
+        guard let window = reminderWindow, let controller = hostingController else { return }
+
+        // 配置并显示窗口
+        configureWindow(window)
+        window.contentViewController = controller
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 监听关闭事件（与提醒窗口复用同一套逻辑）
+        setupWindowCloseObserver()
+    }
+
     /// 显示智能提醒弹窗
     func showReminderDialog(
         timerModel: TimerModel,
@@ -103,6 +156,11 @@ class SmartReminderWindowManager: ObservableObject {
         cleanupWindow()
         windowToClose?.close()
         isClosing = false  // 重置关闭状态
+    }
+
+    /// 关闭番茄钟完成弹窗（与提醒弹窗共用同一窗口）
+    func closeCompletionDialog() {
+        closeReminderDialog()
     }
 
 
@@ -206,6 +264,19 @@ class SmartReminderWindowManager: ObservableObject {
     }
 
     func moveWindow(by translation: CGSize) {
+        // iOS 上不需要实现
+    }
+
+    func showCompletionDialog(
+        timerModel: TimerModel,
+        smartReminderManager: SmartReminderManager,
+        selectedTask: String,
+        eventManager: EventManager
+    ) {
+        // iOS 不支持窗口级别弹窗，留空实现
+    }
+
+    func closeCompletionDialog() {
         // iOS 上不需要实现
     }
 }
