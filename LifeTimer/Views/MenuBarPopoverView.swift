@@ -341,6 +341,7 @@ struct MenuBarPopoverView: View {
                         onClose()
                     }
                     .buttonStyle(.bordered)
+                    Spacer()
                 } else {
                     Button("打开主窗口") {
                         openMainWindow()

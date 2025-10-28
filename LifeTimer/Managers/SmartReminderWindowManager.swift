@@ -38,7 +38,7 @@ class SmartReminderWindowManager: ObservableObject {
         let completionView = AnyView(
             MenuBarPopoverView(
                 timerModel: timerModel,
-                mode: .standard,
+                mode: .reminder,
                 defaultTaskFallback: selectedTask,
                 onClose: {
                     SmartReminderWindowManager.shared.closeCompletionDialog()
