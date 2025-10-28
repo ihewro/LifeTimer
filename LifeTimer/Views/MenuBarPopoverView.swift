@@ -34,6 +34,16 @@ struct MenuBarPopoverView: View {
     @State private var currentTask: String = ""
     @State private var showingTaskSelector = false
     
+    // 复用配置：标准菜单栏弹窗 / 智能提醒弹窗
+    enum Mode {
+        case standard
+        case reminder
+    }
+    var mode: Mode = .standard
+    
+    // 当当前任务为空时的回退任务标题（用于提醒弹窗传入选择任务）
+    var defaultTaskFallback: String = ""
+    
     // 关闭弹窗的回调
     let onClose: () -> Void
     
@@ -54,7 +64,7 @@ struct MenuBarPopoverView: View {
         .cornerRadius(12)
         .onAppear {
             // 初始化当前任务
-            currentTask = timerModel.getCurrentDisplayTask(fallback: "")
+            currentTask = timerModel.getCurrentDisplayTask(fallback: defaultTaskFallback)
         }
         // 当弹窗内选择的任务变化时，同步到计时器模型，保证与主界面一致
         .onChange(of: currentTask) { newTask in
@@ -104,7 +114,7 @@ struct MenuBarPopoverView: View {
         VStack(spacing: 16) {
             // 标题区域
             VStack(spacing: 6) {
-                Text("⏰ 开始计时")
+                Text(mode == .reminder ? "⏰ 该开始计时了！" : "⏰ 开始计时")
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -122,17 +132,28 @@ struct MenuBarPopoverView: View {
 
             // 底部按钮
             HStack(spacing: 12) {
-                Button("打开主窗口") {
-                    openMainWindow()
-                }
-                .buttonStyle(.bordered)
+                if mode == .reminder {
+                    Button("稍后提醒") {
+                        let minutes = Int(smartReminderManager.reminderInterval)
+                        smartReminderManager.snoozeReminder(minutes: minutes)
+                        onClose()
+                    }
+                    .buttonStyle(.bordered)
 
-                Spacer()
-                
-                Button("关闭") {
-                    onClose()
+                    Spacer()
+                } else {
+                    Button("打开主窗口") {
+                        openMainWindow()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Spacer()
+                    
+                    Button("关闭") {
+                        onClose()
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
         }
     }
@@ -417,7 +438,7 @@ struct MenuBarPopoverView: View {
         timerModel.currentMode = .singlePomodoro
         
         // 使用当前选择的任务，如果为空则使用默认任务
-        let taskToUse = currentTask.isEmpty ? "专注任务" : currentTask
+        let taskToUse = currentTask.isEmpty ? defaultTaskFallback : currentTask
         timerModel.startTimer(with: taskToUse)
         
         // 关闭弹窗
