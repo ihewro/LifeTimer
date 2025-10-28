@@ -515,7 +515,7 @@ struct MenuBarPopoverView: View {
                 }
                 HStack(spacing: 8) {
                     focusTimeButton(minutes: 30)
-                    focusTimeButton(minutes: 50)
+                    focusTimeButton(minutes: 40)
                 }
             }
         }
