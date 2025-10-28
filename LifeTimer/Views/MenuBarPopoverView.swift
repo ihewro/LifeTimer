@@ -268,6 +268,9 @@ struct MenuBarPopoverView: View {
                     .foregroundColor(.secondary)
             }
 
+            // 支持在完成界面修改任务
+            taskInputSection
+
             // 继续专注
             VStack(spacing: 12) {
                 Text("继续专注")
@@ -306,26 +309,6 @@ struct MenuBarPopoverView: View {
                         .buttonStyle(.bordered)
                     }
                 }
-
-                // 自定义时长
-                HStack(spacing: 8) {
-                    Text("自定义:")
-                        .font(.subheadline)
-
-                    TextField("分钟", text: $customMinutes)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                        .focused($isCustomInputFocused)
-                        .onSubmit {
-                            startCustomPomodoro()
-                        }
-
-                    Button("开始") {
-                        startCustomPomodoro()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(customMinutes.isEmpty || Int(customMinutes) == nil)
-                }
             }
 
             Divider()
@@ -348,18 +331,30 @@ struct MenuBarPopoverView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                 }
-                .buttonStyle(.borderedProminent)
                 .tint(.blue)
             }
 
-            // 底部按钮（与原弹窗一致）
+            // 底部按钮：菜单弹窗显示“打开主窗口”与“跳过”，提醒模式保持“稍后决定”
             HStack(spacing: 12) {
-                Button("稍后决定") {
-                    onClose()
-                }
-                .buttonStyle(.bordered)
+                if mode == .reminder {
+                    Button("稍后决定") {
+                        onClose()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button("打开主窗口") {
+                        openMainWindow()
+                    }
+                    .buttonStyle(.bordered)
 
-                Spacer()
+                    Spacer()
+
+                    Button("跳过") {
+                        timerModel.skipBreak()
+                        onClose()
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
     }
