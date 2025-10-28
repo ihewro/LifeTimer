@@ -33,6 +33,8 @@ struct MenuBarPopoverView: View {
     
     @State private var currentTask: String = ""
     @State private var showingTaskSelector = false
+    @State private var customMinutes: String = ""
+    @FocusState private var isCustomInputFocused: Bool
     
     // 复用配置：标准菜单栏弹窗 / 智能提醒弹窗
     enum Mode {
@@ -53,6 +55,9 @@ struct MenuBarPopoverView: View {
             if timerModel.timerState == .idle {
                 // 未开始计时时的UI
                 idleStateView
+            } else if timerModel.timerState == .completed {
+                // 计时完成后的选择面板
+                completedStateView
             } else {
                 // 计时中的UI
                 runningStateView
@@ -245,6 +250,116 @@ struct MenuBarPopoverView: View {
                     onClose()
                 }
                 .buttonStyle(.bordered)
+            }
+        }
+    }
+    
+    // MARK: - 计时完成后的视图（集成原 sheet dialog 功能）
+    private var completedStateView: some View {
+        VStack(spacing: 16) {
+            // 标题
+            VStack(spacing: 6) {
+                Text("🍅 番茄钟已完成！")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("选择下一步行动")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            // 继续专注
+            VStack(spacing: 12) {
+                Text("继续专注")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // 使用上次时长 + 快速选择
+                HStack(spacing: 8) {
+                    Button(action: {
+                        startPomodoro(minutes: Int(timerModel.getCurrentPomodoroTime() / 60))
+                    }) {
+                        VStack(spacing: 4) {
+                            Text("上次时长")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(Int(timerModel.getCurrentPomodoroTime() / 60))分钟")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+
+                    ForEach([10, 15, 30], id: \ .self) { minutes in
+                        Button(action: {
+                            startPomodoro(minutes: minutes)
+                        }) {
+                            Text("\(minutes)分钟")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                // 自定义时长
+                HStack(spacing: 8) {
+                    Text("自定义:")
+                        .font(.subheadline)
+
+                    TextField("分钟", text: $customMinutes)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                        .focused($isCustomInputFocused)
+                        .onSubmit {
+                            startCustomPomodoro()
+                        }
+
+                    Button("开始") {
+                        startCustomPomodoro()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(customMinutes.isEmpty || Int(customMinutes) == nil)
+                }
+            }
+
+            Divider()
+
+            // 开始休息
+            VStack(spacing: 12) {
+                Text("开始休息")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(action: {
+                    startBreak()
+                }) {
+                    HStack {
+                        Image(systemName: "cup.and.saucer")
+                        Text("休息 \(Int(timerModel.getCurrentBreakTime() / 60)) 分钟")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            }
+
+            // 底部按钮（与原弹窗一致）
+            HStack(spacing: 12) {
+                Button("稍后决定") {
+                    onClose()
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
             }
         }
     }
@@ -442,6 +557,29 @@ struct MenuBarPopoverView: View {
         timerModel.startTimer(with: taskToUse)
         
         // 关闭弹窗
+        onClose()
+    }
+
+    private func startPomodoro(minutes: Int) {
+        // 先重置计时器状态，这样setCustomTime才能正常工作
+        timerModel.resetTimer()
+        timerModel.setCustomTime(minutes: minutes)
+        timerModel.currentMode = .singlePomodoro
+        let taskToUse = currentTask.isEmpty ? defaultTaskFallback : currentTask
+        timerModel.startTimer(with: taskToUse)
+        onClose()
+    }
+
+    private func startCustomPomodoro() {
+        guard let minutes = Int(customMinutes), minutes > 0, minutes <= 99 else { return }
+        startPomodoro(minutes: minutes)
+    }
+
+    private func startBreak() {
+        timerModel.isBreakFromPomodoro = true
+        timerModel.currentMode = .pureRest
+        timerModel.resetTimer()
+        timerModel.startTimer()
         onClose()
     }
 
