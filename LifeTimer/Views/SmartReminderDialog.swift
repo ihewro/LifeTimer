@@ -169,7 +169,6 @@ struct SmartReminderDialog: View {
         // 使用当前选择的任务，如果为空则使用默认任务
         let taskToUse = currentTask.isEmpty ? selectedTask : currentTask
         timerModel.startTimer(with: taskToUse)
-        reminderManager.onUserStartedTimer()
         
         // 关闭弹窗
         isPresented = false

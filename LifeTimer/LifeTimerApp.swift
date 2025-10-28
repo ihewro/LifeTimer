@@ -8,6 +8,7 @@
 import SwiftUI
 #if canImport(Cocoa)
 import Cocoa
+import UserNotifications
 #endif
 
 @main
@@ -83,6 +84,10 @@ struct LifeTimerApp: App {
                     #if canImport(Cocoa)
                     _ = AppIconManager.shared
 
+                    // 初始化声音与通知管理器，并注入 TimerModel
+                    let soundManager = SoundEffectManager.shared
+                    soundManager.setTimerModel(timerModel)
+
                     // 应用全局快捷键和 Dock 图标设置
                     GlobalHotKeyManager.shared.applyCurrentSettings()
                     let showDock = UserDefaults.standard.object(forKey: "ShowDockIcon") as? Bool ?? true
@@ -134,6 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("AppDelegate: applicationDidFinishLaunching")
+        UNUserNotificationCenter.current().delegate = SoundEffectManager.shared
     }
 
     // 防止应用在最后一个窗口关闭时退出

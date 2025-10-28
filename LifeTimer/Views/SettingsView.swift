@@ -215,6 +215,16 @@ struct SettingsView: View {
         smartReminderManager.testShowReminder()
     }
 
+    /// 测试通知（番茄钟1分钟预警）
+    private func testOneMinuteWarningNotification() {
+        soundEffectManager.sendOneMinuteWarningNotification()
+    }
+
+    /// 测试通知（番茄钟结束）
+    private func testPomodoroCompletedNotification() {
+        soundEffectManager.sendPomodoroCompletedNotification()
+    }
+
     private var contentView: some View {
         Group {
             switch selectedTab {
@@ -554,6 +564,30 @@ struct SettingsView: View {
                             ),
                             soundEffectManager: soundEffectManager
                         )
+                        .padding(.horizontal, 20)
+
+                        // 测试发送通知
+                        HStack {
+                            Text("测试通知")
+                                .font(.subheadline)
+                            Spacer()
+                            Button("测试发送") {
+                                testOneMinuteWarningNotification()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.horizontal, 20)
+
+                        // 测试番茄结束通知
+                        HStack {
+                            Text("番茄结束通知")
+                                .font(.subheadline)
+                            Spacer()
+                            Button("测试发送") {
+                                testPomodoroCompletedNotification()
+                            }
+                            .buttonStyle(.bordered)
+                        }
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)

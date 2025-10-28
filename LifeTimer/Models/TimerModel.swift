@@ -166,6 +166,9 @@ class TimerModel: ObservableObject {
 
         timerState = .running
 
+        // 广播集中化的“计时开始”事件，供其他模块（如智能提醒）统一响应
+        NotificationCenter.default.post(name: .timerDidStart, object: self)
+
         // 开始计时器时播放音乐（仅在番茄模式和正计时模式）
         if currentMode == .singlePomodoro || currentMode == .countUp {
             audioManager?.startTimerPlayback()
@@ -608,4 +611,5 @@ class TimerModel: ObservableObject {
 
 extension Notification.Name {
     static let timerCompleted = Notification.Name("timerCompleted")
+    static let timerDidStart = Notification.Name("timerDidStart")
 }

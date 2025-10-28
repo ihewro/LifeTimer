@@ -110,11 +110,21 @@ private struct SoundSourceData: Codable {
 }
 
 // 音效管理器
-class SoundEffectManager: ObservableObject {
+class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = SoundEffectManager()
 
     // 通知权限状态
     @Published var notificationPermissionGranted: Bool = false
+
+    // 注入计时器，用于处理通知按钮动作
+    weak var timerModel: TimerModel?
+
+    // 通知类别与动作标识
+    private let oneMinuteWarningCategoryId = "pomodoro_one_minute_warning_category"
+    private let addFiveMinutesActionId = "action_add_five_minutes"
+    private let pomodoroCompletedCategoryId = "pomodoro_completed_category"
+    private let startFiveMinutePomodoroActionId = "action_start_five_minute_pomodoro"
+
 
     // 音效选择设置
     @Published var pomodoroOneMinuteWarningSound: SoundSource = .system(SystemSoundOption.defaultFor(.pomodoroOneMinuteWarning)) {
@@ -160,10 +170,16 @@ class SoundEffectManager: ObservableObject {
 
     private let userDefaults = UserDefaults.standard
     
-    private init() {
+    private override init() {
+        super.init()
+        
         loadSettings()
         loadCustomSounds()
         requestNotificationPermission()
+        
+        // 设置通知中心代理并注册通知类别
+        UNUserNotificationCenter.current().delegate = self
+        registerNotificationCategories()
     }
 
     // MARK: - 设置管理
@@ -563,10 +579,9 @@ class SoundEffectManager: ObservableObject {
     }
 
     // MARK: - 通知管理
-
     /// 请求通知权限
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [self] granted, error in
             DispatchQueue.main.async {
                 self.notificationPermissionGranted = granted
                 if let error = error {
@@ -574,6 +589,37 @@ class SoundEffectManager: ObservableObject {
                 }
             }
         }
+    }
+
+    /// 注册通知类别与动作
+    private func registerNotificationCategories() {
+        let addFiveAction = UNNotificationAction(
+            identifier: addFiveMinutesActionId,
+            title: "加5分钟",
+            options: []
+        )
+
+        let startFiveAction = UNNotificationAction(
+            identifier: startFiveMinutePomodoroActionId,
+            title: "再来5分钟",
+            options: []
+        )
+
+        let oneMinuteCategory = UNNotificationCategory(
+            identifier: oneMinuteWarningCategoryId,
+            actions: [addFiveAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let completedCategory = UNNotificationCategory(
+            identifier: pomodoroCompletedCategoryId,
+            actions: [startFiveAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([oneMinuteCategory, completedCategory])
     }
 
     /// 发送一分钟倒计时警告通知
@@ -587,6 +633,7 @@ class SoundEffectManager: ObservableObject {
         content.title = "还有一分钟即将结束专注 ⚠️"
         content.subtitle = "进行当前工作的收尾流程吧！"
         content.sound = UNNotificationSound.default
+        content.categoryIdentifier = oneMinuteWarningCategoryId
 
         // 立即发送通知
         let request = UNNotificationRequest(
@@ -613,6 +660,7 @@ class SoundEffectManager: ObservableObject {
         content.title = "番茄钟已完成 🍅"
         content.subtitle = "恭喜完成一个专注时段！"
         content.sound = UNNotificationSound.default
+        content.categoryIdentifier = pomodoroCompletedCategoryId
 
         // 立即发送通知
         let request = UNNotificationRequest(
@@ -627,4 +675,26 @@ class SoundEffectManager: ObservableObject {
             }
         }
     }
+    // MARK: - 注入依赖
+    func setTimerModel(_ timerModel: TimerModel) {
+        self.timerModel = timerModel
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        switch response.actionIdentifier {
+        case addFiveMinutesActionId:
+            // 一分钟预警：为正在进行的番茄增加5分钟
+            timerModel?.adjustCurrentTime(by: 5)
+        case startFiveMinutePomodoroActionId:
+            // 番茄完成：重新开始一个5分钟番茄
+            timerModel?.changeMode(.singlePomodoro)
+            timerModel?.setCustomTime(minutes: 5)
+            timerModel?.startTimer()
+        default:
+            break
+        }
+        completionHandler()
+    }
+
 }

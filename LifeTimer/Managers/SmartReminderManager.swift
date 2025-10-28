@@ -88,6 +88,15 @@ class SmartReminderManager: ObservableObject {
     init() {
         loadSettings()
         setupAppStateObserver()
+
+        // 集中化：监听全局“计时开始”事件，统一关闭智能提醒弹窗
+        NotificationCenter.default.addObserver(
+            forName: .timerDidStart,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.onUserStartedTimer()
+        }
     }
     
     deinit {

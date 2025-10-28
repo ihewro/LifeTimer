@@ -419,8 +419,6 @@ struct MenuBarPopoverView: View {
         // 使用当前选择的任务，如果为空则使用默认任务
         let taskToUse = currentTask.isEmpty ? "专注任务" : currentTask
         timerModel.startTimer(with: taskToUse)
-        // 通知智能提醒管理器用户已开始计时，关闭提醒并停止倒计时
-        smartReminderManager.onUserStartedTimer()
         
         // 关闭弹窗
         onClose()
@@ -432,7 +430,6 @@ struct MenuBarPopoverView: View {
         case .idle:
             // 空闲状态：开始计时器
             timerModel.startTimer(with: currentTask)
-            smartReminderManager.onUserStartedTimer()
 
         case .running:
             // 运行状态：纯休息模式直接结束，其他模式暂停
@@ -445,7 +442,6 @@ struct MenuBarPopoverView: View {
         case .paused:
             // 暂停状态：继续计时器，并恢复音乐播放
             timerModel.startTimer(with: currentTask)
-            smartReminderManager.onUserStartedTimer()
 
         case .completed:
             // 完成状态：重置计时器（为下一次做准备）

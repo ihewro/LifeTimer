@@ -265,7 +265,6 @@ struct TimerView: View {
                     else if timerModel.currentMode == .singlePomodoro && timerModel.timerState == .paused {
                         Button(action: {
                             timerModel.startTimer(with: selectedTask)
-                            smartReminderManager.onUserStartedTimer()
                         }) {
                             Text("继续")
                                 .frame(width: 180)
@@ -332,10 +331,8 @@ struct TimerView: View {
                                 switch timerModel.timerState {
                                 case .idle:
                                     timerModel.startTimer(with: selectedTask)
-                                    smartReminderManager.onUserStartedTimer()
                                 case .paused:
                                     timerModel.startTimer(with: selectedTask)
-                                    smartReminderManager.onUserStartedTimer()
                                     // 恢复计时器时也恢复音乐播放
                                     audioManager.resumeTimerPlayback()
                                 case .running:
@@ -628,7 +625,6 @@ struct TimerView: View {
         case .idle:
             // 空闲状态：开始计时器
             timerModel.startTimer(with: selectedTask)
-            smartReminderManager.onUserStartedTimer()
 
         case .running:
             // 运行状态：纯休息模式直接结束，其他模式暂停
@@ -641,7 +637,6 @@ struct TimerView: View {
         case .paused:
             // 暂停状态：继续计时器
             timerModel.startTimer(with: selectedTask)
-            smartReminderManager.onUserStartedTimer()
             // 恢复计时器时也恢复音乐播放
             audioManager.resumeTimerPlayback()
 
@@ -1374,7 +1369,6 @@ struct PomodoroCompletionDialog: View {
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .singlePomodoro
         timerModel.startTimer(with: selectedTask)
-        smartReminderManager.onUserStartedTimer()
         isPresented = false
     }
 
@@ -1388,7 +1382,6 @@ struct PomodoroCompletionDialog: View {
         timerModel.currentMode = .pureRest
         timerModel.resetTimer()
         timerModel.startTimer()
-        smartReminderManager.onUserStartedTimer()
         isPresented = false
     }
 }
