@@ -222,7 +222,7 @@ struct MenuBarPopoverView: View {
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(4)
                 } else if timerModel.timerState == .running {
-                    Text("专注中...")
+                    Text(timerModel.currentMode == .pureRest ? "休息中..." : "专注中...")
                         .font(.caption)
                         .foregroundColor(.green)
                         .padding(.horizontal, 8)
