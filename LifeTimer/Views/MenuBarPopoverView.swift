@@ -25,6 +25,7 @@ struct PressableIconButtonStyle: ButtonStyle {
     }
 }
 
+
 /// 菜单栏弹窗视图，复用SmartReminderDialog的UI和功能
 struct MenuBarPopoverView: View {
     @ObservedObject var timerModel: TimerModel
@@ -35,6 +36,35 @@ struct MenuBarPopoverView: View {
     @State private var showingTaskSelector = false
     @State private var customMinutes: String = ""
     @FocusState private var isCustomInputFocused: Bool
+    // 搜索与联想相关状态
+    @State private var searchText: String = ""
+    @FocusState private var isTaskSearchFocused: Bool
+    @State private var recentTasks: [String] = []
+    @State private var filteredRecentTasks: [String] = []
+    @State private var filteredPresetTasks: [String] = []
+    @State private var isLoadingSuggestions: Bool = false
+    @State private var suggestionsDataTask: Task<Void, Never>? = nil
+    @State private var suggestionsSearchTask: Task<Void, Never>? = nil
+    @State private var selectedSuggestionIndex: Int? = nil
+    @State private var isSuggestionVisible: Bool = false
+    private let presetTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考", "休息", "运动"]
+    
+    private var shouldShowCreateOption: Bool {
+        !searchText.isEmpty &&
+        !filteredRecentTasks.contains(searchText) &&
+        !filteredPresetTasks.contains(searchText) &&
+        !recentTasks.contains(searchText)
+    }
+    
+    private var allSuggestions: [String] {
+        var items = filteredRecentTasks + filteredPresetTasks
+        if shouldShowCreateOption { items.append(searchText) }
+        return items
+    }
+    private var isSuggestionDropdownVisible: Bool {
+        // 只有在输入框聚焦且存在内容时才显示下拉
+        isTaskSearchFocused && isSuggestionVisible && (!filteredRecentTasks.isEmpty || !filteredPresetTasks.isEmpty || shouldShowCreateOption)
+    }
     
     // 复用配置：标准菜单栏弹窗 / 智能提醒弹窗
     enum Mode {
@@ -67,9 +97,25 @@ struct MenuBarPopoverView: View {
         .padding(20)
         // .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(12)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isSuggestionDropdownVisible {
+                isSuggestionVisible = false
+                isTaskSearchFocused = false
+            }
+        }
         .onAppear {
             // 初始化当前任务
             currentTask = timerModel.getCurrentDisplayTask(fallback: defaultTaskFallback)
+            // 初始化搜索文本与联想数据
+            searchText = currentTask
+            loadTaskSuggestionData()
+            // 默认不聚焦输入框，也不显示下拉
+            isTaskSearchFocused = false
+            isSuggestionVisible = false
+            DispatchQueue.main.async {
+                isTaskSearchFocused = false
+            }
         }
         // 当弹窗内选择的任务变化时，同步到计时器模型，保证与主界面一致
         .onChange(of: currentTask) { newTask in
@@ -112,6 +158,11 @@ struct MenuBarPopoverView: View {
                 .disabled(!timerModel.canAdjustTime())
             }
         )
+        .onDisappear {
+            // 取消未完成的任务，优化内存与资源管理
+            suggestionsDataTask?.cancel()
+            suggestionsSearchTask?.cancel()
+        }
     }
     
     // MARK: - 未开始计时时的视图
@@ -174,6 +225,9 @@ struct MenuBarPopoverView: View {
                 // 运行中任务修改 UI 与初始界面保持一致
                 taskInputSection
             }
+            // 提升标题区域（包含任务输入与下拉）的层级，确保覆盖后续计时与按钮区域
+            .compositingGroup()
+            .zIndex(9999)
 
             // 时间显示 + 调节按钮（与主界面逻辑一致）
             VStack(spacing: 8) {
@@ -472,25 +526,178 @@ struct MenuBarPopoverView: View {
     
     // MARK: - 任务输入框区域
     private var taskInputSection: some View {
-        Button(action: {
-            showingTaskSelector = true
-        }) {
-            HStack {
-                Text(currentTask.isEmpty ? "选择任务" : currentTask)
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 8) {
+                // 搜索框（保持系统原生样式）
+                TextField("搜索或输入任务", text: $searchText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
                     .font(.body)
-                    .foregroundColor(currentTask.isEmpty ? .secondary : .primary)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
-                Spacer()
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .controlSize(.large)
+                    .focused($isTaskSearchFocused)
+                    .overlay(alignment: .trailing) {
+                        if isTaskSearchFocused && !searchText.isEmpty {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    searchText = ""
+                                }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.trailing, 8)
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            .onHover { isHovered in
+                                #if canImport(Cocoa)
+                                if isHovered {
+                                    NSCursor.pointingHand.push()
+                                } else {
+                                    NSCursor.pop()
+                                }
+                                #endif
+                            }
+                        }
+                    }
+                    .onChange(of: searchText) { newText in
+                        // 输入防抖 300ms
+                        suggestionsSearchTask?.cancel()
+                        suggestionsSearchTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 300_000_000)
+                            if !Task.isCancelled {
+                                await performTaskSuggestionSearch(searchText: newText)
+                                // 重置键盘选中索引
+                                selectedSuggestionIndex = allSuggestions.isEmpty ? nil : 0
+                            }
+                        }
+                    }
+                    .onSubmit {
+                        confirmSuggestionSelection()
+                    }
+                    .onChange(of: isTaskSearchFocused) { focused in
+                        if focused {
+                            // 获得焦点时立即显示联想菜单（通过条件渲染）
+                            // 若尚未加载数据，则加载
+                            if recentTasks.isEmpty { loadTaskSuggestionData() }
+                            // 初始联想
+                            suggestionsSearchTask?.cancel()
+                            suggestionsSearchTask = Task { @MainActor in
+                                await performTaskSuggestionSearch(searchText: searchText)
+                                selectedSuggestionIndex = allSuggestions.isEmpty ? nil : 0
+                                isSuggestionVisible = (!filteredRecentTasks.isEmpty || !filteredPresetTasks.isEmpty || shouldShowCreateOption)
+                            }
+                        } else {
+                            isSuggestionVisible = false
+                        }
+                    }
+                }
+
+            // 键盘导航（上下选择、回车确认）
+            Group {
+                Button("Select Up") { moveSuggestionSelection(-1) }
+                    .keyboardShortcut(.upArrow, modifiers: [])
+                    .hidden()
+                    .disabled(!isTaskSearchFocused || allSuggestions.isEmpty)
+                Button("Select Down") { moveSuggestionSelection(1) }
+                    .keyboardShortcut(.downArrow, modifiers: [])
+                    .hidden()
+                    .disabled(!isTaskSearchFocused || allSuggestions.isEmpty)
+                Button("Confirm Selection") { confirmSuggestionSelection() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .hidden()
+                    .disabled(!isTaskSearchFocused)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(8)
         }
-        .buttonStyle(PlainButtonStyle())
+        .overlay(alignment: .topLeading) {
+            if isSuggestionDropdownVisible {
+                VStack(spacing: 0) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            if !filteredRecentTasks.isEmpty {
+                                Text("最近常用")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 4)
+                                ForEach(Array(filteredRecentTasks.enumerated()), id: \.offset) { idx, task in
+                                    let globalIndex = idx
+                                    TaskRowView(task: task, isSelected: selectedSuggestionIndex == globalIndex, isNewTask: false) {
+                                        currentTask = task
+                                        searchText = task
+                                        isTaskSearchFocused = false
+                                        isSuggestionVisible = false
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 6)
+                                }
+                            }
+                            if !filteredPresetTasks.isEmpty {
+                                Text("预设任务")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 4)
+                                // 为避免 LazyVStack 重复 ID 警告，这里将 offset 全局平移
+                                let presetItems = Array(filteredPresetTasks.enumerated()).map { (offset: filteredRecentTasks.count + $0.offset, element: $0.element) }
+                                ForEach(presetItems, id: \.offset) { idx, task in
+                                    let globalIndex = idx
+                                    TaskRowView(task: task, isSelected: selectedSuggestionIndex == globalIndex, isNewTask: false) {
+                                        currentTask = task
+                                        searchText = task
+                                        isTaskSearchFocused = false
+                                        isSuggestionVisible = false
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 6)
+                                }
+                            }
+                            if shouldShowCreateOption {
+                                Text("创建新任务")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 4)
+                                let createIndex = filteredRecentTasks.count + filteredPresetTasks.count
+                                TaskRowView(task: searchText, isSelected: selectedSuggestionIndex == createIndex, isNewTask: true) {
+                                    currentTask = searchText
+                                    isTaskSearchFocused = false
+                                    isSuggestionVisible = false
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 6)
+                            }
+                        }
+                    }
+                    // 固定高度，避免被父布局压缩
+                    .frame(height: 200)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Group {
+                        if #available(macOS 12.0, *) {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        } else {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color(NSColor.controlBackgroundColor))
+                        }
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.1), radius: 6, x: 0, y: 4)
+                .offset(y: 38)
+                .zIndex(1000)
+            }
+        }
         .popover(isPresented: $showingTaskSelector, arrowEdge: .top) {
             TaskSelectorPopoverView(
                 selectedTask: $currentTask, 
@@ -498,6 +705,8 @@ struct MenuBarPopoverView: View {
             )
             .environmentObject(eventManager)
         }
+        // 确保下拉菜单层级始终在最上面（相对同级元素）
+        .zIndex(9999)
     }
     
     // MARK: - 专注时间按钮网格
@@ -519,6 +728,67 @@ struct MenuBarPopoverView: View {
                 }
             }
         }
+    }
+
+    // MARK: - 联想数据与搜索逻辑
+    private func loadTaskSuggestionData() {
+        // 取消之前的数据任务
+        suggestionsDataTask?.cancel()
+        suggestionsDataTask = Task { @MainActor in
+            await performTaskSuggestionDataLoading()
+        }
+    }
+    
+    @MainActor
+    private func performTaskSuggestionDataLoading() async {
+        isLoadingSuggestions = true
+        let recent = await Task.detached { [eventManager] in
+            async let recentTasks = eventManager.getRecentTasksAsync(limit: 10)
+            let tasks = await recentTasks
+            return tasks
+        }.value
+        recentTasks = recent
+        // 初始过滤
+        await performTaskSuggestionSearch(searchText: searchText)
+        isLoadingSuggestions = false
+    }
+    
+    @MainActor
+    private func performTaskSuggestionSearch(searchText: String) async {
+        let result = await Task.detached { [recentTasks, presetTasks] in
+            if searchText.isEmpty {
+                return (recentTasks, presetTasks)
+            } else {
+                let s = searchText.lowercased()
+                let r = recentTasks.filter { $0.lowercased().contains(s) }
+                let p = presetTasks.filter { $0.lowercased().contains(s) }
+                return (r, p)
+            }
+        }.value
+        filteredRecentTasks = result.0
+        filteredPresetTasks = result.1
+    }
+    
+    private func moveSuggestionSelection(_ delta: Int) {
+        guard !allSuggestions.isEmpty else { selectedSuggestionIndex = nil; return }
+        let count = allSuggestions.count
+        let current = selectedSuggestionIndex ?? 0
+        var next = current + delta
+        if next < 0 { next = count - 1 }
+        if next >= count { next = 0 }
+        selectedSuggestionIndex = next
+    }
+    
+    private func confirmSuggestionSelection() {
+        if let idx = selectedSuggestionIndex, idx < allSuggestions.count {
+            let task = allSuggestions[idx]
+            currentTask = task
+            searchText = task
+        } else if !searchText.isEmpty {
+            currentTask = searchText
+        }
+        isTaskSearchFocused = false
+        isSuggestionVisible = false
     }
     
     // MARK: - 专注时间按钮
