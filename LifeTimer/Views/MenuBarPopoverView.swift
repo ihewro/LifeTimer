@@ -694,7 +694,7 @@ struct MenuBarPopoverView: View {
                         .stroke(Color(NSColor.separatorColor), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.1), radius: 6, x: 0, y: 4)
-                .offset(y: 38)
+                .offset(y: 35)
                 .zIndex(1000)
             }
         }
