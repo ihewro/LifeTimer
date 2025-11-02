@@ -409,8 +409,16 @@ struct SearchResultsSidebar: View {
                 .background(Color.systemBackground)
             }
         }
-        .frame(width: min(280, max(250, getScreenWidth() * 0.4)))
+        // 自适应宽度，由外部容器（CalendarView）控制具体宽度
+        .frame(maxWidth: .infinity)
         .background(GlassEffectBackground())
+        // 左侧竖向分隔线（与主要内容区的分界）
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(width: 1)
+                .frame(maxHeight: .infinity)
+        }
     }
 }
 
@@ -635,18 +643,21 @@ struct CalendarView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // 搜索结果侧边栏
+                // 统一右侧面板宽度计算（搜索结果与侧边栏一致）
+                let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
+                let sidebarWidth = isCompact ? min(280, max(200, rootGeo.size.width * 0.35)) : 240
+
+                // 搜索结果侧边栏（使用与右侧侧边栏一致的宽度）
                 if showingSearchResults {
                     SearchResultsSidebar(
                         searchResults: searchResults,
                         onEventSelected: handleEventSelection,
                         onClose: closeSearchResults
                     )
+                    .frame(width: sidebarWidth)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
                 }
-                                let isCompact = rootGeo.size.width < 800 || (rootGeo.size.width < 1000 && rootGeo.size.height > rootGeo.size.width)
-                let sidebarWidth = isCompact ? min(280, max(200, rootGeo.size.width * 0.35)) : 240
 
                 if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults {
                     switch currentViewMode {
@@ -743,7 +754,7 @@ struct CalendarView: View {
                     // 视图模式选择器（macOS 上强制等宽分布，避免高版本按内容分配导致不均匀）
                     #if os(macOS)
                     CalendarViewModeSegmentedPicker(selection: $currentViewMode)
-                        .frame(width: 270)
+                        .frame(width: 300)
                         .onChange(of: currentViewMode) { newMode in
                             // 视图模式切换时触发预加载
                             triggerPreloading(for: newMode)
@@ -3741,7 +3752,7 @@ struct EventDetailPopover: View {
                         Text("类型")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Picker("事件类型", selection: $eventType) {
+                        Picker("", selection: $eventType) {
                             ForEach(PomodoroEvent.EventType.allCases, id: \.self) { type in
                                 Text(type.displayName).tag(type)
                             }

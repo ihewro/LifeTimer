@@ -39,6 +39,8 @@ struct MenuBarPopoverView: View {
     // 搜索与联想相关状态
     @State private var searchText: String = ""
     @FocusState private var isTaskSearchFocused: Bool
+    // 标记当前聚焦周期内用户是否主动修改过输入框内容（用于决定是否用空字符串触发初始联想）
+    @State private var hasUserEditedSearch: Bool = false
     @State private var recentTasks: [String] = []
     @State private var filteredRecentTasks: [String] = []
     @State private var filteredPresetTasks: [String] = []
@@ -47,23 +49,37 @@ struct MenuBarPopoverView: View {
     @State private var suggestionsSearchTask: Task<Void, Never>? = nil
     @State private var selectedSuggestionIndex: Int? = nil
     @State private var isSuggestionVisible: Bool = false
+    // 置顶联想项（例如：当前输入框内容），用于在列表顶部优先显示
+    @State private var topSuggestion: String? = nil
     private let presetTasks = ["专注", "学习", "工作", "阅读", "写作", "编程", "设计", "思考", "休息", "运动"]
     
     private var shouldShowCreateOption: Bool {
-        !searchText.isEmpty &&
-        !filteredRecentTasks.contains(searchText) &&
-        !filteredPresetTasks.contains(searchText) &&
-        !recentTasks.contains(searchText)
+        // 仅在用户主动编辑过输入框时才显示“创建新任务”选项
+        // 若顶部联想项与当前输入一致，则不再重复显示创建项
+        let topEqualsSearch = (topSuggestion?.lowercased() == searchText.lowercased())
+        return hasUserEditedSearch && !searchText.isEmpty && !topEqualsSearch &&
+            !filteredRecentTasks.contains(searchText) &&
+            !filteredPresetTasks.contains(searchText) &&
+            !recentTasks.contains(searchText)
     }
     
     private var allSuggestions: [String] {
-        var items = filteredRecentTasks + filteredPresetTasks
+        var items: [String] = []
+        if let top = topSuggestion, !top.isEmpty {
+            items.append(top)
+        }
+        let topLower = items.first?.lowercased()
+        items += filteredRecentTasks.filter { $0.lowercased() != topLower }
+        items += filteredPresetTasks.filter { $0.lowercased() != topLower }
         if shouldShowCreateOption { items.append(searchText) }
         return items
     }
     private var isSuggestionDropdownVisible: Bool {
-        // 只有在输入框聚焦且存在内容时才显示下拉
-        isTaskSearchFocused && isSuggestionVisible && (!filteredRecentTasks.isEmpty || !filteredPresetTasks.isEmpty || shouldShowCreateOption)
+        // 只有在输入框聚焦且存在内容时才显示下拉（包含置顶联想项）
+        isTaskSearchFocused && isSuggestionVisible && (
+            ((topSuggestion?.isEmpty == false)) ||
+            !filteredRecentTasks.isEmpty || !filteredPresetTasks.isEmpty || shouldShowCreateOption
+        )
     }
     
     // 复用配置：标准菜单栏弹窗 / 智能提醒弹窗
@@ -113,6 +129,8 @@ struct MenuBarPopoverView: View {
             // 默认不聚焦输入框，也不显示下拉
             isTaskSearchFocused = false
             isSuggestionVisible = false
+            // 初始认为没有发生用户编辑
+            hasUserEditedSearch = false
             DispatchQueue.main.async {
                 isTaskSearchFocused = false
             }
@@ -562,12 +580,16 @@ struct MenuBarPopoverView: View {
                         }
                     }
                     .onChange(of: searchText) { newText in
+                        // 聚焦状态下的内容变化认为是用户编辑
+                        if isTaskSearchFocused {
+                            hasUserEditedSearch = true
+                        }
                         // 输入防抖 300ms
                         suggestionsSearchTask?.cancel()
                         suggestionsSearchTask = Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 300_000_000)
+                            // try? await Task.sleep(nanoseconds: 200_000_000)
                             if !Task.isCancelled {
-                                await performTaskSuggestionSearch(searchText: newText)
+                                await performTaskSuggestionSearch(searchText: newText, preferredFirst: newText)
                                 // 重置键盘选中索引
                                 selectedSuggestionIndex = allSuggestions.isEmpty ? nil : 0
                             }
@@ -584,12 +606,16 @@ struct MenuBarPopoverView: View {
                             // 初始联想
                             suggestionsSearchTask?.cancel()
                             suggestionsSearchTask = Task { @MainActor in
-                                await performTaskSuggestionSearch(searchText: searchText)
+                                // 若用户尚未编辑过输入框，则用空字符串进行联想，以展示全部建议
+                                let queryText = hasUserEditedSearch ? searchText : ""
+                                await performTaskSuggestionSearch(searchText: queryText, preferredFirst: searchText)
                                 selectedSuggestionIndex = allSuggestions.isEmpty ? nil : 0
                                 isSuggestionVisible = (!filteredRecentTasks.isEmpty || !filteredPresetTasks.isEmpty || shouldShowCreateOption)
                             }
                         } else {
                             isSuggestionVisible = false
+                            // 失焦后重置编辑标记，下一次聚焦仍按“未修改”处理
+                            hasUserEditedSearch = false
                         }
                     }
                 }
@@ -615,6 +641,22 @@ struct MenuBarPopoverView: View {
                 VStack(spacing: 0) {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
+                            // 顶部置顶联想项（当前输入内容），优先显示
+                            let hasTop = (topSuggestion?.isEmpty == false)
+                            let topOffset = hasTop ? 1 : 0
+                            if let top = topSuggestion, !top.isEmpty {
+                                let topLower = top.lowercased()
+                                let isNewTop = !recentTasks.map { $0.lowercased() }.contains(topLower) &&
+                                               !presetTasks.map { $0.lowercased() }.contains(topLower)
+                                TaskRowView(task: top, isSelected: selectedSuggestionIndex == 0, isNewTask: isNewTop) {
+                                    currentTask = top
+                                    searchText = top
+                                    isTaskSearchFocused = false
+                                    isSuggestionVisible = false
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 6)
+                            }
                             if !filteredRecentTasks.isEmpty {
                                 Text("最近常用")
                                     .font(.caption)
@@ -623,7 +665,7 @@ struct MenuBarPopoverView: View {
                                     .padding(.top, 8)
                                     .padding(.bottom, 4)
                                 ForEach(Array(filteredRecentTasks.enumerated()), id: \.offset) { idx, task in
-                                    let globalIndex = idx
+                                    let globalIndex = topOffset + idx
                                     TaskRowView(task: task, isSelected: selectedSuggestionIndex == globalIndex, isNewTask: false) {
                                         currentTask = task
                                         searchText = task
@@ -642,7 +684,7 @@ struct MenuBarPopoverView: View {
                                     .padding(.top, 8)
                                     .padding(.bottom, 4)
                                 // 为避免 LazyVStack 重复 ID 警告，这里将 offset 全局平移
-                                let presetItems = Array(filteredPresetTasks.enumerated()).map { (offset: filteredRecentTasks.count + $0.offset, element: $0.element) }
+                                let presetItems = Array(filteredPresetTasks.enumerated()).map { (offset: topOffset + filteredRecentTasks.count + $0.offset, element: $0.element) }
                                 ForEach(presetItems, id: \.offset) { idx, task in
                                     let globalIndex = idx
                                     TaskRowView(task: task, isSelected: selectedSuggestionIndex == globalIndex, isNewTask: false) {
@@ -662,7 +704,7 @@ struct MenuBarPopoverView: View {
                                     .padding(.horizontal, 10)
                                     .padding(.top, 8)
                                     .padding(.bottom, 4)
-                                let createIndex = filteredRecentTasks.count + filteredPresetTasks.count
+                                let createIndex = (topOffset + filteredRecentTasks.count + filteredPresetTasks.count)
                                 TaskRowView(task: searchText, isSelected: selectedSuggestionIndex == createIndex, isNewTask: true) {
                                     currentTask = searchText
                                     isTaskSearchFocused = false
@@ -749,12 +791,12 @@ struct MenuBarPopoverView: View {
         }.value
         recentTasks = recent
         // 初始过滤
-        await performTaskSuggestionSearch(searchText: searchText)
+        await performTaskSuggestionSearch(searchText: searchText, preferredFirst: searchText)
         isLoadingSuggestions = false
     }
     
     @MainActor
-    private func performTaskSuggestionSearch(searchText: String) async {
+    private func performTaskSuggestionSearch(searchText: String, preferredFirst: String? = nil) async {
         let result = await Task.detached { [recentTasks, presetTasks] in
             if searchText.isEmpty {
                 return (recentTasks, presetTasks)
@@ -765,8 +807,22 @@ struct MenuBarPopoverView: View {
                 return (r, p)
             }
         }.value
-        filteredRecentTasks = result.0
-        filteredPresetTasks = result.1
+        let preferred = preferredFirst?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preferredLower = preferred?.lowercased()
+        if let preferred = preferred, !preferred.isEmpty {
+            topSuggestion = preferred
+            if let pLower = preferredLower {
+                filteredRecentTasks = result.0.filter { $0.lowercased() != pLower }
+                filteredPresetTasks = result.1.filter { $0.lowercased() != pLower }
+            } else {
+                filteredRecentTasks = result.0
+                filteredPresetTasks = result.1
+            }
+        } else {
+            topSuggestion = nil
+            filteredRecentTasks = result.0
+            filteredPresetTasks = result.1
+        }
     }
     
     private func moveSuggestionSelection(_ delta: Int) {
