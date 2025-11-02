@@ -339,7 +339,7 @@ struct MenuBarPopoverView: View {
                         VStack(spacing: 4) {
                             Text("上次时长")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                // .foregroundColor(.secondary)
                             Text("\(Int(timerModel.getCurrentPomodoroTime() / 60))分钟")
                                 .font(.title3)
                                 .fontWeight(.medium)
@@ -348,7 +348,7 @@ struct MenuBarPopoverView: View {
                         .padding(.vertical, 10)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    // .tint(.green)
 
                     ForEach([10, 15, 30], id: \ .self) { minutes in
                         Button(action: {

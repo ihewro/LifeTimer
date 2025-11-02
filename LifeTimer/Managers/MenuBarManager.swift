@@ -298,15 +298,18 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
         newPopover.delegate = self
         popover = newPopover
         
-        // 激活应用，确保弹窗获得键盘焦点
-        NSApp.activate(ignoringOtherApps: true)
+        // 不再强制激活应用以避免将主窗口带到最前
+        // 说明：NSApp.activate(ignoringOtherApps: true) 会使应用成为前台并将所有窗口置顶，
+        // 在主窗口已存在但被其他应用窗口遮挡时，点击菜单栏按钮会把主窗口也带到最前。
+        // 这里移除强制激活，直接显示 popover，并让其窗口成为 key，保证键盘焦点即可。
         
         // 显示弹窗
         newPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         
         // 让弹窗窗口成为 key window（异步以确保窗口已创建）
         DispatchQueue.main.async { [weak hostingController] in
-            hostingController?.view.window?.makeKeyAndOrderFront(nil)
+            // 仅将弹窗窗口设为 key，以确保能够接收键盘输入，不干扰主窗口的层级
+            hostingController?.view.window?.makeKey()
         }
         
         NSLog("MenuBarManager: Popover shown")

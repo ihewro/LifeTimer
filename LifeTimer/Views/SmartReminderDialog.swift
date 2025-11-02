@@ -34,7 +34,15 @@ struct SmartReminderDialog: View {
             timerModel: timerModel,
             mode: .reminder,
             defaultTaskFallback: selectedTask,
-            onClose: { isPresented = false }
+            onClose: {
+                #if os(macOS)
+                // 在独立窗口模式下，必须通过窗口管理器显式关闭窗口
+                SmartReminderWindowManager.shared.closeReminderDialog()
+                #else
+                // 非 macOS 平台使用绑定控制显示
+                isPresented = false
+                #endif
+            }
         )
         .environmentObject(eventManager)
         .environmentObject(reminderManager)
