@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activity 页面重设计预览说明</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; background: #f7f7f8; color: #1f1f1f; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 24px; margin: 0 0 12px; }
+    h2 { font-size: 18px; margin: 24px 0 8px; }
+    p { line-height: 1.7; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    ul { line-height: 1.8; }
+    code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+    .section { margin-top: 14px; }
+    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #eef2ff; color: #3b82f6; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>“活动”页面重设计预览说明</h1>
+    <p class="pill">本页用于说明这次 UI 改动的设计目标与信息架构（由于无法在此环境运行 Xcode 预览）</p>
+
+    <div class="card section">
+      <h2>改动要点</h2>
+      <ul>
+        <li>删除顶部分段 Tab，改为单页信息布局，减少操作负担。</li>
+        <li>引入一次性异步加载并缓存数据，避免重复查询 <code>ActivityMonitorManager</code>。</li>
+        <li>移除“时间轴回退生成”逻辑，只基于真实系统事件生成最近会话，避免误导。</li>
+        <li>简化样式：减少颜色与阴影，突出信息层级与可读性。</li>
+      </ul>
+    </div>
+
+    <div class="card section">
+      <h2>信息架构（新版）</h2>
+      <ul>
+        <li><strong>活动概览：</strong>活跃时长、应用切换数、热门应用数（今日或选中日期）。</li>
+        <li><strong>最近应用活动：</strong>基于系统事件生成会话，展示最近 8 条（应用名、时间段、时长）。</li>
+        <li><strong>热门应用：</strong>Top 8 应用使用时长列表（统一行样式）。</li>
+      </ul>
+    </div>
+
+    <div class="card section">
+      <h2>Toolbar 保留功能</h2>
+      <ul>
+        <li>日期导航：前一天、后一天、回到今天。</li>
+        <li>监控控制：显示监控状态（绿/红点）与“开始/停止”。</li>
+      </ul>
+    </div>
+
+    <div class="card section">
+      <h2>开发说明</h2>
+      <ul>
+        <li>核心文件：<code>Views/ActivityStatsView.swift</code></li>
+        <li>新增组件：<code>StatTile</code>、<code>RecentEventRow</code>、<code>SimpleAppRow</code></li>
+        <li>数据来源：<code>ActivityMonitorManager.getOverview</code>、<code>getAppUsageStats</code>、<code>getSystemEvents</code></li>
+      </ul>
+    </div>
+
+    <p class="section">如需恢复原“生产力”与“时间分布”模块，可在后续版本将其作为独立页面加入，以保持主界面的聚焦与简洁。</p>
+  </div>
+</body>
+</html>

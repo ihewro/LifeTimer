@@ -11,40 +11,43 @@ import SwiftUI
 struct ActivityStatsView: View {
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @State private var selectedDate = Date()
-    @State private var selectedTab = 0
-    @State private var refreshTrigger = UUID() // 用于强制刷新数据
+    // 数据加载状态与缓存
+    @State private var isLoading = false
+    @State private var overviewActiveTime: TimeInterval = 0
+    @State private var overviewAppSwitches: Int = 0
+    @State private var topApps: [AppUsageStats] = []
+    @State private var recentSessions: [AppTimelineEvent] = []
+    @State private var dataLoadingTask: Task<Void, Never>? = nil
 
     var body: some View {
-        // 内容区域
-        Group {
-            switch selectedTab {
-            case 0:
-                overviewTab
-            case 1:
-                timelineTab
-            case 2:
-                appStatsTab
-            case 3:
-                productivityTab
-            default:
-                overviewTab
+        // 简化后的单页内容
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if isLoading {
+                    loadingView
+                } else {
+                    activityOverviewSection
+                    recentActivitySection
+                    topAppsSection
+                }
             }
+            .padding()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            refreshData()
+            loadActivityDataAsync()
         }
         .onChange(of: selectedDate) { _ in
-            refreshData()
+            loadActivityDataAsync()
         }
         .onReceive(activityMonitor.$isMonitoring) { _ in
             // 当监控状态改变时刷新数据
-            refreshData()
+            loadActivityDataAsync()
         }
 #if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // 当应用重新激活时刷新数据
-            refreshData()
+            loadActivityDataAsync()
         }
 #endif
         .toolbar {
@@ -55,17 +58,6 @@ struct ActivityStatsView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.primary)
                         .padding(.horizontal, 8)
-            }
-            // 左侧：Tab选项卡 Picker
-            ToolbarItem(placement: .principal) {
-                Picker("", selection: $selectedTab) {
-                    Text("概览").tag(0)
-                    Text("时间轴").tag(1)
-                    Text("应用").tag(2)
-                    Text("生产力").tag(3)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 280)
             }
 
             // 中间：日期导航
@@ -89,10 +81,6 @@ struct ActivityStatsView: View {
 
                 }
             }
-            // 中间：占位符确保 toolbar 铺满宽度
-            ToolbarItem(placement: .principal) {
-                Spacer()
-            }
             // 右侧：监控状态和控制
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 8) {
@@ -115,297 +103,127 @@ struct ActivityStatsView: View {
                 }
             }
         }
+        .onDisappear {
+            // 取消未完成的加载任务
+            dataLoadingTask?.cancel()
+        }
     }
 
-    // MARK: - 数据刷新方法
+    // MARK: - 加载中视图
+    private var loadingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .progressViewStyle(.circular)
+            Text("正在加载…")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
 
-    private func refreshData() {
-        // 触发数据刷新
-        refreshTrigger = UUID()
+    // MARK: - 数据加载（一次性并缓存到 State）
 
-        // 强制重新计算时间轴事件
-        DispatchQueue.main.async {
-            // 这里可以添加其他需要刷新的数据逻辑
-            print("Activity data refreshed for date: \(selectedDate)")
+    private func loadActivityDataAsync() {
+        isLoading = true
+        dataLoadingTask?.cancel()
+        dataLoadingTask = Task { @MainActor in
+            // 在主线程串行调用，确保 ActivityMonitorManager 线程安全
+            let overview = activityMonitor.getOverview(for: selectedDate)
+            let apps = activityMonitor.getAppUsageStats(for: selectedDate)
+            let systemEvents = activityMonitor.getSystemEvents(for: selectedDate)
+
+            // 更新概览数据
+            overviewActiveTime = overview.activeTime
+            overviewAppSwitches = overview.appSwitches
+
+            // 更新热门应用（Top 8）
+            topApps = Array(apps.prefix(8))
+
+            // 基于真实系统事件生成最近会话，最多显示最近 8 条
+            recentSessions = buildSessions(from: systemEvents)
+                .sorted { $0.startTime > $1.startTime }
+            recentSessions = Array(recentSessions.prefix(8))
+
+            isLoading = false
         }
     }
 
 
 
-    // MARK: - 概览标签页
+    // MARK: - 简化后的三个主板块
 
-    private var overviewTab: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                let overview = activityMonitor.getOverview(for: selectedDate)
+    private var activityOverviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(isToday(selectedDate) ? "今日概览" : "\(formatSelectedDate(selectedDate)) 概览")
+                .font(.headline)
 
-                // 概览卡片
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(isToday(selectedDate) ? "今日概览" : "\(formatSelectedDate(selectedDate))概览")
-                        .font(.headline)
-
-                    HStack(spacing: 20) {
-                        StatCard(
-                            title: "活跃时间",
-                            value: formatTime(overview.activeTime),
-                            icon: "clock",
-                            color: .blue
-                        )
-
-                        StatCard(
-                            title: "应用切换",
-                            value: "\(overview.appSwitches)",
-                            icon: "arrow.triangle.2.circlepath",
-                            color: .orange
-                        )
-
-                        // StatCard(
-                        //     title: "网站访问",
-                        //     value: "\(overview.websiteVisits)",
-                        //     icon: "globe",
-                        //     color: .green
-                        // )
-                    }
-                }
-                .padding()
-                .background(Color.systemBackground)
-                .cornerRadius(12)
-
-                // 快速应用统计
-                quickAppStats
-
-                // // 快速网站统计
-                // quickWebsiteStats
+            HStack(spacing: 12) {
+                StatTile(title: "活跃时长", value: formatTime(overviewActiveTime), systemImage: "clock")
+                StatTile(title: "应用切换", value: "\(overviewAppSwitches)", systemImage: "arrow.triangle.2.circlepath")
+                StatTile(title: "热门应用", value: "\(topApps.count)", systemImage: "sparkles")
             }
-            .padding()
         }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.systemBackground))
     }
 
-    // MARK: - 时间轴标签页（真实时间轴）
+    private var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("最近应用活动")
+                .font(.headline)
 
-    private var timelineTab: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                let timelineEvents = generateTimelineEvents()
-                if timelineEvents.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-
-                        Text("暂无时间轴数据")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-
-                        Text("请确保活动监控已开启，并且有应用使用记录")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding()
-                } else {
-                    // 真实时间轴视图
-                    AppTimelineView(events: timelineEvents, refreshTrigger: refreshTrigger)
-                }
-            }
-            .padding(.vertical)
-        }
-    }
-
-    // MARK: - 应用统计标签页
-
-    private var appStatsTab: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
-
-                if appStats.isEmpty {
-                    Text("暂无应用使用数据")
+            if recentSessions.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 36))
                         .foregroundColor(.secondary)
-                        .padding()
-                } else {
-                    ForEach(appStats, id: \.appName) { stat in
-                        AppStatRow(stat: stat)
+                    Text(activityMonitor.isMonitoring ? "暂无记录" : "未监控，无法记录活动")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(recentSessions.prefix(8).enumerated()), id: \.offset) { _, event in
+                        RecentEventRow(event: event)
                     }
                 }
             }
-            .padding()
         }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.systemBackground))
     }
 
-    // MARK: - 生产力标签页
-
-    private var productivityTab: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                let analysis = activityMonitor.getProductivityAnalysis(for: selectedDate)
-
-                // 生产力得分
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("生产力分析")
-                        .font(.headline)
-
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("生产力得分")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            Text(analysis.formattedProductivityScore)
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundColor(productivityColor(analysis.productivityScore))
-
-                            Text(analysis.productivityLevel)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        // 生产力环形图
-                        if analysis.totalTime > 0 {
-                            ProductivityChart(analysis: analysis)
-                                .frame(width: 120, height: 120)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color.systemBackground)
-                .cornerRadius(12)
-
-                // 时间分布
-                timeDistributionView(analysis: analysis)
-
-                // 建议
-                productivitySuggestions(analysis: analysis)
-            }
-            .padding()
-        }
-    }
-
-    // MARK: - 辅助视图
-
-    private var quickAppStats: some View {
+    private var topAppsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("热门应用")
                 .font(.headline)
-
-            let topApps = Array(activityMonitor.getAppUsageStats(for: selectedDate).prefix(10))
 
             if topApps.isEmpty {
                 Text("暂无数据")
                     .foregroundColor(.secondary)
             } else {
                 ForEach(topApps, id: \.appName) { stat in
-                    HStack {
-                        Text(stat.appName)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(stat.formattedTime)
-                            .foregroundColor(.secondary)
-                    }
+                    SimpleAppRow(app: stat)
                 }
             }
         }
         .padding()
-        .background(Color.systemBackground)
-        .cornerRadius(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.systemBackground))
     }
 
-    private var quickWebsiteStats: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("热门网站")
-                .font(.headline)
+    // 生产力模块已从主界面移除，如需可在后续版本以独立视图重新加入
 
-            let topSites = Array(activityMonitor.getWebsiteStats(for: selectedDate).prefix(3))
+    // MARK: - 辅助视图
 
-            if topSites.isEmpty {
-                Text("暂无数据")
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(topSites, id: \.domain) { stat in
-                    HStack {
-                        Text(stat.domain)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(stat.visits)次 · \(stat.formattedTime)")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color.systemBackground)
-        .cornerRadius(12)
-    }
+    // 已移除快速应用统计（整合到主板块）
 
-    private func timeDistributionView(analysis: ProductivityAnalysis) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("时间分布")
-                .font(.headline)
+    // 已移除网站统计区块（后续如果需要，可新增“网站使用”独立视图）
 
-            VStack(spacing: 8) {
-                TimeDistributionBar(
-                    title: "生产性工作",
-                    time: analysis.productiveTime,
-                    total: analysis.totalTime,
-                    color: .green
-                )
+    // 已移除生产力时间分布（不在此页展示）
 
-                TimeDistributionBar(
-                    title: "娱乐休闲",
-                    time: analysis.entertainmentTime,
-                    total: analysis.totalTime,
-                    color: .orange
-                )
-
-                TimeDistributionBar(
-                    title: "其他",
-                    time: analysis.otherTime,
-                    total: analysis.totalTime,
-                    color: .gray
-                )
-            }
-        }
-        .padding()
-        .background(Color.systemBackground)
-        .cornerRadius(12)
-    }
-
-    private func productivitySuggestions(analysis: ProductivityAnalysis) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("建议")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 8) {
-                if analysis.productivityScore < 50 {
-                    SuggestionRow(
-                        icon: "lightbulb",
-                        text: "尝试减少娱乐应用的使用时间",
-                        color: .yellow
-                    )
-                }
-
-                if analysis.totalWebsiteVisits > 50 {
-                    SuggestionRow(
-                        icon: "safari",
-                        text: "考虑使用网站屏蔽工具提高专注度",
-                        color: .blue
-                    )
-                }
-
-                SuggestionRow(
-                    icon: "target",
-                    text: "设定每日生产力目标，保持良好习惯",
-                    color: .green
-                )
-            }
-        }
-        .padding()
-        .background(Color.systemBackground)
-        .cornerRadius(12)
-    }
+    // 已移除建议区块（不在此页展示）
 
     // MARK: - 辅助方法
 
@@ -420,18 +238,7 @@ struct ActivityStatsView: View {
         }
     }
 
-    private func productivityColor(_ score: Double) -> Color {
-        switch score {
-        case 80...100:
-            return .green
-        case 60..<80:
-            return .blue
-        case 40..<60:
-            return .orange
-        default:
-            return .red
-        }
-    }
+    // 已移除生产力颜色映射（不在此页展示）
 
     private func previousDay() {
         selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
@@ -463,199 +270,147 @@ struct ActivityStatsView: View {
         Calendar.current.isDate(date, inSameDayAs: Date())
     }
 
-    // MARK: - 时间轴数据生成
+    // MARK: - 从系统事件生成会话（无回退假数据）
+    private func buildSessions(from systemEvents: [SystemEvent]) -> [AppTimelineEvent] {
+        guard !systemEvents.isEmpty else { return [] }
 
-    private func generateTimelineData() -> [TimelineHourData] {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: selectedDate)
-        var timelineData: [TimelineHourData] = []
-
-        for hour in 0..<24 {
-            let hourStart = calendar.date(byAdding: .hour, value: hour, to: startOfDay) ?? startOfDay
-            let hourEnd = calendar.date(byAdding: .hour, value: 1, to: hourStart) ?? hourStart
-
-            // 获取这个小时内的应用使用数据
-            let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
-            let hourApps = appStats.compactMap { stat -> TimelineAppUsage? in
-                // 简化处理：假设应用使用时间均匀分布在一天中
-                let hourUsage = stat.totalTime / 24
-                if hourUsage > 60 { // 只显示使用超过1分钟的应用
-                    return TimelineAppUsage(
-                        appName: stat.appName,
-                        duration: TimeInterval(hourUsage),
-                        startTime: hourStart,
-                        endTime: hourEnd
-                    )
-                }
-                return nil
-            }
-
-            timelineData.append(TimelineHourData(
-                hour: hour,
-                hourStart: hourStart,
-                apps: hourApps
-            ))
-        }
-
-        return timelineData
-    }
-
-    // MARK: - 时间轴事件生成（基于真实系统事件）
-
-    private func generateTimelineEvents() -> [AppTimelineEvent] {
-        // 直接从 ActivityMonitorManager 获取指定日期的真实系统事件
-        let systemEvents = activityMonitor.getSystemEvents(for: selectedDate)
-
-        print("Debug: Found \(systemEvents.count) system events for \(selectedDate)")
-
-        // 如果没有系统事件，尝试从应用统计数据生成简化的时间轴
-        if systemEvents.isEmpty {
-            return generateFallbackTimelineEvents()
-        }
-
-        var events: [AppTimelineEvent] = []
+        var sessions: [AppTimelineEvent] = []
         var currentApp: String?
         var appStartTime: Date?
 
-        // 按时间顺序处理系统事件
-        let sortedEvents = systemEvents.sorted { $0.timestamp < $1.timestamp }
-
-        for event in sortedEvents {
-            switch event.type {
+        let sorted = systemEvents.sorted { $0.timestamp < $1.timestamp }
+        for ev in sorted {
+            switch ev.type {
             case .appActivated:
-                // 获取当前事件的应用名称
-                guard let eventAppName = event.appName else { break }
-
-                // 如果是同一个应用的重复激活事件，跳过处理
-                if currentApp == eventAppName {
-                    break
-                }
-
-                // 结束上一个应用的使用记录
-                if let lastApp = currentApp,
-                   let startTime = appStartTime {
-
-                    let duration = event.timestamp.timeIntervalSince(startTime)
-
-                    // 只记录使用时间超过10秒的应用会话
+                guard let name = ev.appName else { break }
+                if currentApp == name { break }
+                if let last = currentApp, let start = appStartTime {
+                    let duration = ev.timestamp.timeIntervalSince(start)
                     if duration > 10 {
-                        events.append(AppTimelineEvent(
-                            appName: lastApp,
-                            startTime: startTime,
-                            endTime: event.timestamp,
-                            duration: duration
-                        ))
+                        sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: ev.timestamp, duration: duration))
                     }
                 }
-
-                // 开始新应用的使用记录（只有当应用真正切换时）
-                currentApp = eventAppName
-                appStartTime = event.timestamp
-
-            case .appTerminated:
-                // 如果终止的是当前应用，结束其使用记录
-                if let appName = event.appName,
-                   appName == currentApp,
-                   let startTime = appStartTime {
-
-                    let duration = event.timestamp.timeIntervalSince(startTime)
-
+                currentApp = name
+                appStartTime = ev.timestamp
+            case .appTerminated, .systemSleep:
+                if let last = currentApp, let start = appStartTime {
+                    let duration = ev.timestamp.timeIntervalSince(start)
                     if duration > 10 {
-                        events.append(AppTimelineEvent(
-                            appName: appName,
-                            startTime: startTime,
-                            endTime: event.timestamp,
-                            duration: duration
-                        ))
+                        sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: ev.timestamp, duration: duration))
                     }
-
-                    currentApp = nil
-                    appStartTime = nil
                 }
-
-            case .systemSleep:
-                // 系统休眠时结束当前应用记录
-                if let lastApp = currentApp,
-                   let startTime = appStartTime {
-
-                    let duration = event.timestamp.timeIntervalSince(startTime)
-
-                    if duration > 10 {
-                        events.append(AppTimelineEvent(
-                            appName: lastApp,
-                            startTime: startTime,
-                            endTime: event.timestamp,
-                            duration: duration
-                        ))
-                    }
-
-                    currentApp = nil
-                    appStartTime = nil
-                }
-
+                currentApp = nil
+                appStartTime = nil
             default:
                 break
             }
         }
 
-        // 处理仍在运行的应用（如果是今天的数据）
-        let calendar = Calendar.current
-        if calendar.isDateInToday(selectedDate),
-           let lastApp = currentApp,
-           let startTime = appStartTime {
-
+        // 如果是今天，补齐正在使用的应用
+        if Calendar.current.isDateInToday(selectedDate), let last = currentApp, let start = appStartTime {
             let now = Date()
-            let duration = now.timeIntervalSince(startTime)
-
+            let duration = now.timeIntervalSince(start)
             if duration > 10 {
-                events.append(AppTimelineEvent(
-                    appName: lastApp,
-                    startTime: startTime,
-                    endTime: now,
-                    duration: duration
-                ))
+                sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: now, duration: duration))
             }
         }
 
-        print("Debug: Generated \(events.count) timeline events from system events")
-
-        // 按开始时间倒序排序并去重（最新的事件在前面）
-        let finalSortedEvents = events.sorted { $0.startTime > $1.startTime }
-        return removeDuplicateEvents(finalSortedEvents)
+        // 去重并按开始时间倒序返回
+        let sortedSessions = sessions.sorted { $0.startTime > $1.startTime }
+        return removeDuplicateEvents(sortedSessions)
     }
 
-    // 备用时间轴生成方法（当没有系统事件时使用）
-    private func generateFallbackTimelineEvents() -> [AppTimelineEvent] {
-        let appStats = activityMonitor.getAppUsageStats(for: selectedDate)
+    // MARK: - 简化行与卡片组件
 
-        print("Debug: Using fallback method with \(appStats.count) app stats")
+    private func formatHHmm(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
 
-        guard !appStats.isEmpty else { return [] }
+    struct StatTile: View {
+        let title: String
+        let value: String
+        let systemImage: String
 
-        var events: [AppTimelineEvent] = []
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: selectedDate)
+        var body: some View {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .foregroundColor(.accentColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(value)
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+        }
+    }
 
-        // 为每个应用创建一个简化的使用记录
-        var currentTime = calendar.date(byAdding: .hour, value: 9, to: startOfDay) ?? startOfDay
+    struct RecentEventRow: View {
+        let event: AppTimelineEvent
 
-        for stat in appStats.sorted(by: { $0.totalTime > $1.totalTime }) {
-            let duration = min(stat.totalTime, 3600) // 最多1小时
-            let endTime = calendar.date(byAdding: .second, value: Int(duration), to: currentTime) ?? currentTime
+        var body: some View {
+            HStack(spacing: 12) {
+                Image(systemName: "app")
+                    .foregroundColor(.accentColor)
+                    .frame(width: 20)
 
-            events.append(AppTimelineEvent(
-                appName: stat.appName,
-                startTime: currentTime,
-                endTime: endTime,
-                duration: duration
-            ))
-
-            // 下一个应用开始时间（添加5分钟间隔）
-            currentTime = calendar.date(byAdding: .minute, value: 5, to: endTime) ?? endTime
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(event.appName)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    Text("\(formatRange(event.startTime, event.endTime)) · \(formatDuration(event.duration))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
         }
 
-        return events
+        private func formatRange(_ start: Date, _ end: Date) -> String {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm"
+            return "\(f.string(from: start)) - \(f.string(from: end))"
+        }
+
+        private func formatDuration(_ duration: TimeInterval) -> String {
+            let m = Int(duration) / 60
+            let h = m / 60
+            let mm = m % 60
+            return h > 0 ? "\(h)h \(mm)m" : "\(mm)m"
+        }
     }
+
+    struct SimpleAppRow: View {
+        let app: AppUsageStats
+
+        var body: some View {
+            HStack(spacing: 12) {
+                Image(systemName: "app.fill")
+                    .foregroundColor(.accentColor)
+                    .frame(width: 20)
+                Text(app.appName)
+                    .lineLimit(1)
+                Spacer()
+                Text(app.formattedTime)
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+        }
+    }
+
+    // 保留去重逻辑，但去除调试与回退逻辑
+
+    // 已移除时间轴回退生成逻辑（避免使用虚拟均分数据误导）
 
     // 去除重复或重叠的事件
     private func removeDuplicateEvents(_ events: [AppTimelineEvent]) -> [AppTimelineEvent] {
