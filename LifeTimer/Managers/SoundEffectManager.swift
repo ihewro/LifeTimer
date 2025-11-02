@@ -697,4 +697,21 @@ class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDe
         completionHandler()
     }
 
+    // 前台展示通知：确保应用在前台时也以横幅方式显示（并播放声音）
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        #if os(macOS)
+        if #available(macOS 11.0, *) {
+            completionHandler([.banner, .list, .sound])
+        } else {
+            completionHandler([.alert, .sound])
+        }
+        #else
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .list, .sound])
+        } else {
+            completionHandler([.alert, .sound])
+        }
+        #endif
+    }
+
 }
