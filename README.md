@@ -10,6 +10,8 @@
 - `ctrl + space` 唤起mini 弹窗
 - `+` / `-` 在专注过程中快速调整时间
 - `空格`：暂停/继续 专注
+- `command + s` 折叠/展开侧边栏
+- `command+数字`切换侧边栏标签页功能
 
 ### 简洁的界面设计
 ![alt text](media/image-1.png)

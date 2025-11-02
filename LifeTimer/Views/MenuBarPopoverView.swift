@@ -722,7 +722,7 @@ struct MenuBarPopoverView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    GlassEffectBackground()
+                    GlassEffectBackground(radius: 8)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

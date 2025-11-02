@@ -3930,24 +3930,41 @@ struct DateDisplayOnly: View {
 
 // MARK: - Modern Glass Effect for cross-platform
 struct GlassEffectBackground: View {
+    // 可选圆角半径；为 nil 时保持直角边界
+    var radius: CGFloat? = nil
+
     var body: some View {
-        #if os(macOS)
-        // macOS 使用材质效果，为未来的 glassEffect 做准备
-//        if #available(macOS 26.0, *) {
-//            // 未来版本可以使用 glassEffect (当 API 可用时)
-//            // Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
-//            Color.clear.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 0))
-//        } else {
-            // 当前版本使用增强的材质效果，模拟玻璃效果
-            Color.clear
-            .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
-//        }
-        #else
-        // iOS 使用半透明材质效果
-        Color.systemBackground
-            .opacity(0.95)
-            .background(.ultraThinMaterial)
-        #endif
+        Group {
+            #if os(macOS)
+            // macOS 使用材质效果，为未来的 glassEffect 做准备
+//            if #available(macOS 26.0, *) {
+//                // 未来版本可以使用 glassEffect (当 API 可用时)
+               // Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
+//            } else {
+                // 当前版本使用增强的材质效果，模拟玻璃效果
+                Color.clear
+                    .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
+//            }
+            #else
+            // iOS 使用半透明材质效果
+            Color.systemBackground
+                .opacity(0.95)
+                .background(.ultraThinMaterial)
+            #endif
+        }
+        .modifier(RadiusClipModifier(radius: radius))
+    }
+}
+
+// 为可选圆角提供一个简洁的 clipShape 处理
+private struct RadiusClipModifier: ViewModifier {
+    let radius: CGFloat?
+    func body(content: Content) -> some View {
+        if let r = radius, r > 0 {
+            content.clipShape(RoundedRectangle(cornerRadius: r, style: .continuous))
+        } else {
+            content
+        }
     }
 }
 
