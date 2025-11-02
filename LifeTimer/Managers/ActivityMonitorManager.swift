@@ -184,6 +184,29 @@ class AppCategoryManager: ObservableObject {
     func isIgnoredApp(_ appName: String) -> Bool {
         return ignoredApps.contains(where: { appName.contains($0) })
     }
+    
+    /// 更新应用分类
+    func updateCategory(for appName: String, to category: String) {
+        switch category {
+        case "忽略":
+            addIgnoredApp(appName)
+        case "生产力":
+            addProductiveApp(appName)
+        case "娱乐":
+            addEntertainmentApp(appName)
+        default:
+            // 移除应用从所有分类中
+            if let i = ignoredApps.firstIndex(of: appName) {
+                removeIgnoredApp(at: i)
+            }
+            if let j = productiveApps.firstIndex(of: appName) {
+                removeProductiveApp(at: j)
+            }
+            if let k = entertainmentApps.firstIndex(of: appName) {
+                removeEntertainmentApp(at: k)
+            }
+        }
+    }
 }
 
 /// 活动监控管理器 - 统一管理所有系统监控功能

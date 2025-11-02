@@ -365,8 +365,8 @@ struct MenuBarPopoverView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                     }
-                    .buttonStyle(.borderedProminent)
-                    // .tint(.green)
+                    // .buttonStyle(.borderedProminent)
+                    .tint(.green)
 
                     ForEach([10, 15, 30], id: \ .self) { minutes in
                         Button(action: {

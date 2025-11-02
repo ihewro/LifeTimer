@@ -47,12 +47,24 @@ struct ActivityStatsView: View {
             loadActivityDataAsync()
         }
         .onReceive(activityMonitor.$isMonitoring) { _ in
-            // 当监控状态改变时刷新数据
+            // 监控状态变化时重新加载数据
+            loadActivityDataAsync()
+        }
+        .onReceive(activityMonitor.appCategoryManager.$ignoredApps) { _ in
+            // 忽略应用列表变化时重新加载数据
+            loadActivityDataAsync()
+        }
+        .onReceive(activityMonitor.appCategoryManager.$productiveApps) { _ in
+            // 生产力应用列表变化时重新加载数据
+            loadActivityDataAsync()
+        }
+        .onReceive(activityMonitor.appCategoryManager.$entertainmentApps) { _ in
+            // 娱乐应用列表变化时重新加载数据
             loadActivityDataAsync()
         }
 #if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // 当应用重新激活时刷新数据
+            // 应用重新激活时刷新数据
             loadActivityDataAsync()
         }
 #endif
@@ -188,13 +200,15 @@ struct ActivityStatsView: View {
             overviewActiveTime = overview.activeTime
             overviewAppSwitches = overview.appSwitches
 
-            // 更新热门应用（Top 8）
-            topApps = Array(apps.prefix(8))
+            // 过滤忽略应用并更新热门应用（Top 8）
+            let filteredApps = apps.filter { !activityMonitor.appCategoryManager.isIgnoredApp($0.appName) }
+            topApps = Array(filteredApps.prefix(8))
 
-            // 基于真实系统事件生成最近会话，最多显示最近 8 条
-            recentSessions = buildSessions(from: systemEvents)
-                .sorted { $0.startTime > $1.startTime }
-            recentSessions = Array(recentSessions.prefix(8))
+            // 基于真实系统事件生成最近会话，过滤忽略应用，最多显示最近 8 条
+            let allSessions = buildSessions(from: systemEvents)
+            let filteredSessions = allSessions.filter { !activityMonitor.appCategoryManager.isIgnoredApp($0.appName) }
+            let recent = filteredSessions.sorted { $0.startTime > $1.startTime }
+            recentSessions = Array(recent.prefix(8))
 
             isLoading = false
         }
@@ -340,9 +354,9 @@ struct ActivityStatsView: View {
                 if currentApp == name { break }
                 if let last = currentApp, let start = appStartTime {
                     let duration = ev.timestamp.timeIntervalSince(start)
-                    if duration > 10 {
+//                    if duration > 10 {
                         sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: ev.timestamp, duration: duration))
-                    }
+//                    }
                 }
                 currentApp = name
                 currentBundleId = ev.bundleId
@@ -350,9 +364,9 @@ struct ActivityStatsView: View {
             case .appTerminated, .systemSleep:
                 if let last = currentApp, let start = appStartTime {
                     let duration = ev.timestamp.timeIntervalSince(start)
-                    if duration > 10 {
+//                    if duration > 10 {
                         sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: ev.timestamp, duration: duration))
-                    }
+//                    }
                 }
                 currentApp = nil
                 currentBundleId = nil
@@ -366,9 +380,9 @@ struct ActivityStatsView: View {
         if Calendar.current.isDateInToday(selectedDate), let last = currentApp, let start = appStartTime {
             let now = Date()
             let duration = now.timeIntervalSince(start)
-            if duration > 10 {
+//            if duration > 10 {
                 sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: now, duration: duration))
-            }
+//            }
         }
 
         // 去重并按开始时间倒序返回
@@ -464,24 +478,7 @@ struct ActivityStatsView: View {
         }
 
         private func updateCategory(for appName: String, to category: String) {
-            switch category {
-            case "忽略":
-                appCategoryManager.addIgnoredApp(appName)
-            case "生产力":
-                appCategoryManager.addProductiveApp(appName)
-            case "娱乐":
-                appCategoryManager.addEntertainmentApp(appName)
-            default:
-                if let i = appCategoryManager.ignoredApps.firstIndex(of: appName) {
-                    appCategoryManager.removeIgnoredApp(at: i)
-                }
-                if let j = appCategoryManager.productiveApps.firstIndex(of: appName) {
-                    appCategoryManager.removeProductiveApp(at: j)
-                }
-                if let k = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
-                    appCategoryManager.removeEntertainmentApp(at: k)
-                }
-            }
+            appCategoryManager.updateCategory(for: appName, to: category)
         }
     }
 
@@ -555,19 +552,7 @@ struct ActivityStatsView: View {
         }
 
         private func updateCategory(for appName: String, to category: String) {
-            switch category {
-            case "生产力":
-                appCategoryManager.addProductiveApp(appName)
-            case "娱乐":
-                appCategoryManager.addEntertainmentApp(appName)
-            default:
-                if let i = appCategoryManager.productiveApps.firstIndex(of: appName) {
-                    appCategoryManager.removeProductiveApp(at: i)
-                }
-                if let j = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
-                    appCategoryManager.removeEntertainmentApp(at: j)
-                }
-            }
+            appCategoryManager.updateCategory(for: appName, to: category)
         }
     }
 
