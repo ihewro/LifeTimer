@@ -411,6 +411,22 @@ struct ActivitySettingsView: View {
 
             Divider()
 
+            // 忽略应用配置
+            AppCategoryConfigView(
+                title: "忽略应用",
+                icon: "eye.slash.fill",
+                iconColor: .gray,
+                apps: appCategoryManager.ignoredApps,
+                onAdd: { appName in
+                    appCategoryManager.addIgnoredApp(appName)
+                },
+                onRemove: { index in
+                    appCategoryManager.removeIgnoredApp(at: index)
+                }
+            )
+
+            Divider()
+
             // 重置按钮
             HStack {
                 Spacer()

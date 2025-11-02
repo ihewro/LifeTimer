@@ -457,6 +457,7 @@ struct ActivityStatsView: View {
         }
 
         private func currentCategory(for appName: String) -> String {
+            if appCategoryManager.isIgnoredApp(appName) { return "忽略" }
             if appCategoryManager.isProductiveApp(appName) { return "生产力" }
             if appCategoryManager.isEntertainmentApp(appName) { return "娱乐" }
             return "其他"
@@ -464,16 +465,21 @@ struct ActivityStatsView: View {
 
         private func updateCategory(for appName: String, to category: String) {
             switch category {
+            case "忽略":
+                appCategoryManager.addIgnoredApp(appName)
             case "生产力":
                 appCategoryManager.addProductiveApp(appName)
             case "娱乐":
                 appCategoryManager.addEntertainmentApp(appName)
             default:
-                if let i = appCategoryManager.productiveApps.firstIndex(of: appName) {
-                    appCategoryManager.removeProductiveApp(at: i)
+                if let i = appCategoryManager.ignoredApps.firstIndex(of: appName) {
+                    appCategoryManager.removeIgnoredApp(at: i)
                 }
-                if let j = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
-                    appCategoryManager.removeEntertainmentApp(at: j)
+                if let j = appCategoryManager.productiveApps.firstIndex(of: appName) {
+                    appCategoryManager.removeProductiveApp(at: j)
+                }
+                if let k = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
+                    appCategoryManager.removeEntertainmentApp(at: k)
                 }
             }
         }
@@ -570,7 +576,7 @@ struct ActivityStatsView: View {
         let current: String
         let onSelect: (String) -> Void
 
-        private let options = ["生产力", "娱乐", "其他"]
+        private let options = ["忽略", "生产力", "娱乐", "其他"]
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -610,6 +616,7 @@ struct ActivityStatsView: View {
 
     static func categoryColor(for category: String) -> Color {
         switch category {
+        case "忽略": return Color.red
         case "生产力": return Color.blue
         case "娱乐": return Color.orange
         default: return Color.gray

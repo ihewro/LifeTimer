@@ -15,10 +15,12 @@ import Cocoa
 class AppCategoryManager: ObservableObject {
     @Published var productiveApps: [String] = []
     @Published var entertainmentApps: [String] = []
+    @Published var ignoredApps: [String] = []
 
     private let userDefaults = UserDefaults.standard
     private let productiveAppsKey = "ProductiveApps"
     private let entertainmentAppsKey = "EntertainmentApps"
+    private let ignoredAppsKey = "IgnoredApps"
 
     // 默认应用列表
     private let defaultProductiveApps = [
@@ -35,6 +37,13 @@ class AppCategoryManager: ObservableObject {
         "Discord", "Telegram", "WeChat", "QQ", "TikTok", "Instagram",
         "Twitter", "Facebook", "Reddit", "Twitch", "Bilibili", "爱奇艺",
         "腾讯视频", "优酷", "抖音", "小红书", "微博"
+    ]
+
+    private let defaultIgnoredApps = [
+        "System Preferences", "Activity Monitor", "Console", "Keychain Access",
+        "Disk Utility", "Migration Assistant", "Boot Camp Assistant", "Bluetooth Screen Sharing",
+        "Screen Sharing", "Remote Desktop", "Accessibility Inspector", "Digital Color Meter",
+        "Grapher", "Screenshot", "Preview", "Archive Utility", "Calculator"
     ]
 
     init() {
@@ -56,12 +65,20 @@ class AppCategoryManager: ObservableObject {
             entertainmentApps = defaultEntertainmentApps
             saveConfiguration()
         }
+
+        if let ignoredData = userDefaults.array(forKey: ignoredAppsKey) as? [String] {
+            ignoredApps = ignoredData
+        } else {
+            ignoredApps = defaultIgnoredApps
+            saveConfiguration()
+        }
     }
 
     /// 保存配置
     func saveConfiguration() {
         userDefaults.set(productiveApps, forKey: productiveAppsKey)
         userDefaults.set(entertainmentApps, forKey: entertainmentAppsKey)
+        userDefaults.set(ignoredApps, forKey: ignoredAppsKey)
     }
 
     /// 添加生产力应用
@@ -72,6 +89,11 @@ class AppCategoryManager: ObservableObject {
         // 如果在娱乐应用中，先移除
         if let index = entertainmentApps.firstIndex(of: trimmedName) {
             entertainmentApps.remove(at: index)
+        }
+        
+        // 如果在忽略应用中，先移除
+        if let index = ignoredApps.firstIndex(of: trimmedName) {
+            ignoredApps.remove(at: index)
         }
 
         productiveApps.append(trimmedName)
@@ -88,9 +110,34 @@ class AppCategoryManager: ObservableObject {
         if let index = productiveApps.firstIndex(of: trimmedName) {
             productiveApps.remove(at: index)
         }
+        
+        // 如果在忽略应用中，先移除
+        if let index = ignoredApps.firstIndex(of: trimmedName) {
+            ignoredApps.remove(at: index)
+        }
 
         entertainmentApps.append(trimmedName)
         entertainmentApps.sort()
+        saveConfiguration()
+    }
+
+    /// 添加忽略应用
+    func addIgnoredApp(_ appName: String) {
+        let trimmedName = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty && !ignoredApps.contains(trimmedName) else { return }
+
+        // 如果在生产力应用中，先移除
+        if let index = productiveApps.firstIndex(of: trimmedName) {
+            productiveApps.remove(at: index)
+        }
+        
+        // 如果在娱乐应用中，先移除
+        if let index = entertainmentApps.firstIndex(of: trimmedName) {
+            entertainmentApps.remove(at: index)
+        }
+
+        ignoredApps.append(trimmedName)
+        ignoredApps.sort()
         saveConfiguration()
     }
 
@@ -108,10 +155,18 @@ class AppCategoryManager: ObservableObject {
         saveConfiguration()
     }
 
+    /// 删除忽略应用
+    func removeIgnoredApp(at index: Int) {
+        guard index < ignoredApps.count else { return }
+        ignoredApps.remove(at: index)
+        saveConfiguration()
+    }
+
     /// 重置为默认设置
     func resetToDefaults() {
         productiveApps = defaultProductiveApps
         entertainmentApps = defaultEntertainmentApps
+        ignoredApps = defaultIgnoredApps
         saveConfiguration()
     }
 
@@ -123,6 +178,11 @@ class AppCategoryManager: ObservableObject {
     /// 检查应用是否为娱乐应用
     func isEntertainmentApp(_ appName: String) -> Bool {
         return entertainmentApps.contains(where: { appName.contains($0) })
+    }
+
+    /// 检查应用是否为忽略应用
+    func isIgnoredApp(_ appName: String) -> Bool {
+        return ignoredApps.contains(where: { appName.contains($0) })
     }
 }
 
