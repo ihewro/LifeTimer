@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LifeTimer 预览：工具栏日期选择交互</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 24px; color: #1f2937; }
+    .toolbar { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafafa; }
+    .date-label { padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+    .date-label:hover { background: #f0f0f0; }
+    .popover { position: absolute; margin-top: 8px; padding: 12px; width: 320px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); background: #fff; }
+    .popover h4 { margin: 0 0 8px 0; font-size: 14px; color: #6b7280; }
+    .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+    .actions button { padding: 6px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; }
+    .actions button:hover { background: #f9fafb; }
+    .actions .spacer { flex: 1; }
+    .caption { color: #6b7280; font-size: 13px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h2>工具栏日期选择交互预览</h2>
+  <p>此页面模拟在 ActivityStatsView 工具栏中点击日期文字后弹出日期选择器（Popover），用于切换查看数据日期。</p>
+
+  <div class="toolbar">
+    <div id="dateLabel" class="date-label"><span style="color:#6b7280;">📅</span> <span id="dateText">08月12日</span> <span style="color:#6b7280;">▾</span></div>
+    <div class="actions">
+      <button onclick="prevDay()">⟨ 前一天</button>
+      <button onclick="nextDay()">后一天 ⟩</button>
+      <div class="spacer"></div>
+      <button onclick="goToday()" id="todayBtn">今天</button>
+    </div>
+  </div>
+
+  <div id="popover" class="popover" style="display:none;">
+    <h4>选择日期</h4>
+    <input type="date" id="dateInput" />
+    <div class="actions">
+      <button onclick="prevDay()">⟨ 前一天</button>
+      <button onclick="nextDay()">后一天 ⟩</button>
+      <div class="spacer"></div>
+      <button onclick="goToday()" id="todayBtn2">今天</button>
+    </div>
+  </div>
+
+  <p class="caption">说明：在真实应用中，点击“08月12日”会出现 SwiftUI 的 popover，内容包含 DatePicker（iOS 使用 graphical 样式，macOS 使用默认样式）以及快捷按钮“前一天/后一天/今天”。选择后会触发数据刷新。</p>
+
+  <script>
+    const dateLabel = document.getElementById('dateLabel');
+    const popover = document.getElementById('popover');
+    const dateInput = document.getElementById('dateInput');
+
+    function formatLabel(date) {
+      const d = new Date(date);
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${month}月${day}日`;
+    }
+
+    function setLabel(date) {
+      document.getElementById('dateText').textContent = formatLabel(date);
+      dateInput.valueAsDate = new Date(date);
+      const today = new Date();
+      const isToday = today.toDateString() === new Date(date).toDateString();
+      document.getElementById('todayBtn').disabled = isToday;
+      document.getElementById('todayBtn2').disabled = isToday;
+    }
+
+    function togglePopover() {
+      if (popover.style.display === 'none') {
+        const rect = dateLabel.getBoundingClientRect();
+        popover.style.left = rect.left + 'px';
+        popover.style.top = (rect.bottom + window.scrollY) + 'px';
+        popover.style.display = 'block';
+      } else {
+        popover.style.display = 'none';
+      }
+    }
+
+    dateLabel.addEventListener('click', togglePopover);
+    dateInput.addEventListener('change', () => {
+      const d = dateInput.valueAsDate || new Date();
+      setLabel(d);
+    });
+
+    function prevDay() {
+      const d = dateInput.valueAsDate || new Date();
+      d.setDate(d.getDate() - 1);
+      setLabel(d);
+    }
+
+    function nextDay() {
+      const d = dateInput.valueAsDate || new Date();
+      d.setDate(d.getDate() + 1);
+      setLabel(d);
+    }
+
+    function goToday() {
+      const d = new Date();
+      setLabel(d);
+    }
+
+    // 初始化为今天
+    setLabel(new Date());
+  </script>
+</body>
+</html>

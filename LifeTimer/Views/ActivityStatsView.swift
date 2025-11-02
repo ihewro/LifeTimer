@@ -22,6 +22,8 @@ struct ActivityStatsView: View {
     @State private var topApps: [AppUsageStats] = []
     @State private var recentSessions: [AppTimelineEvent] = []
     @State private var dataLoadingTask: Task<Void, Never>? = nil
+    // 日期选择弹窗状态
+    @State private var showDatePickerPopover = false
 
     var body: some View {
         // 简化后的单页内容
@@ -57,34 +59,79 @@ struct ActivityStatsView: View {
         .toolbar {
 
             ToolbarItem(placement: .navigation) {
-                    // 日期显示组件
-                    Text(formatSelectedDate(selectedDate))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 8)
-            }
+                // 日期显示组件（点击弹出日期选择器）
+                Button {
+                    showDatePickerPopover = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
 
-            // 中间：日期导航
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 8) {
-                    Button(action: {
-                        selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
-                    }) {
-                        Image(systemName: "chevron.left")
-                    }
-                    Button(action: {
-                        selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
-                    }) {
-                        Image(systemName: "chevron.right")
-                    }
+                        Text(formatSelectedDate(selectedDate))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.primary)
 
-                    Button("今天") {
-                        selectedDate = Date()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
                     }
-                    .disabled(isToday(selectedDate))
+                    .padding(.horizontal, 8)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showDatePickerPopover) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        #if os(iOS)
+                        DatePicker("选择日期", selection: $selectedDate, displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                        #else
+                        DatePicker("选择日期", selection: $selectedDate, displayedComponents: .date)
+                        #endif
 
+                        HStack(spacing: 8) {
+                            Button {
+                                selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                            } label: {
+                                Label("前一天", systemImage: "chevron.left")
+                            }
+                            Button {
+                                selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                            } label: {
+                                Label("后一天", systemImage: "chevron.right")
+                            }
+                            Spacer()
+                            Button("今天") {
+                                selectedDate = Date()
+                            }
+                            .disabled(isToday(selectedDate))
+                        }
+                    }
+                    .padding(12)
+                    .frame(minWidth: 280)
                 }
             }
+
+            // // 中间：日期导航
+            // ToolbarItem(placement: .primaryAction) {
+            //     HStack(spacing: 8) {
+            //         Button(action: {
+            //             selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+            //         }) {
+            //             Image(systemName: "chevron.left")
+            //         }
+            //         Button(action: {
+            //             selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+            //         }) {
+            //             Image(systemName: "chevron.right")
+            //         }
+
+            //         Button("今天") {
+            //             selectedDate = Date()
+            //         }
+            //         .disabled(isToday(selectedDate))
+
+            //     }
+            // }
             // 右侧：监控状态和控制
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 8) {
