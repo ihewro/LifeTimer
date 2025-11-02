@@ -743,7 +743,7 @@ struct CalendarView: View {
                     // 视图模式选择器（macOS 上强制等宽分布，避免高版本按内容分配导致不均匀）
                     #if os(macOS)
                     CalendarViewModeSegmentedPicker(selection: $currentViewMode)
-                        .frame(width: 180)
+                        .frame(width: 270)
                         .onChange(of: currentViewMode) { newMode in
                             // 视图模式切换时触发预加载
                             triggerPreloading(for: newMode)
