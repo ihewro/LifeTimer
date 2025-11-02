@@ -722,15 +722,7 @@ struct MenuBarPopoverView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    Group {
-                        if #available(macOS 12.0, *) {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                        } else {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color(NSColor.controlBackgroundColor))
-                        }
-                    }
+                    GlassEffectBackground()
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
