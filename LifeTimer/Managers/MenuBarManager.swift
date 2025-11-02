@@ -259,9 +259,13 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     }
 
     @objc private func handleGlobalHotKey() {
-        // 使用主线程以确保UI操作安全
+        // 使用主线程以确保UI操作安全；改为切换逻辑：已显示则关闭，否则显示
         DispatchQueue.main.async {
-            self.showPopover()
+            if let popover = self.popover, popover.isShown {
+                self.closePopover()
+            } else {
+                self.showPopover()
+            }
         }
     }
     

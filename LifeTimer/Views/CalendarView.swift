@@ -668,7 +668,7 @@ struct CalendarView: View {
                                 .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                            Divider()
+                            // Divider()
 
                             DayStatsPanel(selectedDate: $selectedDate)
                                 .environmentObject(eventManager)
@@ -688,7 +688,7 @@ struct CalendarView: View {
                                 .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                            Divider()
+                            // Divider()
 
                             WeekSidebarStats(selectedDate: $selectedDate)
                                 .environmentObject(eventManager)
@@ -708,7 +708,7 @@ struct CalendarView: View {
                                 .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                            Divider()
+                            // Divider()
 
                             MonthSidebarStats(selectedDate: $selectedDate)
                                 .environmentObject(eventManager)

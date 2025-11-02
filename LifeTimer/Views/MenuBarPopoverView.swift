@@ -654,8 +654,9 @@ struct MenuBarPopoverView: View {
                                     isTaskSearchFocused = false
                                     isSuggestionVisible = false
                                 }
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
+                                .padding(.top, 8)
                             }
                             if !filteredRecentTasks.isEmpty {
                                 Text("最近常用")
@@ -672,7 +673,7 @@ struct MenuBarPopoverView: View {
                                         isTaskSearchFocused = false
                                         isSuggestionVisible = false
                                     }
-                                    .padding(.horizontal, 6)
+                                    .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
                                 }
                             }
@@ -693,7 +694,7 @@ struct MenuBarPopoverView: View {
                                         isTaskSearchFocused = false
                                         isSuggestionVisible = false
                                     }
-                                    .padding(.horizontal, 6)
+                                    .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
                                 }
                             }
@@ -710,7 +711,7 @@ struct MenuBarPopoverView: View {
                                     isTaskSearchFocused = false
                                     isSuggestionVisible = false
                                 }
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                             }
                         }
