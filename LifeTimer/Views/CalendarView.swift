@@ -740,7 +740,15 @@ struct CalendarView: View {
             // 中间：完整的工具栏布局
             ToolbarItemGroup(placement: .principal) {
                 HStack {
-                    // 视图模式选择器
+                    // 视图模式选择器（macOS 上强制等宽分布，避免高版本按内容分配导致不均匀）
+                    #if os(macOS)
+                    CalendarViewModeSegmentedPicker(selection: $currentViewMode)
+                        .frame(width: 180)
+                        .onChange(of: currentViewMode) { newMode in
+                            // 视图模式切换时触发预加载
+                            triggerPreloading(for: newMode)
+                        }
+                    #else
                     Picker("视图模式", selection: $currentViewMode) {
                         ForEach(CalendarViewMode.allCases, id: \.self) { mode in
                             Text(mode.rawValue).tag(mode)
@@ -752,6 +760,7 @@ struct CalendarView: View {
                         // 视图模式切换时触发预加载
                         triggerPreloading(for: newMode)
                     }
+                    #endif
 
                 }
             }
@@ -3978,6 +3987,76 @@ struct VisualEffectView: View {
         Color.systemBackground
             .opacity(0.95)
             .background(.ultraThinMaterial)
+    }
+}
+#endif
+
+// MARK: - macOS 等宽分段选择器
+#if os(macOS)
+/// macOS 等宽分布的分段选择器，修复 NSSegmentedControl 在高版本下按内容分配导致宽度不均问题
+struct CalendarViewModeSegmentedPicker: View {
+    @Binding var selection: CalendarViewMode
+
+    var body: some View {
+        MacEqualWidthSegmentedControl(selection: $selection)
+            .frame(height: 26)
+    }
+}
+
+struct MacEqualWidthSegmentedControl: NSViewRepresentable {
+    @Binding var selection: CalendarViewMode
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let labels = CalendarViewMode.allCases.map { $0.rawValue }
+        let control = NSSegmentedControl(labels: labels, trackingMode: .selectOne, target: context.coordinator, action: #selector(Coordinator.valueChanged(_:)))
+        control.segmentStyle = .automatic
+        if #available(macOS 13.0, *) {
+            control.segmentDistribution = .fillEqually
+        }
+        control.selectedSegment = CalendarViewMode.allCases.firstIndex(of: selection) ?? 0
+        control.controlSize = .small
+        return control
+    }
+
+    func updateNSView(_ nsView: NSSegmentedControl, context: Context) {
+        // 确保 segment 数量与标签一致
+        let labels = CalendarViewMode.allCases.map { $0.rawValue }
+        if nsView.segmentCount != labels.count {
+            nsView.segmentCount = labels.count
+            for (i, label) in labels.enumerated() {
+                nsView.setLabel(label, forSegment: i)
+            }
+        } else {
+            for (i, label) in labels.enumerated() {
+                if nsView.label(forSegment: i) != label {
+                    nsView.setLabel(label, forSegment: i)
+                }
+            }
+        }
+
+        if #available(macOS 13.0, *) {
+            nsView.segmentDistribution = .fillEqually
+        }
+
+        // 同步选中状态
+        if let idx = CalendarViewMode.allCases.firstIndex(of: selection), nsView.selectedSegment != idx {
+            nsView.selectedSegment = idx
+        }
+    }
+
+    class Coordinator: NSObject {
+        var selection: Binding<CalendarViewMode>
+        init(selection: Binding<CalendarViewMode>) { self.selection = selection }
+
+        @objc func valueChanged(_ sender: NSSegmentedControl) {
+            let idx = sender.selectedSegment
+            guard idx >= 0 && idx < CalendarViewMode.allCases.count else { return }
+            selection.wrappedValue = CalendarViewMode.allCases[idx]
+        }
     }
 }
 #endif

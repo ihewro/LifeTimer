@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CalendarView 分段选择器等宽预览</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      margin: 24px;
+      line-height: 1.6;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr); /* 强制等宽 */
+      border: 1px solid rgba(0,0,0,0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(127,127,127,0.1);
+    }
+    .segmented button {
+      appearance: none;
+      border: none;
+      padding: 6px 8px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .segmented button:not(:last-child) {
+      border-right: 1px solid rgba(0,0,0,0.2);
+    }
+    .segmented button.selected {
+      background: rgba(0, 122, 255, 0.12);
+      color: rgb(0, 122, 255);
+      font-weight: 600;
+    }
+    .preview-row { margin: 12px 0; }
+    .box { padding: 8px; border: 1px dashed rgba(0,0,0,0.2); border-radius: 8px; }
+  </style>
+  <script>
+    function init(id) {
+      const root = document.getElementById(id);
+      root.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          root.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+        });
+      });
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+      init('seg-180');
+      init('seg-300');
+    });
+  </script>
+</head>
+<body>
+  <h2>CalendarView 分段选择器：等宽分布预览</h2>
+  <p>该预览模拟了工具栏中的「日 / 周 / 月」分段选择器，在不同宽度下的等宽分布效果。真实应用中，macOS 使用 NSSegmentedControl 并设置 <code>segmentDistribution = .fillEqually</code> 来保证等宽。</p>
+
+  <div class="preview-row">
+    <div class="box">
+      <p>宽度 180px（与应用中默认一致）：</p>
+      <div id="seg-180" class="segmented" style="width: 180px;">
+        <button class="selected">日</button>
+        <button>周</button>
+        <button>月</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-row">
+    <div class="box">
+      <p>宽度 300px（更宽的情况下，仍然等宽）：</p>
+      <div id="seg-300" class="segmented" style="width: 300px;">
+        <button class="selected">日</button>
+        <button>周</button>
+        <button>月</button>
+      </div>
+    </div>
+  </div>
+
+  <p>说明：</p>
+  <ul>
+    <li>在较高版本的 macOS 中，SwiftUI 的 Picker(.segmented) 可能按内容宽度分配，导致三项（「日」「周」「月」）不等宽。</li>
+    <li>修复方案是在 macOS 上用 NSViewRepresentable 包装 NSSegmentedControl，并将 <code>segmentDistribution</code> 设置为 <code>.fillEqually</code>。</li>
+    <li>iOS 等平台仍继续使用原生的 Picker(.segmented)。</li>
+  </ul>
+</body>
+</html>
