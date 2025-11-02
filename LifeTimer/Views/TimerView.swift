@@ -425,6 +425,8 @@ struct TimerView: View {
 
             // 设置智能提醒管理器的依赖
             smartReminderManager.setTimerModel(timerModel)
+            // 同步当前任务到智能提醒管理器（用于弹窗中的默认任务回退）
+            smartReminderManager.setCurrentTask(selectedTask)
 
             // 只有在计时器空闲状态且用户未设置自定义任务时，才从最近事件设置默认任务
             // 这样可以防止窗口重新激活时覆盖用户在计时过程中修改的任务
@@ -436,22 +438,10 @@ struct TimerView: View {
             // 监听番茄钟完成状态
             // 只有在未开启自动休息时才显示完成弹窗
             if newState == .completed && timerModel.currentMode == .singlePomodoro && !timerModel.autoStartBreak {
-                #if os(macOS)
-                SmartReminderWindowManager.shared.showCompletionDialog(
-                    timerModel: timerModel,
-                    smartReminderManager: smartReminderManager,
-                    selectedTask: selectedTask,
-                    eventManager: eventManager
-                )
-                #else
+                // macOS 由 SmartReminderManager 统一触发独立窗口显示
+                // iOS 仍在 UI 层展示 sheet
+                #if !os(macOS)
                 showingCompletionDialog = true
-                #endif
-            }
-
-            // 开始新的计时或休息时，关闭窗口级别的完成弹窗
-            if newState == .running {
-                #if os(macOS)
-                SmartReminderWindowManager.shared.closeCompletionDialog()
                 #endif
             }
 
@@ -464,6 +454,8 @@ struct TimerView: View {
             // 用户修改任务时，设置自定义任务到TimerModel
             // TimerModel会自动处理运行时的任务切换逻辑
             timerModel.setUserCustomTask(newTask)
+            // 同步到智能提醒管理器，便于独立窗口使用默认任务回退
+            smartReminderManager.setCurrentTask(newTask)
         }
         .onChange(of: timerModel.userCustomTaskTitle) { newTitle in
             // 当TimerModel中的自定义任务标题发生变化时，同步更新selectedTask

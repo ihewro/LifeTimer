@@ -170,6 +170,10 @@ class SmartReminderManager: ObservableObject {
     /// 用户开始计时时调用（重置提醒状态）
     func onUserStartedTimer() {
         stopReminder()
+        // 关闭窗口级别的“完成弹窗”，避免干扰正在进行的计时
+        #if os(macOS)
+        SmartReminderWindowManager.shared.closeCompletionDialog()
+        #endif
     }
     
     /// 延迟提醒（用户选择稍后提醒时调用）
@@ -250,6 +254,21 @@ class SmartReminderManager: ObservableObject {
 
         // 只有真正的计时完成才启动提醒倒计时
         startReminderCountdown()
+
+        // 在 macOS 上：独立于主窗口显示“完成弹窗”（不依赖 UI 层）
+        #if os(macOS)
+        if let timerModel = timerModel,
+           timerModel.currentMode == .singlePomodoro,
+           !timerModel.autoStartBreak,
+           let eventManager = eventManager {
+            SmartReminderWindowManager.shared.showCompletionDialog(
+                timerModel: timerModel,
+                smartReminderManager: self,
+                selectedTask: currentSelectedTask,
+                eventManager: eventManager
+            )
+        }
+        #endif
     }
 
     /// 开始计时器状态监控
