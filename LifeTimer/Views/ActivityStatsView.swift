@@ -151,7 +151,7 @@ struct ActivityStatsView: View {
                     // .buttonStyle(.borderedProminent)
                     // .controlSize(.small)
                     // .font(.caption)
-                }
+                }.padding(.horizontal,10)
             }
         }
         .onDisappear {

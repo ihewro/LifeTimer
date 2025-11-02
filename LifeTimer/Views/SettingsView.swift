@@ -731,16 +731,16 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        Button("反馈建议") {
-                            // 打开邮件或反馈页面
-                        }
-                        .padding(.horizontal, 20)
+                        // Button("反馈建议") {
+                        //     // 打开邮件或反馈页面
+                        // }
+                        // .padding(.horizontal, 20)
 
                         // Button("重置数据") {
                         //     // 重置所有数据
                         // }
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 20)
+                        // .foregroundColor(.red)
+                        // .padding(.horizontal, 20)
 
                         Button("开源项目") {
                             if let url = URL(string: "https://github.com/ihewro/LifeTimer") {

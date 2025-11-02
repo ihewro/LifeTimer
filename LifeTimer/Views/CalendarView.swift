@@ -665,7 +665,7 @@ struct CalendarView: View {
                     case .day:
                         VStack(spacing: 0) {
                             MiniCalendarView(viewMode: .day, selectedDate: $selectedDate)
-                                .padding(isCompact ? 8 : 16)
+                                .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
                             Divider()
@@ -685,7 +685,7 @@ struct CalendarView: View {
                     case .week:
                         VStack(spacing: 0) {
                             MiniCalendarView(viewMode: .week, selectedDate: $selectedDate)
-                                .padding(isCompact ? 8 : 16)
+                                .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
                             Divider()
@@ -705,7 +705,7 @@ struct CalendarView: View {
                     case .month:
                         VStack(spacing: 0) {
                             MiniCalendarView(viewMode: .month, selectedDate: $selectedDate)
-                                .padding(isCompact ? 8 : 16)
+                                .padding(16)
                                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
                             Divider()
@@ -2973,8 +2973,12 @@ struct MonthView: View {
             let availableHeight = geometry.size.height
             let cellHeight = availableHeight / 6 // 6 rows for calendar weeks
 
-            LazyVGrid(columns: columns, spacing: 1) {
-                ForEach(monthDays, id: \.self) { date in
+            LazyVGrid(columns: columns, spacing: 0) {
+                let totalColumns = columns.count
+                let totalRows = Int(ceil(Double(monthDays.count) / Double(totalColumns)))
+                ForEach(Array(monthDays.enumerated()), id: \.element) { index, date in
+                    let row = index / totalColumns
+                    let col = index % totalColumns
                     MonthDayCell(
                         date: date,
                         selectedDate: $selectedDate,
@@ -2983,7 +2987,10 @@ struct MonthView: View {
                         activityStats: monthActivityCache[date] ?? [],
                         cellHeight: cellHeight,
                         isLoading: isDataMismatch,
-                        highlightedEventId: $highlightedEventId
+                        highlightedEventId: $highlightedEventId,
+                        isFirstRow: row == 0,
+                        isLastRow: row == totalRows - 1,
+                        isLastColumn: col == totalColumns - 1
                     )
                     .id("\(date.timeIntervalSince1970)-\(isLoadingData)") // 确保正确的视图标识
                     .drawingGroup() // 将单元格渲染为单个图层，提高性能
@@ -3014,7 +3021,7 @@ struct MonthView: View {
             }
             }
         }
-        .padding(.horizontal, 8)
+        // .padding(.horizontal, 8)
         .padding(.vertical, 0)
     }
 
@@ -3497,6 +3504,9 @@ struct MonthDayCell: View {
     let cellHeight: CGFloat
     let isLoading: Bool
     @Binding var highlightedEventId: UUID?
+    let isFirstRow: Bool
+    let isLastRow: Bool
+    let isLastColumn: Bool
 
     private let calendar = Calendar.current
 
@@ -3621,12 +3631,45 @@ struct MonthDayCell: View {
         }
         .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         .background(
-            Rectangle()
-                .fill(Color.clear)
-                .overlay(
+            ZStack {
+                // 顶部边框（首行不绘制）
+                if !isFirstRow {
+                    VStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 0.5)
+                        Spacer()
+                    }
+                }
+
+                // 左侧边框
+                HStack(spacing: 0) {
                     Rectangle()
-                        .stroke(Color.gray.opacity(0.15), lineWidth: 0.5)
-                )
+                        .fill(Color.gray.opacity(0.15))
+                        .frame(width: 0.5)
+                    Spacer()
+                }
+
+                // 右侧边框（仅最后一列）
+                if isLastColumn {
+                    HStack(spacing: 0) {
+                        Spacer()
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(width: 0.5)
+                    }
+                }
+
+                // 底部边框（仅最后一行）
+                if isLastRow {
+                    VStack(spacing: 0) {
+                        Spacer()
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 0.5)
+                    }
+                }
+            }
         )
         .contentShape(Rectangle())
         .onAppear {
@@ -3704,7 +3747,6 @@ struct EventDetailPopover: View {
     @State private var startTime: Date
     @State private var endTime: Date
     @State private var eventType: PomodoroEvent.EventType
-    @State private var isEditing = false
 
     init(event: PomodoroEvent, onSave: @escaping (PomodoroEvent) -> Void, onDelete: @escaping () -> Void) {
         self.event = event
@@ -3724,11 +3766,8 @@ struct EventDetailPopover: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                 Spacer()
-                Button(isEditing ? "完成" : "编辑") {
-                    if isEditing {
-                        saveEvent()
-                    }
-                    isEditing.toggle()
+                Button("保存") {
+                    saveEvent()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -3736,98 +3775,53 @@ struct EventDetailPopover: View {
 
             Divider()
 
-            if isEditing {
-                // 编辑模式
-                VStack(alignment: .leading, spacing: 12) {
-                    // 事件标题
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("标题")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("事件标题", text: $title)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    // 事件类型
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("类型")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $eventType) {
-                            ForEach(PomodoroEvent.EventType.allCases, id: \.self) { type in
-                                Text(type.displayName).tag(type)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    // 时间设置
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("时间")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("开始")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
-                                    .datePickerStyle(.compact)
-                                    .labelsHidden()
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("结束")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
-                                    .datePickerStyle(.compact)
-                                    .labelsHidden()
-                            }
-                        }
-                    }
+            // 编辑区域（始终处于编辑状态）
+            VStack(alignment: .leading, spacing: 12) {
+                // 事件标题
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("标题")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("事件标题", text: $title)
+                        .textFieldStyle(.roundedBorder)
                 }
-            } else {
-                // 显示模式
-                VStack(alignment: .leading, spacing: 12) {
-                    // 事件标题
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("标题")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(event.title)
-                            .font(.body)
-                            .fontWeight(.medium)
-                    }
 
-                    // 事件类型
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("类型")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        HStack {
-                            Circle()
-                                .fill(event.type.color)
-                                .frame(width: 12, height: 12)
-                            Text(event.type.displayName)
-                                .font(.body)
+                // 事件类型
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("类型")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("", selection: $eventType) {
+                        ForEach(PomodoroEvent.EventType.allCases, id: \.self) { type in
+                            Text(type.displayName).tag(type)
                         }
                     }
+                    .pickerStyle(.segmented)
+                }
 
-                    // 时间信息
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("时间")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("开始：\(formatTime(event.startTime))")
-                                .font(.body)
-                            Text("结束：\(formatTime(event.endTime))")
-                                .font(.body)
-                            Text("时长：\(formatDuration(event.endTime.timeIntervalSince(event.startTime)))")
-                                .font(.callout)
+                // 时间设置
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("时间")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("开始")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
+                            DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("结束")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
                         }
                     }
                 }
