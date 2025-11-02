@@ -8,7 +8,6 @@ struct WeekSidebarStats: View {
 
     @State private var isLoading = false
     @State private var totalActiveTime: TimeInterval = 0
-    @State private var totalAppSwitches: Int = 0
     @State private var pomodoroSessions: Int = 0
     @State private var topApps: [AppUsageStats] = []
     @State private var dataTask: Task<Void, Never>?
@@ -43,8 +42,7 @@ struct WeekSidebarStats: View {
                 .fontWeight(.medium)
 
             HStack(spacing: 12) {
-                statTile(title: "活跃时长", value: formatTime(totalActiveTime), systemImage: "clock")
-                statTile(title: "应用切换", value: "\(totalAppSwitches)", systemImage: "arrow.triangle.2.circlepath")
+                statTile(title: "总专注时长", value: formatTime(totalActiveTime), systemImage: "clock")
                 statTile(title: "番茄会话", value: "\(pomodoroSessions)", systemImage: "timer")
             }
         }
@@ -144,13 +142,11 @@ struct WeekSidebarStats: View {
             let eventsByDate = eventManager.eventsForDates(dates)
             let appsByDate = activityMonitor.getAppUsageStatsForDates(dates)
 
-            // 汇总活跃时长与应用切换
+            // 汇总总专注时长（番茄时间 + 正计时，不含休息与自定义事件） —— 与 CalendarView 逻辑保持一致
             var totalTime: TimeInterval = 0
-            var switches: Int = 0
-            for d in dates {
-                if let ov = overviewByDate[d] {
-                    totalTime += ov.activeTime
-                    switches += ov.appSwitches
+            for events in eventsByDate.values {
+                for event in events where event.type == .pomodoro || event.type == .countUp {
+                    totalTime += event.endTime.timeIntervalSince(event.startTime)
                 }
             }
 
@@ -174,7 +170,6 @@ struct WeekSidebarStats: View {
             if Task.isCancelled { return }
             await MainActor.run {
                 totalActiveTime = totalTime
-                totalAppSwitches = switches
                 pomodoroSessions = sessions
                 topApps = Array(mergedApps.prefix(5))
                 isLoading = false

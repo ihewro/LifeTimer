@@ -657,6 +657,7 @@ struct CalendarView: View {
                     .frame(width: sidebarWidth)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.3), value: showingSearchResults)
+                    .ignoresSafeArea(.container, edges: .top)
                 }
 
                 if (!isCompact || rootGeo.size.width > 580) && !showingSearchResults {
@@ -3847,7 +3848,9 @@ struct EventDetailPopover: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // 不要在弹窗中使用无限尺寸，否则会导致内容贴边、看起来没有内边距
+        // 让视图按自身内容尺寸布局，从而保留上下左右的边距
+        // .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func saveEvent() {

@@ -139,21 +139,21 @@ struct SyncView: View {
         }
         .toolbar {
             // 左侧：同步图标和标题
-            ToolbarItem(placement: .navigation) {
-                HStack {
-                    // Image(systemName: "arrow.triangle.2.circlepath")
-                    //     .font(.title2)
-                    //     .foregroundColor(.accentColor)
-                    Text("数据同步")
-                        // .font(.title2)
-                        .fontWeight(.semibold)
-                }
-            }
+            // ToolbarItem(placement: .navigation) {
+            //     HStack {
+            //         // Image(systemName: "arrow.triangle.2.circlepath")
+            //         //     .font(.title2)
+            //         //     .foregroundColor(.accentColor)
+            //         Text("数据同步")
+            //             // .font(.title2)
+            //             // .fontWeight(.semibold)
+            //     }
+            // }
 
             // 中间：占位符确保 toolbar 铺满宽度
-            ToolbarItem(placement: .principal) {
-                Spacer()
-            }
+            // ToolbarItem(placement: .principal) {
+            //     Spacer()
+            // }
 
             // // 右侧：Debug模式切换
             // ToolbarItem(placement: .primaryAction) {

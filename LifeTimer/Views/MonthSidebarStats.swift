@@ -43,8 +43,8 @@ struct MonthSidebarStats: View {
                 .fontWeight(.medium)
 
             HStack(spacing: 12) {
-                statTile(title: "活跃天数", value: "\(activeDays)", systemImage: "calendar")
-                statTile(title: "活跃时长", value: formatTime(totalActiveTime), systemImage: "clock")
+                // statTile(title: "活跃天数", value: "\(activeDays)", systemImage: "calendar")
+                statTile(title: "总专注时长", value: formatTime(totalActiveTime), systemImage: "clock")
                 statTile(title: "番茄会话", value: "\(pomodoroSessions)", systemImage: "timer")
             }
         }
@@ -143,13 +143,19 @@ struct MonthSidebarStats: View {
             let eventsByDate = eventManager.eventsForDates(dates)
             let appsByDate = activityMonitor.getAppUsageStatsForDates(dates)
 
-            // 活跃天数与活跃时长
+            // 活跃天数（基于概览 activeTime > 0）
             var activeDayCount = 0
-            var totalTime: TimeInterval = 0
             for d in dates {
-                if let ov = overviewByDate[d] {
-                    totalTime += ov.activeTime
-                    if ov.activeTime > 0 { activeDayCount += 1 }
+                if let ov = overviewByDate[d], ov.activeTime > 0 {
+                    activeDayCount += 1
+                }
+            }
+
+            // 总专注时长（番茄时间 + 正计时，不含休息与自定义事件） —— 与 CalendarView 逻辑保持一致
+            var totalTime: TimeInterval = 0
+            for events in eventsByDate.values {
+                for event in events where event.type == .pomodoro || event.type == .countUp {
+                    totalTime += event.endTime.timeIntervalSince(event.startTime)
                 }
             }
 

@@ -83,6 +83,7 @@ struct SettingsView: View {
     @EnvironmentObject var activityMonitor: ActivityMonitorManager
     @EnvironmentObject var smartReminderManager: SmartReminderManager
     @EnvironmentObject var syncManager: SyncManager
+    @Environment(\.openURL) private var openURL
 
     @StateObject private var soundEffectManager = SoundEffectManager.shared
     @StateObject private var appIconManager = AppIconManager.shared
@@ -739,6 +740,13 @@ struct SettingsView: View {
                         //     // 重置所有数据
                         // }
                         .foregroundColor(.red)
+                        .padding(.horizontal, 20)
+
+                        Button("开源项目") {
+                            if let url = URL(string: "https://github.com/ihewro/LifeTimer") {
+                                openURL(url)
+                            }
+                        }
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
