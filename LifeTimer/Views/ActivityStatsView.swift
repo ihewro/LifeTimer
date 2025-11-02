@@ -6,6 +6,10 @@
 //
 
 import SwiftUI
+// 为 macOS 提供应用图标支持
+#if os(macOS)
+import AppKit
+#endif
 
 /// 活动统计视图
 struct ActivityStatsView: View {
@@ -187,6 +191,7 @@ struct ActivityStatsView: View {
                 LazyVStack(spacing: 8) {
                     ForEach(Array(recentSessions.prefix(8).enumerated()), id: \.offset) { _, event in
                         RecentEventRow(event: event)
+                            .environmentObject(activityMonitor.appCategoryManager)
                     }
                 }
             }
@@ -205,7 +210,8 @@ struct ActivityStatsView: View {
                     .foregroundColor(.secondary)
             } else {
                 ForEach(topApps, id: \.appName) { stat in
-                    SimpleAppRow(app: stat)
+                    TopAppRow(app: stat, totalActive: overviewActiveTime)
+                        .environmentObject(activityMonitor.appCategoryManager)
                 }
             }
         }
@@ -276,6 +282,7 @@ struct ActivityStatsView: View {
 
         var sessions: [AppTimelineEvent] = []
         var currentApp: String?
+        var currentBundleId: String?
         var appStartTime: Date?
 
         let sorted = systemEvents.sorted { $0.timestamp < $1.timestamp }
@@ -287,19 +294,21 @@ struct ActivityStatsView: View {
                 if let last = currentApp, let start = appStartTime {
                     let duration = ev.timestamp.timeIntervalSince(start)
                     if duration > 10 {
-                        sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: ev.timestamp, duration: duration))
+                        sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: ev.timestamp, duration: duration))
                     }
                 }
                 currentApp = name
+                currentBundleId = ev.bundleId
                 appStartTime = ev.timestamp
             case .appTerminated, .systemSleep:
                 if let last = currentApp, let start = appStartTime {
                     let duration = ev.timestamp.timeIntervalSince(start)
                     if duration > 10 {
-                        sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: ev.timestamp, duration: duration))
+                        sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: ev.timestamp, duration: duration))
                     }
                 }
                 currentApp = nil
+                currentBundleId = nil
                 appStartTime = nil
             default:
                 break
@@ -311,7 +320,7 @@ struct ActivityStatsView: View {
             let now = Date()
             let duration = now.timeIntervalSince(start)
             if duration > 10 {
-                sessions.append(AppTimelineEvent(appName: last, startTime: start, endTime: now, duration: duration))
+                sessions.append(AppTimelineEvent(appName: last, bundleId: currentBundleId, startTime: start, endTime: now, duration: duration))
             }
         }
 
@@ -353,17 +362,30 @@ struct ActivityStatsView: View {
 
     struct RecentEventRow: View {
         let event: AppTimelineEvent
+        @EnvironmentObject var appCategoryManager: AppCategoryManager
+        @State private var showCategoryPicker = false
 
         var body: some View {
             HStack(spacing: 12) {
-                Image(systemName: "app")
-                    .foregroundColor(.accentColor)
-                    .frame(width: 20)
+                AppBadge(appName: event.appName, bundleId: event.bundleId, size: 22)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(event.appName)
-                        .font(.subheadline)
-                        .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(event.appName)
+                            .font(.subheadline)
+                            .lineLimit(1)
+
+                        let category = currentCategory(for: event.appName)
+                        CategoryTag(text: category, color: ActivityStatsView.categoryColor(for: category))
+                            .onTapGesture { showCategoryPicker = true }
+                            .popover(isPresented: $showCategoryPicker) {
+                                CategoryPickerPopover(current: category) { selection in
+                                    updateCategory(for: event.appName, to: selection)
+                                    showCategoryPicker = false
+                                }
+                            }
+                    }
+
                     Text("\(formatRange(event.startTime, event.endTime)) · \(formatDuration(event.duration))")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -386,25 +408,291 @@ struct ActivityStatsView: View {
             let mm = m % 60
             return h > 0 ? "\(h)h \(mm)m" : "\(mm)m"
         }
+
+        private func currentCategory(for appName: String) -> String {
+            if appCategoryManager.isProductiveApp(appName) { return "生产力" }
+            if appCategoryManager.isEntertainmentApp(appName) { return "娱乐" }
+            return "其他"
+        }
+
+        private func updateCategory(for appName: String, to category: String) {
+            switch category {
+            case "生产力":
+                appCategoryManager.addProductiveApp(appName)
+            case "娱乐":
+                appCategoryManager.addEntertainmentApp(appName)
+            default:
+                if let i = appCategoryManager.productiveApps.firstIndex(of: appName) {
+                    appCategoryManager.removeProductiveApp(at: i)
+                }
+                if let j = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
+                    appCategoryManager.removeEntertainmentApp(at: j)
+                }
+            }
+        }
     }
 
-    struct SimpleAppRow: View {
+    struct TopAppRow: View {
         let app: AppUsageStats
+        let totalActive: TimeInterval
+        @EnvironmentObject var appCategoryManager: AppCategoryManager
+        @State private var showCategoryPicker = false
+
+        private var ratio: Double {
+            guard totalActive > 0 else { return 0 }
+            return min(max(app.totalTime / totalActive, 0), 1)
+        }
 
         var body: some View {
-            HStack(spacing: 12) {
-                Image(systemName: "app.fill")
-                    .foregroundColor(.accentColor)
-                    .frame(width: 20)
-                Text(app.appName)
-                    .lineLimit(1)
-                Spacer()
-                Text(app.formattedTime)
-                    .foregroundColor(.secondary)
-                    .font(.caption)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    AppBadge(appName: app.appName, bundleId: nil, size: 22)
+
+                    Text(app.appName)
+                        .font(.subheadline)
+                        .lineLimit(1)
+
+                    let category = currentCategory(for: app.appName)
+                    CategoryTag(text: category, color: ActivityStatsView.categoryColor(for: category))
+                        .onTapGesture { showCategoryPicker = true }
+                        .popover(isPresented: $showCategoryPicker) {
+                            CategoryPickerPopover(current: category) { selection in
+                                updateCategory(for: app.appName, to: selection)
+                                showCategoryPicker = false
+                            }
+                        }
+
+                    Spacer()
+
+                    Text(app.formattedTime)
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+
+                HStack(spacing: 8) {
+                    ZStack(alignment: .leading) {
+                        // 背景条：占据可用的全部宽度
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.15))
+                            .frame(height: 6)
+
+                        // 前景进度条：使用实际可用宽度计算比例
+                        GeometryReader { geometry in
+                            Capsule()
+                                .fill(ActivityStatsView.appColor(for: app.appName))
+                                .frame(width: max(4, geometry.size.width * ratio), height: 6)
+                        }
+                        .frame(height: 6)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(ActivityStatsView.formatPercent(ratio))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+        }
+
+        private func currentCategory(for appName: String) -> String {
+            if appCategoryManager.isProductiveApp(appName) { return "生产力" }
+            if appCategoryManager.isEntertainmentApp(appName) { return "娱乐" }
+            return "其他"
+        }
+
+        private func updateCategory(for appName: String, to category: String) {
+            switch category {
+            case "生产力":
+                appCategoryManager.addProductiveApp(appName)
+            case "娱乐":
+                appCategoryManager.addEntertainmentApp(appName)
+            default:
+                if let i = appCategoryManager.productiveApps.firstIndex(of: appName) {
+                    appCategoryManager.removeProductiveApp(at: i)
+                }
+                if let j = appCategoryManager.entertainmentApps.firstIndex(of: appName) {
+                    appCategoryManager.removeEntertainmentApp(at: j)
+                }
+            }
+        }
+    }
+
+    /// 轻量级弹出式分类选择菜单（保持标签外观不变，点击标签时弹出）
+    struct CategoryPickerPopover: View {
+        let current: String
+        let onSelect: (String) -> Void
+
+        private let options = ["生产力", "娱乐", "其他"]
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("调整分类")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        onSelect(option)
+                    } label: {
+                        HStack {
+                            Text(option)
+                                .font(.system(size: 13))
+                            Spacer()
+                            if option == current {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(12)
+            .frame(minWidth: 180)
+        }
+    }
+
+    // MARK: - 共享辅助：分类、颜色与百分比
+    // 分类逻辑：仅三类（生产力、娱乐、其他）。此静态方法保留但不再使用旧的关键词推断。
+    static func inferredCategory(for appName: String) -> String {
+        // 由于无法在静态方法中访问 EnvironmentObject，这里保守返回“其他”。
+        // 实际分类在各行组件中通过 activityMonitor.appCategoryManager 动态计算。
+        return "其他"
+    }
+
+    static func categoryColor(for category: String) -> Color {
+        switch category {
+        case "生产力": return Color.blue
+        case "娱乐": return Color.orange
+        default: return Color.gray
+        }
+    }
+
+    static func appColor(for appName: String) -> Color {
+        let palette: [Color] = [.blue, .purple, .green, .orange, .pink, .indigo, .teal, .cyan]
+        let idx = abs(appName.hashValue) % palette.count
+        return palette[idx]
+    }
+
+    static func formatPercent(_ value: Double) -> String {
+        let pct = Int(round(value * 100))
+        return "\(pct)%"
+    }
+
+    // MARK: - 图标提供者与徽章
+    #if os(macOS)
+    final class AppIconProvider {
+        static let shared = AppIconProvider()
+        private var cache: [String: NSImage] = [:]
+
+        func icon(for appName: String) -> NSImage? {
+            // 命中缓存
+            if let img = cache[appName] { return img }
+
+            // 1) 优先尝试从正在运行的应用中匹配（避免使用已弃用 API）
+            if let runningApp = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == appName }),
+               let bundleURL = runningApp.bundleURL {
+                let image = NSWorkspace.shared.icon(forFile: bundleURL.path)
+                cache[appName] = image
+                return image
+            }
+
+            // 2) 常见安装路径回退：/Applications、/System/Applications、/Applications/Utilities、~/Applications
+            let candidates: [String] = [
+                "/Applications/\(appName).app",
+                "/System/Applications/\(appName).app",
+                "/Applications/Utilities/\(appName).app",
+                "\(NSHomeDirectory())/Applications/\(appName).app"
+            ]
+            for path in candidates {
+                if FileManager.default.fileExists(atPath: path) {
+                    let image = NSWorkspace.shared.icon(forFile: path)
+                    cache[appName] = image
+                    return image
+                }
+            }
+
+            // 未找到图标时返回 nil，让上层使用文字徽章回退
+            return nil
+        }
+
+        // 可选：根据 bundle id 获取图标（如果后续支持在事件中记录 bundle id，可使用该方法）
+        func iconForBundleId(_ bundleId: String) -> NSImage? {
+            let key = "bundle:\(bundleId)"
+            if let img = cache[key] { return img }
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                let image = NSWorkspace.shared.icon(forFile: url.path)
+                cache[key] = image
+                return image
+            }
+            return nil
+        }
+    }
+    #endif
+
+    struct AppBadge: View {
+        let appName: String
+        let bundleId: String?
+        let size: CGFloat
+
+        var body: some View {
+            #if os(macOS)
+            // 优先使用 bundleId 获取图标，其次使用应用名
+            if let bid = bundleId, let nsImage = AppIconProvider.shared.iconForBundleId(bid) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(ActivityStatsView.appColor(for: appName).opacity(0.6), lineWidth: 1)
+                    )
+            } else if let nsImage = AppIconProvider.shared.icon(for: appName) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(ActivityStatsView.appColor(for: appName).opacity(0.6), lineWidth: 1)
+                    )
+            } else {
+                fallbackBadge
+            }
+            #else
+            fallbackBadge
+            #endif
+        }
+
+        private var fallbackBadge: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(ActivityStatsView.appColor(for: appName))
+                Text(String(appName.prefix(1)).uppercased())
+                    .font(.caption2)
+                    .foregroundColor(.white)
+            }
+            .frame(width: size, height: size)
+        }
+    }
+
+    struct CategoryTag: View {
+        let text: String
+        let color: Color
+
+        var body: some View {
+            Text(text)
+                .font(.caption2)
+                .foregroundColor(color)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(color.opacity(0.15))
+                )
         }
     }
 
@@ -456,10 +744,10 @@ struct TimelineHourGroup {
 
 // MARK: - 时间轴小时分组视图
 
-struct TimelineHourGroupView: View {
-    let hourGroup: TimelineHourGroup
-    let isCollapsed: Bool
-    let onToggleCollapse: () -> Void
+    struct TimelineHourGroupView: View {
+        let hourGroup: TimelineHourGroup
+        let isCollapsed: Bool
+        let onToggleCollapse: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -538,6 +826,7 @@ struct TimelineHourGroupView: View {
 
 struct AppTimelineEvent {
     let appName: String
+    let bundleId: String?
     let startTime: Date
     let endTime: Date
     let duration: TimeInterval

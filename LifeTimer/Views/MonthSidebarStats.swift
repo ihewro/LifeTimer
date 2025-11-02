@@ -89,15 +89,15 @@ struct MonthSidebarStats: View {
     private func statTile(title: String, value: String, systemImage: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 14))
+                // Image(systemName: systemImage)
+                //     .foregroundColor(.secondary)
+                //     .font(.system(size: 14))
                 Text(title)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             Text(value)
-                .font(.title3)
+                .font(.caption)
                 .fontWeight(.semibold)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

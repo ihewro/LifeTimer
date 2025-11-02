@@ -92,6 +92,11 @@ struct SystemEvent: Codable, Identifiable {
         guard let durationString = data["duration"] else { return nil }
         return TimeInterval(durationString)
     }
+
+    // 通过 bundle_id 快捷访问（如果存在）
+    var bundleId: String? {
+        return data["bundle_id"]
+    }
 }
 
 /// 应用使用统计
