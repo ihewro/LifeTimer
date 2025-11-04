@@ -66,6 +66,8 @@ class WindowManager: ObservableObject {
         if let visibleWindow = mainWindows.first(where: { $0.isVisible && !$0.isMiniaturized }) {
             NSLog("WindowManager: Found visible window, bringing to front")
             bringWindowToFront(visibleWindow)
+            // 兜底：在弹窗关闭可能抢占焦点的情况下，再次确保主窗口获得焦点
+            ensureMainWindowFrontMost(after: 0.05)
             return true
         }
         
@@ -74,6 +76,7 @@ class WindowManager: ObservableObject {
             NSLog("WindowManager: Found minimized window, deminiaturizing")
             minimizedWindow.deminiaturize(nil)
             bringWindowToFront(minimizedWindow)
+            ensureMainWindowFrontMost(after: 0.05)
             return true
         }
         
@@ -82,6 +85,7 @@ class WindowManager: ObservableObject {
             NSLog("WindowManager: Found hidden window, showing")
             hiddenWindow.setIsVisible(true)
             bringWindowToFront(hiddenWindow)
+            ensureMainWindowFrontMost(after: 0.05)
             return true
         }
         
