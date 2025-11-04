@@ -838,8 +838,11 @@ struct MenuBarPopoverView: View {
         } else if !searchText.isEmpty {
             currentTask = searchText
         }
-        isTaskSearchFocused = false
         isSuggestionVisible = false
+        // 将失焦操作延迟到下一次主线程循环，避免 macOS NSTextField 在立即失焦时选中文本的默认行为。
+        DispatchQueue.main.async {
+            isTaskSearchFocused = false
+        }
     }
     
     // MARK: - 专注时间按钮
@@ -926,12 +929,11 @@ struct MenuBarPopoverView: View {
     }
 
     private func openMainWindow() {
+        // 关闭弹窗
+        onClose()
         // 打开主窗口
         let windowManager = WindowManager.shared
         windowManager.showOrCreateMainWindow()
-        
-        // 关闭弹窗
-        onClose()
     }
 }
 
