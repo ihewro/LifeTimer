@@ -366,7 +366,7 @@ struct MenuBarPopoverView: View {
                         .padding(.vertical, 10)
                     }
                     // .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    // .tint(.green)
 
                     ForEach([10, 15, 30], id: \ .self) { minutes in
                         Button(action: {
@@ -403,7 +403,7 @@ struct MenuBarPopoverView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                 }
-                .tint(.blue)
+                // .tint(.blue)
             }
 
             // 底部按钮：菜单弹窗显示“打开主窗口”与“跳过”，提醒模式保持“稍后决定”
@@ -757,11 +757,11 @@ struct MenuBarPopoverView: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     focusTimeButton(minutes: 10)
-                    focusTimeButton(minutes: 20)
+                    focusTimeButton(minutes: 25)
                 }
                 HStack(spacing: 8) {
-                    focusTimeButton(minutes: 30)
-                    focusTimeButton(minutes: 40)
+                    focusTimeButton(minutes: 35)
+                    focusTimeButton(minutes: 45)
                 }
             }
         }

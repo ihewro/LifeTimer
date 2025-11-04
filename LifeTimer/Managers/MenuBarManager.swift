@@ -248,6 +248,7 @@ class MenuBarManager: NSObject, ObservableObject, NSPopoverDelegate {
     @objc private func statusItemClicked() {
         NSLog("MenuBarManager: Status item clicked")
 
+
         // 如果弹窗已经显示，则关闭它
         if let popover = popover, popover.isShown {
             closePopover()
