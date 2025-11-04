@@ -596,27 +596,27 @@ class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDe
         let addFiveAction = UNNotificationAction(
             identifier: addFiveMinutesActionId,
             title: "加5分钟",
-            options: []
+            options: [.foreground]
         )
 
         let startFiveAction = UNNotificationAction(
             identifier: startFiveMinutePomodoroActionId,
             title: "再来5分钟",
-            options: []
+            options: [.foreground]
         )
 
         let oneMinuteCategory = UNNotificationCategory(
             identifier: oneMinuteWarningCategoryId,
             actions: [addFiveAction],
             intentIdentifiers: [],
-            options: []
+            options: [.customDismissAction]
         )
 
         let completedCategory = UNNotificationCategory(
             identifier: pomodoroCompletedCategoryId,
             actions: [startFiveAction],
             intentIdentifiers: [],
-            options: []
+            options: [.customDismissAction]
         )
 
         UNUserNotificationCenter.current().setNotificationCategories([oneMinuteCategory, completedCategory])
@@ -634,6 +634,18 @@ class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDe
         content.subtitle = "进行当前工作的收尾流程吧！"
         content.sound = UNNotificationSound.default
         content.categoryIdentifier = oneMinuteWarningCategoryId
+        // 提升通知的打断等级以尽可能保持可见（系统仍可能受用户设置影响）
+        #if os(macOS)
+        if #available(macOS 12.0, *) {
+            content.interruptionLevel = .timeSensitive
+            content.relevanceScore = 1.0
+        }
+        #else
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .timeSensitive
+            content.relevanceScore = 1.0
+        }
+        #endif
 
         // 立即发送通知
         let request = UNNotificationRequest(
@@ -661,6 +673,18 @@ class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDe
         content.subtitle = "恭喜完成一个专注时段！"
         content.sound = UNNotificationSound.default
         content.categoryIdentifier = pomodoroCompletedCategoryId
+        // 提升通知的打断等级以尽可能保持可见（系统仍可能受用户设置影响）
+        #if os(macOS)
+        if #available(macOS 12.0, *) {
+            content.interruptionLevel = .timeSensitive
+            content.relevanceScore = 1.0
+        }
+        #else
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .timeSensitive
+            content.relevanceScore = 1.0
+        }
+        #endif
 
         // 立即发送通知
         let request = UNNotificationRequest(
