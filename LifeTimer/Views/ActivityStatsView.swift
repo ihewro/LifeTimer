@@ -196,10 +196,6 @@ struct ActivityStatsView: View {
             let apps = activityMonitor.getAppUsageStats(for: selectedDate)
             let systemEvents = activityMonitor.getSystemEvents(for: selectedDate)
 
-            // 更新概览数据
-            overviewActiveTime = overview.activeTime
-            overviewAppSwitches = overview.appSwitches
-
             // 过滤忽略应用并更新热门应用（Top 8）
             let filteredApps = apps.filter { !activityMonitor.appCategoryManager.isIgnoredApp($0.appName) }
             topApps = Array(filteredApps.prefix(8))
@@ -209,6 +205,12 @@ struct ActivityStatsView: View {
             let filteredSessions = allSessions.filter { !activityMonitor.appCategoryManager.isIgnoredApp($0.appName) }
             let recent = filteredSessions.sorted { $0.startTime > $1.startTime }
             recentSessions = Array(recent.prefix(8))
+
+            // 更新概览数据（遵循忽略应用过滤）
+            // 活跃时长：仅统计未被忽略应用的使用时长
+            overviewActiveTime = filteredApps.reduce(0) { $0 + $1.totalTime }
+            // 应用切换：仅统计未被忽略应用的会话数量（等价于未忽略的 appActivated 次数）
+            overviewAppSwitches = filteredSessions.count
 
             isLoading = false
         }
