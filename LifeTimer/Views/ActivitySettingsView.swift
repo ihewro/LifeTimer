@@ -518,10 +518,6 @@ struct ActivitySettingsView: View {
             Text("LifeTimer 系统监控模块")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-
-            Text("版本 1.0.0")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
         .padding(.horizontal, 20)
     }

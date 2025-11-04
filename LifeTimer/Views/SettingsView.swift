@@ -726,15 +726,17 @@ struct SettingsView: View {
                         HStack {
                             Text("版本")
                             Spacer()
-                            Text("1.0.0")
+                            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-")
                                 .foregroundColor(.secondary)
                         }
                         .padding(.horizontal, 20)
 
-                        // Button("反馈建议") {
-                        //     // 打开邮件或反馈页面
-                        // }
-                        // .padding(.horizontal, 20)
+                        Button("反馈建议") {
+                            if let url = URL(string: "https://github.com/ihewro/LifeTimer") {
+                                openURL(url)
+                            }
+                        }
+                        .padding(.horizontal, 20)
 
                         // Button("重置数据") {
                         //     // 重置所有数据
