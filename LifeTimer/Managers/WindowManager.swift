@@ -129,7 +129,8 @@ class WindowManager: ObservableObject {
     }
     
     /// 将窗口带到前台
-    private func bringWindowToFront(_ window: NSWindow) {
+    /// 使用 fileprivate 以便同文件内的通知管理器也可复用该方法
+    fileprivate func bringWindowToFront(_ window: NSWindow) {
         DispatchQueue.main.async {
             // 激活应用
             NSApp.activate(ignoringOtherApps: true)
@@ -139,6 +140,36 @@ class WindowManager: ObservableObject {
             window.orderFrontRegardless()
             
             NSLog("WindowManager: Window brought to front: \(window.title)")
+        }
+    }
+
+    /// 在创建主窗口后，确保其显示在最前面并成为 key window
+    /// 有些情况下（例如从菜单栏 Popover 触发），SwiftUI 的 openWindow 创建窗口后不会自动置顶，
+    /// 再加上弹窗关闭过程可能影响焦点，导致新窗口未在最前。此方法做一次兜底处理。
+    func ensureMainWindowFrontMost(after delay: TimeInterval = 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // 激活应用，避免其他 App 仍占据前台
+            NSApp.activate(ignoringOtherApps: true)
+
+            let windows = self.findMainWindows()
+            // 优先选择已可见且未最小化的窗口，否则选择最后一个（通常是新创建的）
+            let target = windows.first(where: { $0.isVisible && !$0.isMiniaturized }) ?? windows.last
+
+            if let target = target {
+                self.bringWindowToFront(target)
+                return
+            }
+
+            // 如果此时还未能拿到窗口（可能尚未完成创建），稍后重试一次
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                let laterWindows = self.findMainWindows()
+                if let laterTarget = laterWindows.first(where: { $0.isVisible && !$0.isMiniaturized }) ?? laterWindows.last {
+                    self.bringWindowToFront(laterTarget)
+                    NSLog("WindowManager: Retried ensuring front-most window")
+                } else {
+                    NSLog("WindowManager: Failed to ensure front-most window (no main windows found)")
+                }
+            }
         }
     }
     
@@ -181,6 +212,8 @@ class WindowNotificationManager {
         ) { _ in
             NSLog("WindowNotificationManager: Received CreateNewMainWindow notification")
             openWindow(WindowManager.mainWindowID)
+            // 兜底：确保新创建的主窗口位于最前并获得键盘焦点
+            WindowManager.shared.ensureMainWindowFrontMost(after: 0.05)
         }
 
         isSetup = true

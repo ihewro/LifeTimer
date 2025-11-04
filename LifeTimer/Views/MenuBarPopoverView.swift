@@ -410,6 +410,8 @@ struct MenuBarPopoverView: View {
             HStack(spacing: 12) {
                 if mode == .reminder {
                     Button("稍后决定") {
+                        let minutes = Int(smartReminderManager.reminderInterval)
+                        smartReminderManager.snoozeReminder(minutes: minutes)
                         onClose()
                     }
                     .buttonStyle(.bordered)
