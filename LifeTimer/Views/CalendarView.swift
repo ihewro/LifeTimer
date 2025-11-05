@@ -278,27 +278,31 @@ struct YearDayCell: View {
       ZStack {
         // Background shading according to task intensity
         RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .fill(Color.accentColor.opacity(shadeOpacity))
+          .fill(Color.accentColor.opacity(shadeOpacity * 0.35))
 
         // Day number with selection/today states
         Text("\(calendar.component(.day, from: date))")
           .font(.caption2)
-          .fontWeight(isSelected ? .bold : .regular)
+          .fontWeight(isSelected ? .semibold : .regular)
           .foregroundColor(
-            isSelected ? Color.white : (
+            isSelected ? Color.accentColor : (
               isCurrentMonth ? (isToday ? Color.accentColor : Color.primary) : Color.secondary
             )
           )
           .frame(width: 22, height: 22)
-          .background(
-            Circle()
-              .fill(isSelected ? Color.accentColor : Color.clear)
-          )
       }
       .frame(minHeight: 24)
+      .background(
+        Group {
+          if isSelected {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+              .fill(Color.accentColor.opacity(0.12))
+          }
+        }
+      )
       .overlay(
         RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .stroke(isSelected ? Color.accentColor.opacity(0.9) : Color.clear, lineWidth: 1)
+          .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
       )
       .opacity(isLoading ? 0.7 : 1.0)
       .contentShape(Rectangle())
@@ -408,7 +412,7 @@ struct YearView: View {
                   // 单击仅选择日期，双击打开当天事件 Popover
                   // 使用高优先级双击手势以确保与 Button 的单击行为不冲突
                   .highPriorityGesture(
-                  TapGesture(count: 2).onEnded {
+                  TapGesture(count: 1).onEnded {
                       selectedDate = day
                       popoverDate = day
                       // 记录触发弹窗的月份索引，确保只在对应月份的单元格上展示弹窗
@@ -1179,7 +1183,7 @@ struct CalendarView: View {
                         .frame(width: sidebarWidth)
                         .background(GlassEffectBackground())
                         .ignoresSafeArea(.container, edges: .top)
-                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+                        // 移除 selectedDate 动画以减少点击日期时的过度重绘
 
                     case .week:
                         VStack(spacing: 0) {
@@ -1199,7 +1203,7 @@ struct CalendarView: View {
                         .frame(width: sidebarWidth)
                         .background(GlassEffectBackground())
                         .ignoresSafeArea(.container, edges: .top)
-                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+                        // 移除 selectedDate 动画以减少点击日期时的过度重绘
 
                     case .month:
                         VStack(spacing: 0) {
@@ -1219,7 +1223,7 @@ struct CalendarView: View {
                         .frame(width: sidebarWidth)
                         .background(GlassEffectBackground())
                         .ignoresSafeArea(.container, edges: .top)
-                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+                        // 移除 selectedDate 动画以减少点击日期时的过度重绘
 
                     case .year:
                         VStack(spacing: 0) {
@@ -1234,7 +1238,7 @@ struct CalendarView: View {
                         .frame(width: sidebarWidth)
                         .background(GlassEffectBackground())
                         .ignoresSafeArea(.container, edges: .top)
-                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
+                        // 移除 selectedDate 动画以减少点击日期时的过度重绘
                     }
                 }
             }
@@ -1269,7 +1273,7 @@ struct CalendarView: View {
                     // 视图模式选择器（macOS 上强制等宽分布，避免高版本按内容分配导致不均匀）
                     #if os(macOS)
                     CalendarViewModeSegmentedPicker(selection: $currentViewMode)
-                        .frame(width: 400)
+                        .frame(width: 320)
                         .onChange(of: currentViewMode) { newMode in
                             // 视图模式切换时触发预加载
                             triggerPreloading(for: newMode)
