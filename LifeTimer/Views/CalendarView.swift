@@ -651,7 +651,6 @@ struct YearSidebarStats: View {
         .font(.caption)
       }
       .padding(12)
-      .background(GlassEffectBackground(radius: 12))
 
       Spacer()
     }
