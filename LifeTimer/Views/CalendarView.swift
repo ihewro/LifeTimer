@@ -236,6 +236,486 @@ struct WeekCurrentTimeIndicator: View {
     }
 }
 
+// MARK: - Year View Implementation
+
+// A compact day cell used inside the YearView grids. It reuses MiniDayCell's visual language
+// but adds background shading based on the day's task count intensity relative to the yearly max.
+struct YearDayCell: View {
+  let date: Date
+  @Binding var selectedDate: Date
+  let currentMonth: Date
+  let taskCount: Int
+  let maxTaskCount: Int
+  let isLoading: Bool
+
+  private let calendar = Calendar.current
+
+  private var isCurrentMonth: Bool {
+    calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
+  }
+
+  private var isToday: Bool {
+    calendar.isDateInToday(date)
+  }
+
+  private var isSelected: Bool {
+    calendar.isDate(date, inSameDayAs: selectedDate)
+  }
+
+  private var shadeOpacity: Double {
+    guard isCurrentMonth, maxTaskCount > 0, taskCount > 0 else { return 0 }
+    let normalized = min(1.0, Double(taskCount) / Double(maxTaskCount))
+    // Use square-root to compress dynamic range and keep low counts visible
+    let adjusted = sqrt(normalized)
+    // Keep a minimum visibility to hint low activity days
+    return max(0.15, adjusted * 0.85)
+  }
+
+  var body: some View {
+    Button(action: {
+      selectedDate = date
+    }) {
+      ZStack {
+        // Background shading according to task intensity
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(Color.accentColor.opacity(shadeOpacity))
+
+        // Day number with selection/today states
+        Text("\(calendar.component(.day, from: date))")
+          .font(.caption2)
+          .fontWeight(isSelected ? .bold : .regular)
+          .foregroundColor(
+            isSelected ? Color.white : (
+              isCurrentMonth ? (isToday ? Color.accentColor : Color.primary) : Color.secondary
+            )
+          )
+          .frame(width: 22, height: 22)
+          .background(
+            Circle()
+              .fill(isSelected ? Color.accentColor : Color.clear)
+          )
+      }
+      .frame(minHeight: 24)
+      .overlay(
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .stroke(isSelected ? Color.accentColor.opacity(0.9) : Color.clear, lineWidth: 1)
+      )
+      .opacity(isLoading ? 0.7 : 1.0)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(PlainButtonStyle())
+    .help(isCurrentMonth ? "\(taskCount) 个任务" : "")
+  }
+}
+
+struct YearView: View {
+  @EnvironmentObject var eventManager: EventManager
+  @EnvironmentObject var activityMonitorManager: ActivityMonitorManager
+
+  @Binding var selectedDate: Date
+  @Binding var highlightedEventId: UUID?
+
+  // Display vs Data year for smooth UX (like MonthView design)
+  @State private var displayYear: Date = Date()
+  @State private var dataYear: Date = Date()
+  @State private var isLoadingData: Bool = false
+  @State private var loadRequestId: Int = 0
+  // 预缓存每个月的 42 天网格，避免在 UI 线程上重复计算
+  @State private var monthDaysCache: [Int: [Date]] = [:]
+
+  // Per-day cache of events and counts for the year
+  @State private var dailyTaskCount: [Date: Int] = [:]
+  @State private var maxDailyTaskCount: Int = 0
+
+  // Popover states
+  @State private var showingDayEventsPopover: Bool = false
+  @State private var popoverDate: Date = Date()
+  @State private var popoverMonthIndex: Int? = nil
+
+  private let calendar = Calendar.current
+
+  var body: some View {
+    VStack(spacing: 8) {
+      yearNavigationView
+
+      // 键盘快捷键：空格/回车打开所选日期的 Popover
+      // 这里使用两个不可见按钮分别绑定空格与回车按键，触发弹窗显示
+      HStack(spacing: 0) {
+        Button(action: {
+          popoverDate = selectedDate
+          // 键盘触发时，根据选中日期计算月份索引，避免同一天在两个月份出现时弹出多个 popover
+          popoverMonthIndex = calendar.component(.month, from: selectedDate) - 1
+          showingDayEventsPopover = true
+        }) {
+          Text("")
+        }
+        .keyboardShortcut(.space, modifiers: [])
+        .frame(width: 0, height: 0)
+        .opacity(0.001)
+
+        Button(action: {
+          popoverDate = selectedDate
+          // 键盘触发时，根据选中日期计算月份索引，避免同一天在两个月份出现时弹出多个 popover
+          popoverMonthIndex = calendar.component(.month, from: selectedDate) - 1
+          showingDayEventsPopover = true
+        }) {
+          Text("")
+        }
+        .keyboardShortcut(.return, modifiers: [])
+        .frame(width: 0, height: 0)
+        .opacity(0.001)
+      }
+
+      // 始终显示全年网格；在加载时上方显示提示，不再隐藏网格
+      ZStack(alignment: .top) {
+        ScrollView {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+          ForEach(0..<12, id: \.self) { monthIndex in
+            let monthDate = monthStart(for: displayYear, monthIndex: monthIndex)
+            VStack(spacing: 6) {
+              // Month header
+              HStack {
+                Text(monthLabel(for: monthDate))
+                  .font(.headline)
+                  .foregroundColor(.primary)
+                Spacer()
+              }
+
+              // Weekday header
+              HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { i in
+                  Text(weekdaySymbol(i))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                }
+              }
+
+              // Month 7x6 grid（优先使用后台线程预计算的缓存，避免在主线程上重复日期计算）
+              let days = monthDaysCache[monthIndex] ?? monthDays(for: monthDate)
+              LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
+                ForEach(days, id: \.self) { day in
+                  // day 为午夜时间，直接作为键使用，避免在主线程重复计算 startOfDay
+                  let count = dailyTaskCount[day] ?? 0
+                  YearDayCell(
+                    date: day,
+                    selectedDate: $selectedDate,
+                    currentMonth: monthDate,
+                    taskCount: count,
+                    maxTaskCount: maxDailyTaskCount,
+                    isLoading: isLoadingData
+                  )
+                  // 单击仅选择日期，双击打开当天事件 Popover
+                  // 使用高优先级双击手势以确保与 Button 的单击行为不冲突
+                  .highPriorityGesture(
+                  TapGesture(count: 2).onEnded {
+                      selectedDate = day
+                      popoverDate = day
+                      // 记录触发弹窗的月份索引，确保只在对应月份的单元格上展示弹窗
+                      popoverMonthIndex = monthIndex
+                      showingDayEventsPopover = true
+                  }
+                )
+                  // 将 Popover 附着在具体的单元格上，确保显示在“单元格旁边”
+                  .popover(
+                  isPresented: Binding<Bool>(
+                    get: {
+                      showingDayEventsPopover &&
+                      calendar.isDate(popoverDate, inSameDayAs: day) &&
+                      popoverMonthIndex == monthIndex
+                    },
+                    set: { newValue in
+                      if !newValue {
+                        showingDayEventsPopover = false
+                        popoverMonthIndex = nil
+                      }
+                    }
+                  ),
+                  attachmentAnchor: .point(.trailing),
+                  arrowEdge: .trailing
+                  ) {
+                    DayEventsPopover(
+                      date: day,
+                      selectedEvent: .constant(nil),
+                      showingEventDetail: .constant(false)
+                    )
+                    .environmentObject(eventManager)
+                  }
+                }
+              }
+            }
+            .padding(8)
+            .background(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.systemBackground.opacity(0.7))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+            )
+          }
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+        if isLoadingData {
+          HStack(spacing: 8) {
+            ProgressView()
+            Text("正在加载全年数据…")
+              .font(.footnote)
+              .foregroundColor(.secondary)
+          }
+          .padding(8)
+          .background(Color.systemBackground.opacity(0.9))
+          .cornerRadius(8)
+          .padding(.top, 4)
+        }
+      }
+    }
+    }
+    .onAppear {
+      displayYear = startOfYear(for: selectedDate)
+      dataYear = displayYear
+      loadYearData(for: displayYear)
+    }
+    .onChange(of: selectedDate) { newValue in
+      let newYear = startOfYear(for: newValue)
+      if !calendar.isDate(newYear, inSameDayAs: displayYear) {
+        displayYear = newYear
+      }
+      // If user navigates to a different year, refresh data
+      if !calendar.isDate(newYear, inSameDayAs: dataYear) {
+        loadYearData(for: newYear)
+      }
+    }
+  }
+
+  // MARK: - Header
+  private var yearNavigationView: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Text(yearLabel(for: displayYear))
+        .font(.title)
+        .fontWeight(.semibold)
+        .foregroundColor(.primary)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func navigateYear(_ delta: Int) {
+    guard let next = calendar.date(byAdding: .year, value: delta, to: displayYear) else { return }
+    displayYear = next
+    selectedDate = next
+    loadYearData(for: next)
+  }
+
+  // MARK: - Data Loading
+  private func loadYearData(for yearDate: Date) {
+    // 增加请求 ID，确保仅最新一次请求会更新 UI（防止快速切换年份导致旧数据覆盖）
+    let requestId = loadRequestId + 1
+    loadRequestId = requestId
+    isLoadingData = true
+    let start = startOfYear(for: yearDate)
+    guard let end = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: start) else {
+      DispatchQueue.main.async {
+        if self.loadRequestId == requestId { self.isLoadingData = false }
+      }
+      return
+    }
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let events = eventManager.eventsInDateRange(from: start, to: end)
+      var perDay: [Date: [PomodoroEvent]] = [:]
+      events.forEach { event in
+        let key = calendar.startOfDay(for: event.startTime)
+        perDay[key, default: []].append(event)
+      }
+      let counts = perDay.mapValues { $0.count }
+      let maxCount = counts.values.max() ?? 0
+
+      // 预计算全年每个月的日期网格（42 天），在后台线程完成，避免阻塞 UI
+      var monthsDays: [Int: [Date]] = [:]
+      for monthIndex in 0..<12 {
+        let mStart = monthStart(for: yearDate, monthIndex: monthIndex)
+        monthsDays[monthIndex] = monthDays(for: mStart)
+      }
+
+      DispatchQueue.main.async {
+        // 只在请求 ID 与当前一致时更新 UI，避免旧数据覆盖新导航
+        guard self.loadRequestId == requestId else { return }
+        self.dailyTaskCount = counts
+        self.maxDailyTaskCount = maxCount
+        self.monthDaysCache = monthsDays
+        self.isLoadingData = false
+        self.dataYear = yearDate
+      }
+    }
+  }
+
+  // MARK: - Helpers
+  private func startOfYear(for date: Date) -> Date {
+    let comps = calendar.dateComponents([.year], from: date)
+    return calendar.date(from: comps) ?? date
+  }
+
+  private func monthStart(for yearDate: Date, monthIndex: Int) -> Date {
+    var comps = calendar.dateComponents([.year], from: yearDate)
+    comps.month = monthIndex + 1
+    comps.day = 1
+    return calendar.date(from: comps) ?? yearDate
+  }
+
+  private func monthDays(for month: Date) -> [Date] {
+    guard let monthInterval = calendar.dateInterval(of: .month, for: month) else { return [] }
+    // Start from the beginning of the week containing the first day
+    let firstWeekStart = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: monthInterval.start)) ?? monthInterval.start
+    var days: [Date] = []
+    for i in 0..<42 {
+      if let day = calendar.date(byAdding: .day, value: i, to: firstWeekStart) {
+        days.append(day)
+      }
+    }
+    return days
+  }
+
+  private func monthLabel(for date: Date) -> String {
+    let m = calendar.component(.month, from: date)
+    return "\(m)月"
+  }
+
+  private func weekdaySymbol(_ index: Int) -> String {
+    // Assuming the app uses Chinese locale with Sunday-first
+    let symbols = ["日", "一", "二", "三", "四", "五", "六"]
+    return symbols[index]
+  }
+
+  private func yearLabel(for date: Date) -> String {
+    let y = calendar.component(.year, from: date)
+    return "\(y)年"
+  }
+}
+
+struct YearSidebarStats: View {
+  @EnvironmentObject var eventManager: EventManager
+  @Binding var selectedDate: Date
+
+  @State private var totalPomodoroCount: Int = 0
+  @State private var totalFocusDuration: TimeInterval = 0
+  @State private var displayYear: Date = Date()
+  @State private var isLoadingStats: Bool = false
+
+  private let calendar = Calendar.current
+
+  var body: some View {
+    VStack(spacing: 12) {
+      // Navigation
+      CalendarNavigationToolbar(viewMode: .year, selectedDate: $selectedDate, todayLabel: "今天")
+
+      VStack(alignment: .leading, spacing: 8) {
+        if isLoadingStats {
+          HStack(spacing: 8) {
+            ProgressView()
+            Text("正在统计…")
+              .font(.footnote)
+              .foregroundColor(.secondary)
+          }
+        }
+
+        Text("活动概览")
+          .font(.subheadline)
+          .fontWeight(.medium)
+
+        VStack(spacing: 8) {
+          HStack {
+            Image(systemName: "timer")
+              .foregroundColor(.blue)
+            Text("专注时长")
+            Spacer()
+            Text(formatTime(totalFocusDuration))
+              .fontWeight(.medium)
+          }
+
+          HStack {
+            Image(systemName: "calendar.badge.clock")
+              .foregroundColor(.green)
+            Text("番茄个数")
+            Spacer()
+            Text("\(totalPomodoroCount) 个")
+              .fontWeight(.medium)
+          }
+        }
+        .font(.caption)
+      }
+      .padding(12)
+      .background(GlassEffectBackground(radius: 12))
+
+      Spacer()
+    }
+    .onAppear {
+      displayYear = startOfYear(for: selectedDate)
+      reloadStats()
+    }
+    .onChange(of: selectedDate) { _ in
+      let y = startOfYear(for: selectedDate)
+      if !calendar.isDate(y, inSameDayAs: displayYear) {
+        displayYear = y
+        reloadStats()
+      }
+    }
+  }
+
+  private func navigateYear(_ delta: Int) {
+    guard let next = calendar.date(byAdding: .year, value: delta, to: displayYear) else { return }
+    displayYear = next
+    selectedDate = next
+    reloadStats()
+  }
+
+  private func reloadStats() {
+    let start = startOfYear(for: displayYear)
+    guard let end = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: start) else { return }
+
+    // 后台线程统计，避免阻塞UI
+    isLoadingStats = true
+    DispatchQueue.global(qos: .userInitiated).async {
+      let events = eventManager.eventsInDateRange(from: start, to: end)
+      let completedPomodoros = events.filter { $0.type == PomodoroEvent.EventType.pomodoro && $0.isCompleted }
+      let count = completedPomodoros.count
+      let duration = completedPomodoros.reduce(0) { partial, e in
+        partial + max(0, e.endTime.timeIntervalSince(e.startTime))
+      }
+
+      DispatchQueue.main.async {
+        self.totalPomodoroCount = count
+        self.totalFocusDuration = duration
+        self.isLoadingStats = false
+      }
+    }
+  }
+
+  private func startOfYear(for date: Date) -> Date {
+    let comps = calendar.dateComponents([.year], from: date)
+    return calendar.date(from: comps) ?? date
+  }
+
+  private func yearLabel(for date: Date) -> String {
+    let y = calendar.component(.year, from: date)
+    return "\(y)年"
+  }
+
+  // Reuse the app's time formatting logic
+  private func formatTime(_ interval: TimeInterval) -> String {
+    let totalMinutes = Int(interval) / 60
+    let hours = totalMinutes / 60
+    let minutes = totalMinutes % 60
+    if hours > 0 {
+      return "\(hours)h\(minutes)m"
+    } else {
+      return "\(minutes)m"
+    }
+  }
+}
+
 /// 周视图时间指示器覆盖层 - 跨越整个周视图宽度
 struct WeekTimeIndicatorOverlay: View {
     let hourHeight: CGFloat
@@ -323,12 +803,14 @@ enum CalendarViewMode: String, CaseIterable {
     case day = "日"
     case week = "周"
     case month = "月"
+    case year = "年"
 
     var icon: String {
         switch self {
         case .day: return "calendar.day.timeline.left"
         case .week: return "calendar"
         case .month: return "calendar.month"
+        case .year: return "calendar"
         }
     }
 }
@@ -503,6 +985,7 @@ struct SearchResultRow: View {
 struct CalendarNavigationToolbar: View {
     let viewMode: CalendarViewMode
     @Binding var selectedDate: Date
+    var todayLabel: String = "今天"
 
     private let calendar = Calendar.current
 
@@ -521,6 +1004,9 @@ struct CalendarNavigationToolbar: View {
         case .month:
             let today = Date()
             return calendar.isDate(selectedDate, equalTo: today, toGranularity: .month)
+        case .year:
+            let today = Date()
+            return calendar.isDate(selectedDate, equalTo: today, toGranularity: .year)
         }
     }
 
@@ -535,7 +1021,7 @@ struct CalendarNavigationToolbar: View {
 
             // 今天按钮
             Button(action: goToToday) {
-                Text("今天")
+                Text(todayLabel)
             }
             .controlSize(.small)
             .disabled(isToday)
@@ -564,6 +1050,8 @@ struct CalendarNavigationToolbar: View {
             selectedDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
         case .month:
             selectedDate = calendar.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        case .year:
+            selectedDate = calendar.date(byAdding: .year, value: -1, to: selectedDate) ?? selectedDate
         }
     }
 
@@ -576,6 +1064,8 @@ struct CalendarNavigationToolbar: View {
             selectedDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
         case .month:
             selectedDate = calendar.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate
+        case .year:
+            selectedDate = calendar.date(byAdding: .year, value: 1, to: selectedDate) ?? selectedDate
         }
     }
 }
@@ -633,6 +1123,15 @@ struct CalendarView: View {
                         case .month:
                             MonthView(
                                 viewMode: currentViewMode,
+                                selectedDate: $selectedDate,
+                                highlightedEventId: $highlightedEventId
+                            )
+                            .environmentObject(eventManager)
+                            .environmentObject(activityMonitor)
+                            .background(Color.systemBackground)
+
+                        case .year:
+                            YearView(
                                 selectedDate: $selectedDate,
                                 highlightedEventId: $highlightedEventId
                             )
@@ -721,6 +1220,21 @@ struct CalendarView: View {
                         .background(GlassEffectBackground())
                         .ignoresSafeArea(.container, edges: .top)
                         .animation(.easeInOut(duration: 0.3), value: selectedDate)
+
+                    case .year:
+                        VStack(spacing: 0) {
+                            // 年视图侧栏不显示 MiniCalendarView
+                            YearSidebarStats(selectedDate: $selectedDate)
+                                .environmentObject(eventManager)
+                                .environmentObject(activityMonitor)
+                                .frame(maxHeight: .infinity)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                        .padding(.top, 64)
+                        .frame(width: sidebarWidth)
+                        .background(GlassEffectBackground())
+                        .ignoresSafeArea(.container, edges: .top)
+                        .animation(.easeInOut(duration: 0.3), value: selectedDate)
                     }
                 }
             }
@@ -755,7 +1269,7 @@ struct CalendarView: View {
                     // 视图模式选择器（macOS 上强制等宽分布，避免高版本按内容分配导致不均匀）
                     #if os(macOS)
                     CalendarViewModeSegmentedPicker(selection: $currentViewMode)
-                        .frame(width: 300)
+                        .frame(width: 400)
                         .onChange(of: currentViewMode) { newMode in
                             // 视图模式切换时触发预加载
                             triggerPreloading(for: newMode)
@@ -834,12 +1348,17 @@ struct CalendarView: View {
         }
     }
 
-    /// 执行智能预加载
-    @MainActor
+    /// 执行智能预加载（非主线程）
     private func performSmartPreloading(for viewMode: CalendarViewMode, date: Date) async {
+        // 年视图本身会加载全年数据，这里跳过预加载以避免重复计算
+        if viewMode == .year {
+            return
+        }
+
+        // 生成预加载日期列表（在后台执行）
         let preloadDates = generatePreloadDates(for: viewMode, around: date)
 
-        // 预热EventManager缓存
+        // 预热EventManager缓存（内部已在自有队列异步执行）
         eventManager.warmupCache(for: preloadDates)
 
         // 在后台线程预加载数据，避免阻塞UI
@@ -896,6 +1415,9 @@ struct CalendarView: View {
                     }
                 }
             }
+        case .year:
+            // 年视图不进行额外预加载，避免重复计算造成卡顿
+            break
         }
 
         return dates
@@ -3938,7 +4460,7 @@ struct GlassEffectBackground: View {
             #if os(macOS)
             // macOS 使用材质效果，为未来的 glassEffect 做准备
 //            if #available(macOS 26.0, *) {
-//                // 未来版本可以使用 glassEffect (当 API 可用时)
+               // 未来版本可以使用 glassEffect (当 API 可用时)
                // Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
 //            } else {
                 // 当前版本使用增强的材质效果，模拟玻璃效果
