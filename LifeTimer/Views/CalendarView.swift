@@ -335,6 +335,9 @@ struct YearView: View {
   @State private var showingDayEventsPopover: Bool = false
   @State private var popoverDate: Date = Date()
   @State private var popoverMonthIndex: Int? = nil
+  // 事件详情弹窗与选中事件（与月视图保持一致）
+  @State private var showingEventDetailPopover: Bool = false
+  @State private var popoverEvent: PomodoroEvent?
 
   private let calendar = Calendar.current
 
@@ -440,8 +443,8 @@ struct YearView: View {
                   ) {
                     DayEventsPopover(
                       date: day,
-                      selectedEvent: .constant(nil),
-                      showingEventDetail: .constant(false)
+                      selectedEvent: $popoverEvent,
+                      showingEventDetail: $showingEventDetailPopover
                     )
                     .environmentObject(eventManager)
                   }
@@ -613,7 +616,7 @@ struct YearSidebarStats: View {
   var body: some View {
     VStack(spacing: 12) {
       // Navigation
-      CalendarNavigationToolbar(viewMode: .year, selectedDate: $selectedDate, todayLabel: "今天")
+        CalendarNavigationToolbar(viewMode: .year, selectedDate: $selectedDate, todayLabel: "今天").padding(.horizontal,16)
 
       VStack(alignment: .leading, spacing: 8) {
         if isLoadingStats {
@@ -4309,6 +4312,7 @@ struct EventDetailPopover: View {
                         .foregroundColor(.secondary)
                     TextField("事件标题", text: $title)
                         .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 300)
                 }
 
                 // 事件类型
