@@ -596,13 +596,13 @@ class SoundEffectManager: NSObject, ObservableObject, UNUserNotificationCenterDe
         let addFiveAction = UNNotificationAction(
             identifier: addFiveMinutesActionId,
             title: "加5分钟",
-            options: [.foreground]
+            options: []
         )
 
         let startFiveAction = UNNotificationAction(
             identifier: startFiveMinutePomodoroActionId,
             title: "再来5分钟",
-            options: [.foreground]
+            options: []
         )
 
         let oneMinuteCategory = UNNotificationCategory(
