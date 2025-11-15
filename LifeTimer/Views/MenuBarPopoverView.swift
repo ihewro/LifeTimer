@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Foundation
 #if canImport(Cocoa)
 import Cocoa
 #endif
@@ -204,6 +205,9 @@ struct MenuBarPopoverView: View {
             // 专注时间按钮网格
             focusTimeGrid
 
+            // 休息时间按钮网格
+            restTimeGrid
+
             // 底部按钮
             HStack(spacing: 12) {
                 if mode == .reminder {
@@ -284,6 +288,7 @@ struct MenuBarPopoverView: View {
                     .disabled(!timerModel.canAdjustTime())
                 }
 
+
                 // 状态指示
                 if timerModel.timerState == .paused {
                     Text("已暂停")
@@ -294,13 +299,39 @@ struct MenuBarPopoverView: View {
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(4)
                 } else if timerModel.timerState == .running {
-                    Text(timerModel.currentMode == .pureRest ? "休息中..." : "专注中...")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.green.opacity(0.1))
-                        .cornerRadius(4)
+                    HStack(spacing: 8) {
+                        Text(timerModel.currentMode == .pureRest ? "休息中..." : "专注中...")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(4)
+                        if let endText = formattedEndTime() {
+                            Text("结束 \(endText)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                VStack(spacing: 8) {
+                    // Text("快捷选择")
+                    //     .font(.caption)
+                    //     .foregroundColor(.secondary)
+
+                    HStack(spacing: 8) {
+                        ForEach([5, 10, 15, 20], id: \.self) { inc in
+                            Button("\(inc)分钟") {
+                                if timerModel.canAdjustTime() {
+                                    timerModel.adjustCurrentTime(by: inc)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(!timerModel.canAdjustTime())
+                        }
+                    }
                 }
             }
 
@@ -767,6 +798,21 @@ struct MenuBarPopoverView: View {
         }
     }
 
+    private var restTimeGrid: some View {
+        VStack(spacing: 8) {
+            Text("选择休息时间")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 8) {
+                restTimeButton(minutes: 5)
+                restTimeButton(minutes: 20)
+                restTimeButton(minutes: 40)
+                restTimeButton(minutes: 60)
+            }
+        }
+    }
+
     // MARK: - 联想数据与搜索逻辑
     private func loadTaskSuggestionData() {
         // 取消之前的数据任务
@@ -859,9 +905,28 @@ struct MenuBarPopoverView: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 6)
         }
         // .buttonStyle(.borderedProminent)
+        .controlSize(.regular)
+    }
+
+    private func restTimeButton(minutes: Int) -> some View {
+        Button(action: {
+            startBreak(minutes: minutes)
+        }) {
+            VStack(spacing: 4) {
+                // Text("\(minutes)")
+                //     .font(.title2)
+                    // .fontWeight(.semibold)
+                Text("\(minutes)分钟")
+                    .font(.caption)
+                    // .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+        }
         .controlSize(.regular)
     }
     
@@ -901,6 +966,26 @@ struct MenuBarPopoverView: View {
         timerModel.resetTimer()
         timerModel.startTimer()
         onClose()
+    }
+
+    private func startBreak(minutes: Int) {
+        timerModel.resetTimer()
+        timerModel.currentMode = .pureRest
+        timerModel.setCustomTime(minutes: minutes)
+        timerModel.startTimer()
+        onClose()
+    }
+
+    private func formattedEndTime() -> String? {
+        switch timerModel.currentMode {
+        case .singlePomodoro, .pureRest, .custom:
+            let endDate = Date().addingTimeInterval(timerModel.timeRemaining)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: endDate)
+        case .countUp:
+            return nil
+        }
     }
 
     /// 处理空格键按下事件（与主界面逻辑保持一致）

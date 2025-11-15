@@ -43,6 +43,7 @@
 		WEEKSBAR001122334455667788 /* WeekSidebarStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = WEEKSBAR001122334455667799 /* WeekSidebarStats.swift */; };
 		MONTHSBAR001122334455667788 /* MonthSidebarStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = MONTHSBAR001122334455667799 /* MonthSidebarStats.swift */; };
 		GHOTKEY001122334455667788 /* GlobalHotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = GHOTKEY001122334455667799 /* GlobalHotKeyManager.swift */; };
+		SHORTCUT001122334455667788 /* ShortcutRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = SHORTCUT001122334455667799 /* ShortcutRunner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +85,7 @@
 		WEEKSBAR001122334455667799 /* WeekSidebarStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekSidebarStats.swift; sourceTree = "<group>"; };
 		MONTHSBAR001122334455667799 /* MonthSidebarStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthSidebarStats.swift; sourceTree = "<group>"; };
 		GHOTKEY001122334455667799 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
+		SHORTCUT001122334455667799 /* ShortcutRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRunner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +179,7 @@
 				SYNC001122334455667788FF /* APIClient.swift */,
 				AUTH001122334455667788BB /* AuthManager.swift */,
 				GHOTKEY001122334455667799 /* GlobalHotKeyManager.swift */,
+				SHORTCUT001122334455667799 /* ShortcutRunner.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -309,6 +312,7 @@
 				WEEKSBAR001122334455667788 /* WeekSidebarStats.swift in Sources */,
 				MONTHSBAR001122334455667788 /* MonthSidebarStats.swift in Sources */,
 				GHOTKEY001122334455667788 /* GlobalHotKeyManager.swift in Sources */,
+				SHORTCUT001122334455667788 /* ShortcutRunner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

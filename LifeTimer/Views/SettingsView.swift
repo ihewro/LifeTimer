@@ -105,6 +105,8 @@ struct SettingsView: View {
     @AppStorage("GlobalHotKeyModifier") private var globalHotKeyModifier: String = "control" // control | option | command
     @AppStorage("ShowDockIcon") private var showDockIcon: Bool = true
 
+    @AppStorage("ShortcutsEnabled") private var shortcutsEnabled: Bool = false
+
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -590,6 +592,30 @@ struct SettingsView: View {
                             .buttonStyle(.bordered)
                         }
                         .padding(.horizontal, 20)
+                    }
+                    .padding(.vertical, 12)
+                    .background(Color.systemBackground)
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("快捷指令")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("是否开启快捷指令")
+                            Spacer()
+                            Toggle("", isOn: $shortcutsEnabled)
+                        }
+                        .padding(.horizontal, 20)
+
+                        Text("说明：开启后，请在“快捷指令”App创建一个名称为“LifeTimer”的快捷指令，并根据传入的 input 执行对应的操作：tomato（番茄）、timing（正计时）、rest（休息）、cancel（取消）、complete（结束）")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
                     .background(Color.systemBackground)

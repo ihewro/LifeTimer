@@ -150,6 +150,8 @@ struct ContentView: View {
                 // .frame(minWidth: 500, minHeight: 300)
                 // .interactiveDismissDisabled(true) // 禁止通过手势关闭，确保用户必须做出选择
         }
+        // 强制控件使用激活态外观，避免在 accessory 模式下出现侧边栏与控件灰态
+        .environment(\.controlActiveState, .key)
         // 智能提醒弹窗 - macOS 使用独立窗口，不需要 sheet
         #else
         // iOS 版本使用 TabView

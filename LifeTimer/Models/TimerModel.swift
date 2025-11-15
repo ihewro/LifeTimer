@@ -179,6 +179,8 @@ class TimerModel: ObservableObject {
                 self?.updateTimer()
             }
         }
+
+        ShortcutRunner.shared.runIfEnabled(for: .start, mode: currentMode)
     }
     
     func pauseTimer() {
@@ -192,9 +194,11 @@ class TimerModel: ObservableObject {
 
         // 暂停计时器时暂停音乐
         audioManager?.pauseTimerPlayback()
+
     }
 
     func resetTimer() {
+        let previousState = timerState
         timerState = .idle
 
         // 安全地停止定时器
@@ -212,6 +216,10 @@ class TimerModel: ObservableObject {
 
         // 重置计时器时停止音乐
         audioManager?.stopTimerPlayback()
+
+        if previousState == .running || previousState == .paused {
+            ShortcutRunner.shared.runIfEnabled(for: .stop, mode: currentMode)
+        }
     }
     
     func changeMode(_ mode: TimerMode) {
@@ -288,6 +296,8 @@ class TimerModel: ObservableObject {
         } else {
             resetTimer()
         }
+
+        ShortcutRunner.shared.runIfEnabled(for: .stop, mode: currentMode)
     }
     
     private func updateTimer() {
@@ -359,6 +369,8 @@ class TimerModel: ObservableObject {
                 }
             }
         }
+
+        ShortcutRunner.shared.runIfEnabled(for: .complete, mode: currentMode)
     }
 
     // 自动开始休息
@@ -531,12 +543,11 @@ class TimerModel: ObservableObject {
 
     // 动态调整当前计时时间（仅在番茄模式运行时可用）
     func adjustCurrentTime(by minutes: Int) {
-        guard currentMode == .singlePomodoro && timerState == .running else { return }
+        guard (currentMode == .singlePomodoro || currentMode == .pureRest) && timerState == .running else { return }
 
         let adjustment = TimeInterval(minutes * 60)
         let newTimeRemaining = timeRemaining + adjustment
 
-        // 防止时间调整到负值
         guard newTimeRemaining > 0 else { return }
 
         timeRemaining = newTimeRemaining
@@ -545,7 +556,7 @@ class TimerModel: ObservableObject {
 
     // 检查是否可以进行时间调整
     func canAdjustTime() -> Bool {
-        return currentMode == .singlePomodoro && timerState == .running
+        return (currentMode == .singlePomodoro || currentMode == .pureRest) && timerState == .running
     }
 
     // 提前结束当前番茄钟（将已计时的时间作为完整的番茄时间）
