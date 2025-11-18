@@ -53,6 +53,38 @@ class ShortcutRunner {
 
     private func run(name: String, input: String) {
         #if os(macOS)
+        if FileManager.default.fileExists(atPath: "/usr/bin/shortcuts") {
+            runViaCLI(name: name, input: input)
+        } else {
+            runViaURL(name: name, input: input)
+        }
+        #endif
+    }
+
+    private func runViaCLI(name: String, input: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+        process.arguments = ["run", name, "-i", "-"]
+
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = outPipe
+
+        let inPipe = Pipe()
+        process.standardInput = inPipe
+        if let data = (input as NSString).data(using: String.Encoding.utf8.rawValue) {
+            inPipe.fileHandleForWriting.write(data)
+            try? inPipe.fileHandleForWriting.close()
+        }
+
+        do {
+            try process.run()
+        } catch {
+            runViaURL(name: name, input: input)
+        }
+    }
+
+    private func runViaURL(name: String, input: String) {
         var components = URLComponents()
         components.scheme = "shortcuts"
         components.host = "run-shortcut"
@@ -63,6 +95,5 @@ class ShortcutRunner {
         if let url = components.url {
             NSWorkspace.shared.open(url)
         }
-        #endif
     }
 }
