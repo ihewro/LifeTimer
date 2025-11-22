@@ -422,19 +422,12 @@ struct MenuBarPopoverView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button(action: {
-                    startBreak()
-                }) {
-                    HStack {
-                        Image(systemName: "cup.and.saucer")
-                        Text("休息 \(Int(timerModel.getCurrentBreakTime() / 60)) 分钟")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                HStack(spacing: 8) {
+                    restTimeButton(minutes: 5)
+                    restTimeButton(minutes: 20)
+                    restTimeButton(minutes: 40)
+                    restTimeButton(minutes: 60)
                 }
-                // .tint(.blue)
             }
 
             // 底部按钮：菜单弹窗显示“打开主窗口”与“跳过”，提醒模式保持“稍后决定”
@@ -933,6 +926,9 @@ struct MenuBarPopoverView: View {
     // MARK: - 操作方法
     
     private func startFocus(minutes: Int) {
+        if !searchText.isEmpty {
+            currentTask = searchText
+        }
         timerModel.resetTimer()
         timerModel.setCustomTime(minutes: minutes)
         timerModel.currentMode = .singlePomodoro
@@ -946,6 +942,9 @@ struct MenuBarPopoverView: View {
     }
 
     private func startPomodoro(minutes: Int) {
+        if !searchText.isEmpty {
+            currentTask = searchText
+        }
         // 先重置计时器状态，这样setCustomTime才能正常工作
         timerModel.resetTimer()
         timerModel.setCustomTime(minutes: minutes)
@@ -961,6 +960,9 @@ struct MenuBarPopoverView: View {
     }
 
     private func startBreak() {
+        if !searchText.isEmpty {
+            currentTask = searchText
+        }
         timerModel.isBreakFromPomodoro = true
         timerModel.currentMode = .pureRest
         timerModel.resetTimer()
@@ -969,6 +971,9 @@ struct MenuBarPopoverView: View {
     }
 
     private func startBreak(minutes: Int) {
+        if !searchText.isEmpty {
+            currentTask = searchText
+        }
         timerModel.resetTimer()
         timerModel.currentMode = .pureRest
         timerModel.setCustomTime(minutes: minutes)
