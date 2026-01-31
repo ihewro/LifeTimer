@@ -380,26 +380,9 @@ struct MenuBarPopoverView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 使用上次时长 + 快速选择
+                // 快速选择
                 HStack(spacing: 8) {
-                    Button(action: {
-                        startPomodoro(minutes: Int(timerModel.getCurrentPomodoroTime() / 60))
-                    }) {
-                        VStack(spacing: 4) {
-                            Text("上次时长")
-                                .font(.caption)
-                                // .foregroundColor(.secondary)
-                            Text("\(Int(timerModel.getCurrentPomodoroTime() / 60))分钟")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                    }
-                    // .buttonStyle(.borderedProminent)
-                    // .tint(.green)
-
-                    ForEach([10, 15, 30], id: \ .self) { minutes in
+                    ForEach([15, 30, 45, 60], id: \.self) { minutes in
                         Button(action: {
                             startPomodoro(minutes: minutes)
                         }) {

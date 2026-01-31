@@ -281,6 +281,17 @@ struct SettingsView: View {
                             ))
                         }
                         .padding(.horizontal, 20)
+                        
+                        // 休息结束后自动进入专注（使用上次设定的番茄时间）
+                        HStack {
+                            Text("休息结束后自动进入专注（用上次设定的番茄时间）")
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { timerModel.autoStartFocusAfterBreak },
+                                set: { timerModel.autoStartFocusAfterBreak = $0 }
+                            ))
+                        }
+                        .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 12)
                     .background(Color.systemBackground)

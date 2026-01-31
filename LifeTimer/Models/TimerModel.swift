@@ -101,7 +101,19 @@ class TimerModel: ObservableObject {
     // 自动休息设置
     @Published var autoStartBreak: Bool = false {
         didSet {
-            if autoStartBreak != oldValue {
+            if autoStartBreak != oldValue && !isLoadingSettings {
+                print("⚙️ autoStartBreak changed: \(oldValue) -> \(autoStartBreak)")
+                saveSettings()
+                notifySettingsChanged()
+            }
+        }
+    }
+
+    // 休息结束后自动进入专注设置
+    @Published var autoStartFocusAfterBreak: Bool = false {
+        didSet {
+            if autoStartFocusAfterBreak != oldValue && !isLoadingSettings {
+                print("⚙️ autoStartFocusAfterBreak changed: \(oldValue) -> \(autoStartFocusAfterBreak)")
                 saveSettings()
                 notifySettingsChanged()
             }
@@ -110,10 +122,18 @@ class TimerModel: ObservableObject {
 
     // 跟踪是否是从番茄模式进入的休息
     var isBreakFromPomodoro: Bool = false
+    
+    // 最近一次“设定的番茄时间”（秒），记录在开始番茄时的 planned 值
+    private var lastPlannedPomodoroDuration: TimeInterval = 25 * 60 {
+        didSet {
+            userDefaults.set(lastPlannedPomodoroDuration, forKey: lastPlannedPomodoroDurationKey)
+        }
+    }
 
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private let userDefaults = UserDefaults.standard
+    private var isLoadingSettings = false
 
     // 设置变更通知
     static let settingsChangedNotification = Notification.Name("TimerSettingsChanged")
@@ -123,9 +143,13 @@ class TimerModel: ObservableObject {
     private let shortBreakTimeKey = "ShortBreakTime"
     private let longBreakTimeKey = "LongBreakTime"
     private let autoStartBreakKey = "AutoStartBreak"
+    private let autoStartFocusAfterBreakKey = "AutoStartFocusAfterBreak"
+    private let lastPlannedPomodoroDurationKey = "LastPlannedPomodoroDuration"
 
     init() {
+        isLoadingSettings = true
         loadSettings()
+        isLoadingSettings = false
         setupTimer()
     }
     
@@ -161,6 +185,10 @@ class TimerModel: ObservableObject {
             // 如果用户设置了自定义任务，使用自定义任务
             if hasUserSetCustomTask {
                 sessionTask = userCustomTaskTitle
+            }
+            // 记录本次番茄的“设定时长”（不受运行时调整或提前结束影响）
+            if currentMode == .singlePomodoro {
+                lastPlannedPomodoroDuration = totalTime
             }
         }
 
@@ -348,24 +376,24 @@ class TimerModel: ObservableObject {
         ]
         NotificationCenter.default.post(name: .timerCompleted, object: self, userInfo: userInfo)
 
-        // 自动休息逻辑
-        if autoStartBreak {
-            if currentMode == .singlePomodoro {
-                // 番茄完成后自动开始休息
+        // 自动休息 / 自动专注逻辑
+        if currentMode == .singlePomodoro {
+            if autoStartBreak {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     self.startBreakAutomatically()
                 }
-            } else if currentMode == .pureRest {
-                // 休息完成后自动回到番茄模式
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.returnToPomodoroMode()
-                }
             }
-        } else {
-            // 即使没有开启自动休息，休息完成后也应该回到番茄模式
-            if currentMode == .pureRest && isBreakFromPomodoro {
+        } else if currentMode == .pureRest {
+            if autoStartFocusAfterBreak {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.returnToPomodoroMode()
+                    self.startFocusAfterBreakAutomatically()
+                }
+            } else {
+                // 未开启自动专注时，休息完成后回到番茄模式
+                if autoStartBreak || isBreakFromPomodoro {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.returnToPomodoroMode()
+                    }
                 }
             }
         }
@@ -381,6 +409,25 @@ class TimerModel: ObservableObject {
         timerState = .idle
         // 立即开始休息计时
         startTimer(with: "休息")
+    }
+
+    /// 休息结束后自动以“上次专注时间”开始番茄钟
+    /// - 使用 lastPlannedPomodoroDuration 作为当前会话番茄时长；若无记录则回退到当前实际番茄时间
+    /// - 保持用户自定义任务延续：startTimer 会在 hasUserSetCustomTask 时自动使用 userCustomTaskTitle
+    private func startFocusAfterBreakAutomatically() {
+        // 切换模式至番茄
+        currentMode = .singlePomodoro
+        isBreakFromPomodoro = false
+        // 使用“上次专注时间”作为本次会话临时时长
+        if lastPlannedPomodoroDuration > 0 {
+            currentSessionPomodoroTime = lastPlannedPomodoroDuration
+        } else {
+            currentSessionPomodoroTime = getCurrentPomodoroTime()
+        }
+        // 初始化显示并开始计时
+        setupTimer()
+        timerState = .idle
+        startTimer(with: "")
     }
 
     // 回到番茄模式
@@ -590,10 +637,15 @@ class TimerModel: ObservableObject {
     // MARK: - 设置持久化
 
     private func saveSettings() {
+        if isLoadingSettings {
+            return
+        }
         userDefaults.set(pomodoroTime, forKey: pomodoroTimeKey)
         userDefaults.set(shortBreakTime, forKey: shortBreakTimeKey)
         userDefaults.set(longBreakTime, forKey: longBreakTimeKey)
         userDefaults.set(autoStartBreak, forKey: autoStartBreakKey)
+        userDefaults.set(autoStartFocusAfterBreak, forKey: autoStartFocusAfterBreakKey)
+        print("💾 Saved settings: autoStartBreak=\(autoStartBreak), autoStartFocusAfterBreak=\(autoStartFocusAfterBreak)")
     }
 
     private func loadSettings() {
@@ -614,8 +666,16 @@ class TimerModel: ObservableObject {
         }
 
         // 加载自动休息设置
-        if userDefaults.object(forKey: autoStartBreakKey) != nil {
-            autoStartBreak = userDefaults.bool(forKey: autoStartBreakKey)
+        autoStartBreak = userDefaults.bool(forKey: autoStartBreakKey)
+        // 加载休息后自动专注设置
+        autoStartFocusAfterBreak = userDefaults.bool(forKey: autoStartFocusAfterBreakKey)
+        print("📥 Loaded settings: autoStartBreak=\(autoStartBreak), autoStartFocusAfterBreak=\(autoStartFocusAfterBreak)")
+        // 加载“上次设定的番茄时间”
+        let savedLastDuration = userDefaults.double(forKey: lastPlannedPomodoroDurationKey)
+        if savedLastDuration > 0 {
+            lastPlannedPomodoroDuration = savedLastDuration
+        } else {
+            lastPlannedPomodoroDuration = pomodoroTime
         }
     }
 }
