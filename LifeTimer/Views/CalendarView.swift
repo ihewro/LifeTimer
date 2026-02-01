@@ -4466,14 +4466,14 @@ struct GlassEffectBackground: View {
         Group {
             #if os(macOS)
             // macOS 使用材质效果，为未来的 glassEffect 做准备
-//            if #available(macOS 26.0, *) {
-               // 未来版本可以使用 glassEffect (当 API 可用时)
-               // Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
-//            } else {
+            if #available(macOS 26.0, *) {
+//                未来版本可以使用 glassEffect (当 API 可用时)
+                Color.clear.background(.clear).glassEffect(.regular, in:Rectangle())
+            } else {
                 // 当前版本使用增强的材质效果，模拟玻璃效果
                 Color.clear
                     .background(VisualEffectView(material: "sidebar", blendingMode: "behindWindow"))
-//            }
+            }
             #else
             // iOS 使用半透明材质效果
             Color.systemBackground

@@ -347,7 +347,7 @@ class TimerModel: ObservableObject {
         }
     }
     
-    private func completeTimer() {
+    private func completeTimer(shouldAutoStartBreak: Bool = true) {
         timerState = .completed
         timer?.invalidate()
         timer = nil
@@ -378,7 +378,7 @@ class TimerModel: ObservableObject {
 
         // 自动休息 / 自动专注逻辑
         if currentMode == .singlePomodoro {
-            if autoStartBreak {
+            if autoStartBreak && shouldAutoStartBreak {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     self.startBreakAutomatically()
                 }
@@ -618,7 +618,7 @@ class TimerModel: ObservableObject {
         timeRemaining = 0
 
         // 完成计时器
-        completeTimer()
+        completeTimer(shouldAutoStartBreak: false)
     }
 
     // 跳过休息，直接回到番茄模式的未开始状态
